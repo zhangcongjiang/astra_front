@@ -31,21 +31,8 @@
 
             <!-- 标签查询 -->
             <div class="tag-search" v-if="searchType === 'tag'">
-                <div class="tag-categories">
-                    <div class="tag-category" v-for="category in tagCategories" :key="category.id">
-                        <div class="category-title">{{ category.name }}：</div>
-                        <div class="tags">
-                            <a-tag v-for="tag in category.tags" :key="tag.id"
-                                :color="selectedTags.includes(tag.id) ? 'blue' : 'default'" @click="toggleTag(tag.id)">
-                                {{ tag.name }}
-                            </a-tag>
-                        </div>
-                    </div>
-                </div>
-                <div class="tag-search-actions">
-                    <a-button type="primary" @click="handleSearch">查询</a-button>
-                    <a-button @click="clearTags">清空</a-button>
-                </div>
+                <TagSearch :tags="tagCategories" :showActions="true" v-model:selectedTags="selectedTags"
+                    @search="handleSearch" />
             </div>
         </div>
 
@@ -125,6 +112,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { UploadOutlined, LeftCircleOutlined, RightCircleOutlined } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
 import Pagination from '@/components/Pagination.vue';
+import TagSearch from '@/components/TagSearch.vue';
 
 // 搜索类型
 const searchType = ref('basic');
@@ -578,109 +566,109 @@ onUnmounted(() => {
 }
 
 .preview-image-wrapper {
-  position: relative;
-  max-width: 90vw;
-  margin: 0 auto;
-  text-align: center;
+    position: relative;
+    max-width: 90vw;
+    margin: 0 auto;
+    text-align: center;
 }
 
 .preview-image {
-  object-fit: contain;
-  display: block;
-  margin: 0 auto;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
-  transition: all 0.3s ease;
-  background-color: #fff;
-  padding: 8px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    background-color: #fff;
+    padding: 8px;
 }
 
 .preview-meta {
-  margin-top: 16px;
-  text-align: center;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 12px;
-  border-radius: 4px;
+    margin-top: 16px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 12px;
+    border-radius: 4px;
 }
 
 .preview-title {
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 8px;
 }
 
 .preview-info {
-  margin-bottom: 8px;
-  color: #666;
+    margin-bottom: 8px;
+    color: #666;
 }
 
 .preview-info span {
-  margin-right: 16px;
+    margin-right: 16px;
 }
 
 .preview-tags {
-  margin-top: 8px;
+    margin-top: 8px;
 }
 
 
 .preview-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.8);
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1;
-  transition: all 0.3s;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    transition: all 0.3s;
 }
 
 .preview-nav:hover {
-  color: #fff;
-  background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    background: rgba(0, 0, 0, 0.5);
 }
 
 .preview-prev {
-  left: 20px;
+    left: 20px;
 }
 
 .preview-next {
-  right: 20px;
+    right: 20px;
 }
 
 /* 响应式调整 */
 @media (max-width: 768px) {
-  .preview-nav {
-    width: 30px;
-    height: 30px;
-  }
-  
-  .preview-prev {
-    left: 10px;
-  }
-  
-  .preview-next {
-    right: 10px;
-  }
-  
-  .preview-meta {
-    padding: 8px;
-  }
-  
-  .preview-title {
-    font-size: 16px;
-  }
-  
-  .preview-info span {
-    display: block;
-    margin-right: 0;
-    margin-bottom: 4px;
-  }
+    .preview-nav {
+        width: 30px;
+        height: 30px;
+    }
+
+    .preview-prev {
+        left: 10px;
+    }
+
+    .preview-next {
+        right: 10px;
+    }
+
+    .preview-meta {
+        padding: 8px;
+    }
+
+    .preview-title {
+        font-size: 16px;
+    }
+
+    .preview-info span {
+        display: block;
+        margin-right: 0;
+        margin-bottom: 4px;
+    }
 }
 
 @media (max-width: 576px) {
