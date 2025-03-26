@@ -3,7 +3,7 @@
         <!-- 顶部导航栏（包含Logo和一级菜单） -->
         <div class="top-nav">
             <!-- Logo区域 -->
-            <div class="logo-container">
+            <div class="logo-container"  @click="goToDashboard">
                 <img src="@/assets/logo.png" alt="Logo" class="logo">
                 <span class="logo-text">ASTRA</span>
             </div>
@@ -94,6 +94,13 @@ const menuData = [
     }
 ];
 
+const goToDashboard = () => {
+
+    activeTopMenu.value = 0;
+    activeLeftMenu.value = 0;
+    
+};
+
 // 当前选中的一级菜单索引
 const activeTopMenu = ref(0);
 // 当前选中的二级菜单索引
@@ -168,7 +175,11 @@ const selectLeftMenu = (index) => {
 }
 
 .logo-container:hover {
-    opacity: 0.9;
+    opacity: 0.8;
+}
+
+.logo-container:active {
+    transform: scale(0.98);
 }
 
 .logo {
