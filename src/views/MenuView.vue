@@ -1,0 +1,282 @@
+<template>
+    <div class="app-container">
+        <!-- 顶部导航栏（包含Logo和一级菜单） -->
+        <div class="top-nav">
+            <!-- Logo区域 -->
+            <div class="logo-container">
+                <img src="@/assets/logo.png" alt="Logo" class="logo">
+                <span class="logo-text">ASTRA</span>
+            </div>
+
+            <!-- 一级菜单 -->
+            <div class="top-menu">
+                <div v-for="(item, index) in topMenu" :key="item.id" class="top-menu-item"
+                    :class="{ 'active': activeTopMenu === index }" @click="selectTopMenu(index)">
+                    {{ item.name }}
+                </div>
+            </div>
+        </div>
+
+        <!-- 主体内容区 -->
+        <div class="main-content">
+            <!-- 左侧二级菜单 -->
+            <div class="left-menu">
+                <div v-for="(item, index) in leftMenu" :key="item.id" class="left-menu-item"
+                    :class="{ 'active': activeLeftMenu === index }" @click="selectLeftMenu(index)">
+                    {{ item.name }}
+                </div>
+            </div>
+
+            <!-- 右侧内容区 -->
+            <div class="content">
+                <h2>{{ currentContentTitle }}</h2>
+                <div class="content-body">
+                    {{ currentContent }}
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script setup>
+import { ref, computed } from 'vue';
+
+// 菜单数据
+const menuData = [
+    {
+        id: 1,
+        name: '工作台',
+        children: [
+            { id: 11, name: '工作台', content: '这里是用户工作台...' }
+        ]
+    },
+    {
+        id: 2,
+        name: '图像管理',
+        children: [
+            { id: 21, name: '图片列表', content: '这里是用户收集的普通图片...' },
+            { id: 22, name: '背景图片', content: '这里是用户可能使用到的背景图片...' }
+        ]
+    },
+    {
+        id: 3,
+        name: '音频管理',
+        children: [
+            { id: 31, name: '背景音乐', content: '这里是背景音乐的内容...' },
+            { id: 32, name: '声音特效', content: '这里是声音特效的内容...' },
+            { id: 33, name: '音色管理', content: '这里是朗读者音色的内容...' },
+        ]
+    },
+    {
+        id: 4,
+        name: '视频管理',
+        children: [
+            { id: 41, name: '视频模板', content: '这里是视频管理的内容...' },
+            { id: 42, name: '沙雕动画', content: '这里是沙雕动画的内容...' },
+            { id: 43, name: '数据可视化', content: '这里是数据列表动态生成视频的模板内容...' },
+        ]
+    },
+    {
+        id: 5,
+        name: '个人中心',
+        children: [
+            { id: 51, name: '我的图片', content: '这里是平台生成的图片内容...' },
+            { id: 52, name: '我的音频', content: '这里是平台生成的音频内容...' },
+            { id: 53, name: '我的视频', content: '这里是平台生成的视频内容...' }
+        ]
+    },
+    {
+        id: 6,
+        name: '系统设置',
+        children: [
+            { id: 61, name: '系统设置', content: '这里是系统设置内容...' }
+        ]
+    }
+];
+
+// 当前选中的一级菜单索引
+const activeTopMenu = ref(0);
+// 当前选中的二级菜单索引
+const activeLeftMenu = ref(0);
+
+// 顶部一级菜单
+const topMenu = computed(() => {
+    return menuData.map(item => ({
+        id: item.id,
+        name: item.name
+    }));
+});
+
+// 左侧二级菜单
+const leftMenu = computed(() => {
+    return menuData[activeTopMenu.value]?.children || [];
+});
+
+// 当前内容标题
+const currentContentTitle = computed(() => {
+    return leftMenu.value[activeLeftMenu.value]?.name || '';
+});
+
+// 当前内容
+const currentContent = computed(() => {
+    return leftMenu.value[activeLeftMenu.value]?.content || '';
+});
+
+// 选择一级菜单
+const selectTopMenu = (index) => {
+    activeTopMenu.value = index;
+    activeLeftMenu.value = 0; // 重置二级菜单选中项
+};
+
+// 选择二级菜单
+const selectLeftMenu = (index) => {
+    activeLeftMenu.value = index;
+};
+</script>
+
+<style scoped>
+/* 基础布局 */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    font-family: 'Arial', sans-serif;
+}
+
+/* 顶部导航栏样式 */
+.top-nav {
+    display: flex;
+    height: 60px;
+    background-color: #2c3e50;
+    color: white;
+    align-items: center;
+    padding: 0 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 10;
+}
+
+/* Logo区域样式 */
+.logo-container {
+    display: flex;
+    align-items: center;
+    margin-right: 40px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.logo-container:hover {
+    opacity: 0.9;
+}
+
+.logo {
+    width: 36px;
+    height: 36px;
+    margin-right: 10px;
+    object-fit: contain;
+}
+
+.logo-text {
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffffff;
+    letter-spacing: 1px;
+}
+
+/* 一级菜单样式 */
+.top-menu {
+    display: flex;
+    height: 100%;
+}
+
+.top-menu-item {
+    padding: 0 20px;
+    line-height: 60px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 15px;
+    position: relative;
+}
+
+.top-menu-item:hover {
+    background-color: #34495e;
+}
+
+.top-menu-item.active {
+    background-color: #1abc9c;
+}
+
+.top-menu-item.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background-color: #ffffff;
+}
+
+/* 主体内容区 */
+.main-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* 左侧菜单样式 */
+.left-menu {
+    width: 220px;
+    background-color: #ffffff;
+    border-right: 1px solid #eaeaea;
+    overflow-y: auto;
+    padding: 10px 0;
+}
+
+.left-menu-item {
+    padding: 12px 25px;
+    cursor: pointer;
+    transition: all 0.3s;
+    color: #555;
+    font-size: 14px;
+    border-left: 3px solid transparent;
+}
+
+.left-menu-item:hover {
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+.left-menu-item.active {
+    background-color: #f0f9ff;
+    color: #1abc9c;
+    border-left: 3px solid #1abc9c;
+    font-weight: 500;
+}
+
+/* 内容区域样式 */
+.content {
+    flex: 1;
+    padding: 25px;
+    overflow-y: auto;
+    background-color: #f9f9f9;
+}
+
+.content h2 {
+    margin-bottom: 20px;
+    color: #2c3e50;
+    font-size: 22px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.content-body {
+    line-height: 1.8;
+    color: #555;
+    padding: 10px;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+</style>
