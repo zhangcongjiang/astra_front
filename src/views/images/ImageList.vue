@@ -26,6 +26,15 @@
               @pressEnter="handleSearch"
             />
           </a-form-item>
+          <a-form-item label="创建时间">
+            <a-range-picker
+              v-model:value="basicForm.dateRange"
+              :show-time="{ format: 'HH:mm' }"
+              format="YYYY-MM-DD HH:mm"
+              :placeholder="['开始时间', '结束时间']"
+              @change="handleDateChange"
+            />
+          </a-form-item>
           <a-form-item>
             <a-button type="primary" @click="handleSearch">查询</a-button>
             <a-button @click="resetBasicSearch">重置</a-button>
@@ -72,49 +81,54 @@
       </a-upload>
     </div>
 
-    <!-- 图片列表 -->
+    <!-- 图片列表 - 响应式5列布局 -->
     <div class="image-grid">
-      <a-row :gutter="[16, 16]">
-        <a-col :span="6" v-for="image in currentPageImages" :key="image.id">
-          <a-card hoverable class="image-card">
-            <template #cover>
-              <img :src="image.url" class="image-preview" />
-            </template>
-            <a-card-meta :title="image.name">
-              <template #description>
-                <div class="image-meta">
-                  <div>上传者: {{ image.uploader }}</div>
-                  <div>上传时间: {{ image.uploadTime }}</div>
-                  <div class="image-tags">
-                    <a-tag v-for="tag in image.tags" :key="tag" color="blue">{{ tag }}</a-tag>
-                  </div>
+    <a-row :gutter="[16, 16]">
+      <a-col 
+        v-for="image in currentPageImages" 
+        :key="image.id"
+        :xs="24" :sm="12" :md="8" :lg="6" :xl="4.8"
+        class="image-col"
+      >
+        <a-card hoverable class="image-card">
+          <template #cover>
+            <img 
+              :src="image.url" 
+              class="image-preview"
+              :style="{ height: `${imageHeight}px` }"
+            />
+          </template>
+          <a-card-meta :title="image.name">
+            <template #description>
+              <div class="image-meta">
+                <div>上传者: {{ image.uploader }}</div>
+                <div>上传时间: {{ formatDate(image.uploadTime) }}</div>
+                <div class="image-tags">
+                  <a-tag v-for="tag in image.tags" :key="tag" color="blue">{{ tag }}</a-tag>
                 </div>
-              </template>
-            </a-card-meta>
-          </a-card>
-        </a-col>
-      </a-row>
-    </div>
+              </div>
+            </template>
+          </a-card-meta>
+        </a-card>
+      </a-col>
+    </a-row>
+  </div>
 
-    <!-- 分页 -->
-    <div class="pagination">
-      <a-pagination
-        v-model:current="pagination.current"
-        v-model:pageSize="pagination.pageSize"
-        :total="pagination.total"
-        :pageSizeOptions="['10', '20', '50', '100']"
-        show-size-changer
-        show-quick-jumper
-        @change="handlePageChange"
-        @showSizeChange="handlePageSizeChange"
-      />
-    </div>
+    <!-- 使用独立的分页组件 -->
+    <Pagination
+      v-model:current="pagination.current"
+      v-model:pageSize="pagination.pageSize"
+      :total="pagination.total"
+      @change="handlePaginationChange"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { UploadOutlined } from '@ant-design/icons-vue';
+import dayjs from 'dayjs';
+import Pagination from '@/components/Pagination.vue';
 
 // 搜索类型
 const searchType = ref('basic');
@@ -122,7 +136,10 @@ const searchType = ref('basic');
 // 基础查询表单
 const basicForm = reactive({
   name: '',
-  uploader: ''
+  uploader: '',
+  dateRange: [],
+  startTime: null,
+  endTime: null
 });
 
 // 标签数据
@@ -153,17 +170,7 @@ const tagCategories = ref([
 const selectedTags = ref([]);
 
 // 图片数据
-const imageData = ref([
-  {
-    id: 1,
-    name: '风景1.jpg',
-    url: 'https://example.com/image1.jpg',
-    uploader: '用户A',
-    uploadTime: '2023-05-10',
-    tags: ['风景', '绿色']
-  },
-  // 更多图片数据...
-]);
+const imageData = ref(generateMockImages(50));
 
 // 分页配置
 const pagination = reactive({
@@ -171,6 +178,25 @@ const pagination = reactive({
   pageSize: 10,
   total: 0
 });
+
+// 图片高度响应式设置
+const imageHeight = ref(200);
+
+// 窗口大小变化处理
+const handleResize = () => {
+  const width = window.innerWidth;
+  if (width < 576) {       // 超小屏幕 (手机)
+    imageHeight.value = 120;
+  } else if (width < 768) { // 小屏幕 (平板竖屏)
+    imageHeight.value = 150;
+  } else if (width < 992) { // 中等屏幕 (平板横屏)
+    imageHeight.value = 180;
+  } else if (width < 1200) { // 大屏幕 (小桌面)
+    imageHeight.value = 200;
+  } else {                 // 超大屏幕 (大桌面)
+    imageHeight.value = 220;
+  }
+};
 
 // 当前页显示的图片
 const currentPageImages = computed(() => {
@@ -181,12 +207,20 @@ const currentPageImages = computed(() => {
 
 // 过滤后的图片
 const filteredImages = computed(() => {
-  return imageData.value.filter(image => {
+  const filtered = imageData.value.filter(image => {
     // 基础查询过滤
     if (searchType.value === 'basic') {
-      const nameMatch = image.name.includes(basicForm.name);
-      const uploaderMatch = image.uploader.includes(basicForm.uploader);
-      return nameMatch && uploaderMatch;
+      const nameMatch = image.name.toLowerCase().includes(basicForm.name.toLowerCase());
+      const uploaderMatch = image.uploader.toLowerCase().includes(basicForm.uploader.toLowerCase());
+      let dateMatch = true;
+      
+      if (basicForm.startTime && basicForm.endTime) {
+        const imageDate = dayjs(image.uploadTime);
+        dateMatch = imageDate.isAfter(basicForm.startTime) && 
+                   imageDate.isBefore(basicForm.endTime);
+      }
+      
+      return nameMatch && uploaderMatch && dateMatch;
     }
     
     // 标签查询过滤
@@ -198,10 +232,42 @@ const filteredImages = computed(() => {
     
     return true;
   });
+
+  // 更新分页总数
+  pagination.total = filtered.length;
+  return filtered;
 });
 
-// 初始化分页总数
-pagination.total = imageData.value.length;
+// 生成模拟图片数据
+function generateMockImages(count) {
+  const mockImages = [];
+  const types = ['风景', '人物', '动物', '建筑'];
+  const colors = ['红色', '蓝色', '绿色', '黑白'];
+  const uploaders = ['用户A', '用户B', '用户C', '用户D'];
+  
+  for (let i = 1; i <= count; i++) {
+    const randomType = types[Math.floor(Math.random() * types.length)];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    
+    mockImages.push({
+      id: i,
+      name: `${randomType}${i}.jpg`,
+      url: `https://picsum.photos/id/${Math.floor(Math.random() * 1000)}/300/200`,
+      uploader: uploaders[Math.floor(Math.random() * uploaders.length)],
+      uploadTime: dayjs().subtract(Math.floor(Math.random() * 30), 'day').format('YYYY-MM-DD'),
+      tags: [randomType, randomColor]
+    });
+  }
+  
+  return mockImages;
+}
+
+// 格式化日期
+const formatDate = (date) => {
+  return dayjs(date).format('YYYY-MM-DD HH:mm');
+};
+
+
 
 // 切换标签
 const toggleTag = (tagId) => {
@@ -221,25 +287,33 @@ const clearTags = () => {
 // 搜索
 const handleSearch = () => {
   pagination.current = 1;
-  pagination.total = filteredImages.value.length;
+};
+
+// 日期范围变化处理
+const handleDateChange = (dates) => {
+  if (dates && dates.length === 2) {
+    basicForm.startTime = dates[0];
+    basicForm.endTime = dates[1];
+  } else {
+    basicForm.startTime = null;
+    basicForm.endTime = null;
+  }
 };
 
 // 重置基础查询
 const resetBasicSearch = () => {
   basicForm.name = '';
   basicForm.uploader = '';
+  basicForm.dateRange = [];
+  basicForm.startTime = null;
+  basicForm.endTime = null;
   handleSearch();
 };
 
-// 分页变化
-const handlePageChange = (page, pageSize) => {
-  pagination.current = page;
+// 分页变化处理
+const handlePaginationChange = ({ current, pageSize }) => {
+  pagination.current = current;
   pagination.pageSize = pageSize;
-};
-
-// 每页数量变化
-const handlePageSizeChange = (current, size) => {
-  pagination.pageSize = size;
 };
 
 // 上传处理
@@ -253,14 +327,25 @@ const handleUploadChange = (info) => {
       name: info.file.name,
       url: URL.createObjectURL(info.file.originFileObj),
       uploader: '当前用户',
-      uploadTime: new Date().toLocaleDateString(),
+      uploadTime: new Date().toISOString(),
       tags: []
     });
-    pagination.total = imageData.value.length;
   } else if (info.file.status === 'error') {
     message.error(`${info.file.name} 上传失败`);
   }
 };
+
+// 初始化
+onMounted(() => {
+  handleResize();
+  window.addEventListener('resize', handleResize);
+  // 初始化分页总数
+  pagination.total = imageData.value.length;
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize);
+});
 </script>
 
 <style scoped>
@@ -276,9 +361,14 @@ const handleUploadChange = (info) => {
   padding: 16px;
   background: #fff;
   border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .search-header {
+  margin-bottom: 16px;
+}
+
+.basic-search .ant-form-item {
   margin-bottom: 16px;
 }
 
@@ -294,10 +384,14 @@ const handleUploadChange = (info) => {
 .category-title {
   width: 80px;
   font-weight: bold;
+  flex-shrink: 0;
 }
 
 .tags {
   flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .tag-search-actions {
@@ -315,15 +409,43 @@ const handleUploadChange = (info) => {
   margin-bottom: 20px;
 }
 
+.image-col {
+  /* 基础宽度 */
+  width: 20%;
+  /* 响应式调整 */
+  @media (max-width: 1200px) {
+    width: 25%; /* 4列 */
+  }
+  @media (max-width: 992px) {
+    width: 33.333%; /* 3列 */
+  }
+  @media (max-width: 768px) {
+    width: 50%; /* 2列 */
+  }
+  @media (max-width: 576px) {
+    width: 100%; /* 1列 */
+  }
+}
+
 .image-card {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s;
   border-radius: 8px;
   overflow: hidden;
 }
 
+.image-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
 .image-preview {
   width: 100%;
-  height: 180px;
   object-fit: cover;
+  transition: height 0.3s;
 }
 
 .image-meta {
@@ -333,12 +455,26 @@ const handleUploadChange = (info) => {
 
 .image-tags {
   margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
-.pagination {
-  text-align: center;
-  padding: 16px 0;
-  background: #fff;
-  border-radius: 4px;
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .basic-search .ant-form-item {
+    width: 100%;
+    margin-right: 0;
+  }
+  
+  .category-title {
+    width: 60px;
+  }
+}
+
+@media (max-width: 576px) {
+  .image-card {
+    margin-bottom: 16px;
+  }
 }
 </style>
