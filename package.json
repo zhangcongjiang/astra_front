@@ -9,7 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+<<<<<<< HEAD
     "ant-design-vue": "^4.0.0-rc.6",
+=======
+>>>>>>> 3d56150eebdeb707d19a5324842d0a2a43e684b2
     "element-plus": "^2.9.7",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
