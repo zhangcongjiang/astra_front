@@ -175,7 +175,7 @@ const selectLeftMenu = (index) => {
 .logo-container {
     display: flex;
     align-items: center;
-    margin-right: 40px;
+    margin-right: 50px;
     cursor: pointer;
     transition: all 0.3s;
 }
@@ -213,7 +213,7 @@ const selectLeftMenu = (index) => {
     line-height: 60px;
     cursor: pointer;
     transition: all 0.3s;
-    font-size: 15px;
+    font-size: 18px;
     position: relative;
 }
 
@@ -244,7 +244,7 @@ const selectLeftMenu = (index) => {
 
 /* 左侧菜单样式 */
 .left-menu {
-    width: 220px;
+    width: 184px;
     background-color: #ffffff;
     border-right: 1px solid #eaeaea;
     overflow-y: auto;
@@ -256,7 +256,7 @@ const selectLeftMenu = (index) => {
     cursor: pointer;
     transition: all 0.3s;
     color: #555;
-    font-size: 14px;
+    font-size: 18px;
     border-left: 3px solid transparent;
 }
 
