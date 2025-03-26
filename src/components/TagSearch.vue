@@ -18,7 +18,7 @@
             <div class="box box2">
                 <div class="level-label">二级标签：</div>
                 <div class="tags-container">
-                    <template v-for="tag in secondLevelTags" :key="tag.id">
+                    <template v-for="tag in showHoverPreview ? hoverSecondLevelTags : secondLevelTags" :key="tag.id">
                         <a-checkable-tag :checked="selectedTags.includes(tag.id)"
                             @change="checked => handleSecondLevelChange(tag.id, checked)">
                             {{ tag.name }}
@@ -55,24 +55,33 @@ const emit = defineEmits(['search', 'update:selectedTags']);
 const selectedFirstLevelTags = ref([]); // 选中的一级标签
 const secondLevelTags = ref([]); // 当前显示的二级标签
 const selectedTags = ref([]); // 选中的二级标签
+const hoverSecondLevelTags = ref([]); // 悬停时预览的二级标签
+const showHoverPreview = ref(false); // 是否显示悬停预览
 
-// 鼠标悬停一级标签时显示对应的二级标签
+// 鼠标悬停一级标签时显示对应的二级标签预览
 const hoverFirstLevelTag = (category) => {
     if (category.tags && category.tags.length) {
-        secondLevelTags.value = category.tags;
-    } else {
-        secondLevelTags.value = [];
+        hoverSecondLevelTags.value = category.tags;
+        showHoverPreview.value = true;
     }
+};
+
+// 更新显示的二级标签（合并所有选中一级标签的二级标签）
+const updateSecondLevelTags = () => {
+    const allSecondLevelTags = [];
+    props.tags.forEach(category => {
+        if (selectedFirstLevelTags.value.includes(category.id) && category.tags?.length) {
+            allSecondLevelTags.push(...category.tags);
+        }
+    });
+    secondLevelTags.value = allSecondLevelTags;
+    showHoverPreview.value = false; // 取消悬停预览
 };
 
 // 一级标签选择变化
 const handleFirstLevelChange = (category, checked) => {
     if (checked) {
         selectedFirstLevelTags.value.push(category.id);
-        // 如果该分类有二级标签，自动显示
-        if (category.tags && category.tags.length) {
-            secondLevelTags.value = category.tags;
-        }
     } else {
         const index = selectedFirstLevelTags.value.indexOf(category.id);
         if (index > -1) {
@@ -86,6 +95,7 @@ const handleFirstLevelChange = (category, checked) => {
             emit('update:selectedTags', selectedTags.value);
         }
     }
+    updateSecondLevelTags();
 };
 
 // 二级标签选择变化
@@ -106,12 +116,15 @@ const clearTags = () => {
     selectedFirstLevelTags.value = [];
     selectedTags.value = [];
     secondLevelTags.value = [];
+    hoverSecondLevelTags.value = [];
+    showHoverPreview.value = false;
     emit('update:selectedTags', selectedTags.value);
     emit('search');
 };
 
 // 触发搜索
 const handleSearch = () => {
+    showHoverPreview.value = false; // 取消悬停预览
     emit('search');
 };
 
@@ -135,26 +148,21 @@ watch(() => props.tags, () => {
 <style scoped>
 .tag-search-container {
     background: #fff;
-    padding: 16px;
-    border-radius: 4px;
-    /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); */
+    padding: 5px;
 }
 
 .box {
     display: flex;
     gap: 16px;
-    /* 增加标签与标签名之间的间距 */
 }
 
 .level-label {
     font-weight: bold;
     white-space: nowrap;
     width: 100px;
-    /* 稍微增加宽度 */
     flex-shrink: 0;
     padding-top: 4px;
-    margin-right: 5px;
-    /* 与标签对齐 */
+    margin-right: 6px;
 }
 
 .tags-container {
@@ -164,7 +172,6 @@ watch(() => props.tags, () => {
     display: flex;
     flex-wrap: wrap;
     gap: 5px;
-    /* 水平间距12px，垂直间距8px */
     align-items: flex-start;
 }
 
@@ -187,17 +194,14 @@ watch(() => props.tags, () => {
 /* 可选中标签样式 */
 :deep(.ant-tag-checkable) {
     height: 32px;
-    /* 稍微增加高度 */
     line-height: 30px;
     border: 1px solid #e8e8e8;
     border-radius: 6px;
     font-size: 14px;
     padding: 0 12px;
-    /* 增加内边距 */
     position: relative;
     overflow: hidden;
     margin: 2px 0;
-    /* 上下留出空间 */
 }
 
 .box>div:first-child {
@@ -246,12 +250,13 @@ watch(() => props.tags, () => {
 }
 
 :deep(.ant-tag-checkable.has-child) {
-    border: 1px solid rgba(85, 167, 34, 0.8);
+    border: 1px solid #e8e8e8;
 }
 
 :deep(.ant-tag-checkable-checked) {
-    background: rgba(85, 167, 34, 0.1);
-    border: 1px solid #55a722;
+    background: transparent !important;
+    border: 1px solid #1abc9c !important;
+    color: rgba(0, 0, 0, 0.85) !important;
 }
 
 :deep(.ant-tag-checkable-checked::before) {
@@ -267,8 +272,9 @@ watch(() => props.tags, () => {
 }
 
 :deep(.ant-tag-checkable:hover) {
-    background: rgba(85, 167, 34, 0.2) !important;
-    border: 1px solid rgba(85, 167, 34, 0.2) !important;
+    background: transparent !important;
+    border: 1px solid #e8e8e8 !important;
+    color: rgba(0, 0, 0, 0.85) !important;
 }
 
 /* 响应式调整 */
