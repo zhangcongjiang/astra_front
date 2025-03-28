@@ -5,9 +5,10 @@ import MusicList from '@/views/musics/MusicList.vue'
 import VideoTemplateList from '@/views/videos/VideoTemplateList.vue'
 import VideoTemplateApply from '@/views/videos/VideoTemplateApply.vue'
 import BackgroundList from '@/views/images/BackgroundList.vue'
-import VideoList from '@/views/videos/VideoList.vue'
+import MyVideo from '@/views/videos/MyVideo.vue'
 import EffectList from '@/views/musics/EffectList.vue'
 import VoiceList from '@/views/musics/VoiceList.vue'
+import MySound from '@/views/musics/MySound.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -73,12 +74,12 @@ const router = createRouter({
                 }, {
                     path: 'my-sounds',
                     name: 'my-sounds',
-                    component: () => import('../views/Dashboard.vue') // 工作台组件
+                    component: MySound // 工作台组件
                 },
                 {
                     path: 'my-videos',
                     name: 'my-videos',
-                    component: VideoList // 工作台组件
+                    component: MyVideo // 工作台组件
                 },
                 {
                     path: 'system',

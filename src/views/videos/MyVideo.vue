@@ -8,8 +8,8 @@
           <a-input v-model:value="basicForm.title" placeholder="输入标题" @pressEnter="handleSearch" />
         </a-form-item>
         <a-form-item label="创作时间">
-          <a-range-picker v-model:value="basicForm.dateRange" :show-time="{ format: 'HH:mm' }"
-            format="YYYY-MM-DD HH:mm" :placeholder="['开始时间', '结束时间']" @change="handleDateChange" />
+          <a-range-picker v-model:value="basicForm.dateRange" :show-time="{ format: 'HH:mm' }" format="YYYY-MM-DD HH:mm"
+            :placeholder="['开始时间', '结束时间']" @change="handleDateChange" />
         </a-form-item>
         <a-form-item>
           <a-button type="primary" @click="handleSearch">查询</a-button>
@@ -20,21 +20,12 @@
 
     <!-- 数据表格 -->
     <n-card>
-      <n-data-table
-        :columns="columns"
-        :data="filteredData"
-        :pagination="false"
-        :loading="loading"
-      />
+      <n-data-table :columns="columns" :data="filteredData" :pagination="false" :loading="loading" />
     </n-card>
-    
+
     <!-- 分页组件 -->
-    <Pagination
-      v-model:current="currentPage"
-      v-model:pageSize="pageSize"
-      :total="filteredData.length"
-      @change="handlePageChange"
-    />
+    <Pagination v-model:current="currentPage" v-model:pageSize="pageSize" :total="filteredData.length"
+      @change="handlePageChange" />
   </div>
 </template>
 
@@ -61,7 +52,7 @@ const filteredData = computed(() => {
     if (basicForm.startTime && basicForm.endTime) {
       const itemDate = new Date(item.createTime);
       matchesDate = itemDate >= new Date(basicForm.startTime) &&
-                   itemDate <= new Date(basicForm.endTime);
+        itemDate <= new Date(basicForm.endTime);
     }
 
     return matchesTitle && matchesDate;
@@ -135,15 +126,29 @@ const videoList = ref([
 ]);
 
 // 表格列配置
+// 在表格列定义中添加封面列
+// 调整表格列配置
 const columns = [
   {
     title: '序号',
     key: 'index',
-    render: (row, index) => index + 1
+    width: 60,
+    align: 'center',
+    render: (row, index) => (pagination.current - 1) * pagination.pageSize + index + 1
   },
   {
     title: '标题',
     key: 'title'
+  },
+  {
+    title: '封面',
+    key: 'cover',
+    width: 120,
+    align: 'center',
+    render: (row) => h('img', {
+      src: row.cover,
+      style: 'width: 100px; height: 60px; object-fit: cover; border-radius: 4px;'
+    })
   },
   {
     title: '生成进度',
@@ -207,11 +212,28 @@ const columns = [
     ]
   }
 ];
-
+// 在示例数据中添加封面字段
+const videoData = ref([
+  {
+    id: 1,
+    cover: 'https://example.com/cover1.jpg',
+    title: '视频1',
+    createTime: '2023-10-01',
+    audioProgress: 80,
+    videoProgress: 60,
+    params: {
+      // 视频参数
+    }
+  },
+  // 更多视频数据...
+]);
 // 分页配置
-const pagination = {
+// 分页相关
+const pagination = reactive({
+  current: 1,
   pageSize: 10
-};
+});
+
 
 // 显示详情
 const showDetail = (row) => {
