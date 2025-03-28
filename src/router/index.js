@@ -4,6 +4,7 @@ import ImageList from '@/views/images/ImageList.vue'
 import MusicList from '@/views/musics/MusicList.vue'
 import VideoTemplateList from '@/views/videos/VideoTemplateList.vue'
 import VideoTemplateApply from '@/views/videos/VideoTemplateApply.vue'
+import BackgroundList from '@/views/images/BackgroundList.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -27,7 +28,7 @@ const router = createRouter({
                 {
                     path: 'backgrounds',
                     name: 'backgrounds',
-                    component: () => import('../views/Dashboard.vue') // 工作台组件
+                    component: BackgroundList // 工作台组件
                 },
                 {
                     path: 'musics',
