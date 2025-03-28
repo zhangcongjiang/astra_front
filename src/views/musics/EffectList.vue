@@ -35,7 +35,34 @@
                     @search="handleSearch" />
             </div>
         </div>
+        <div class="action-area">
+            <a-button type="primary" @click="showUploadModal" style="float: right;">
+                <upload-outlined /> 上传音效
+            </a-button>
+        </div>
 
+        <!-- 上传音效模态框 -->
+        <a-modal v-model:visible="uploadModalVisible" title="上传音效" width="800px" :maskClosable="false"
+            @ok="handleUploadSubmit" @cancel="closeUploadModal">
+            <a-form :model="uploadForm" :label-col="{ span: 4 }" :wrapper-col="{ span: 20 }" ref="uploadFormRef">
+                <a-form-item label="音效名称" name="name" :rules="[{ required: true, message: '请输入音效名称' }]">
+                    <a-input v-model:value="uploadForm.name" placeholder="请输入音效名称" />
+                </a-form-item>
+                <a-form-item label="音效文件" name="audioFile" :rules="[{ required: true, message: '请上传音效文件' }]">
+                    <a-upload :beforeUpload="() => false" :showUploadList="false" @change="handleFileChange">
+                        <a-button>选择音效文件</a-button>
+                    </a-upload>
+                    <div v-if="uploadForm.audioFile" class="file-info">
+                        已选择: {{ uploadForm.audioFile.name }}
+                    </div>
+                </a-form-item>
+                <a-form-item label="标签">
+                    <TagSearch :tags="tagCategories" :show-actions="false" :allow-image-tagging="true"
+                        :image-tags="uploadForm.tags" @add-image-tag="addEffectTag"
+                        @remove-image-tag="removeEffectTag" />
+                </a-form-item>
+            </a-form>
+        </a-modal>
         <!-- 特效音列表 -->
         <div class="effect-table">
             <a-table :columns="columns" :dataSource="currentPageEffects" :pagination="false"
@@ -349,6 +376,44 @@ const togglePlay = (effect) => {
         isPlaying.value = true;
     }
 };
+// 在script setup中添加
+const uploadModalVisible = ref(false);
+const uploadForm = reactive({
+    name: '',
+    audioFile: null,
+    tags: []
+});
+const uploadFormRef = ref(null);
+
+const showUploadModal = () => {
+    uploadModalVisible.value = true;
+};
+
+const closeUploadModal = () => {
+    uploadModalVisible.value = false;
+    uploadFormRef.value?.resetFields();
+    uploadForm.audioFile = null;
+};
+
+const handleUploadSubmit = async () => {
+    try {
+        await uploadFormRef.value.validate();
+
+        effectData.value.unshift({
+            id: Date.now(),
+            name: uploadForm.name,
+            duration: await getAudioDuration(uploadForm.audioFile),
+            uploadTime: dayjs().format('YYYY-MM-DD HH:mm'),
+            audioUrl: URL.createObjectURL(uploadForm.audioFile),
+            tags: [...uploadForm.tags]
+        });
+
+        message.success('上传成功');
+        closeUploadModal();
+    } catch (error) {
+        console.error('表单验证失败:', error);
+    }
+};
 
 // 音频结束处理
 const handleAudioEnded = () => {
@@ -586,5 +651,15 @@ onUnmounted(() => {
 
 .play-bar3 {
     height: 16
+}
+
+.action-area {
+    margin-bottom: 20px;
+}
+
+.file-info {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #666;
 }
 </style>
