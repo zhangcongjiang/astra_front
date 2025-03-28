@@ -6,6 +6,7 @@ import VideoTemplateList from '@/views/videos/VideoTemplateList.vue'
 import VideoTemplateApply from '@/views/videos/VideoTemplateApply.vue'
 import BackgroundList from '@/views/images/BackgroundList.vue'
 import VideoList from '@/views/videos/VideoList.vue'
+import EffectList from '@/views/musics/EffectList.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -38,7 +39,7 @@ const router = createRouter({
                 }, {
                     path: 'effects',
                     name: 'effects',
-                    component: () => import('../views/Dashboard.vue') // 工作台组件
+                    component: EffectList // 工作台组件
                 },
                 {
                     path: 'speakers',
