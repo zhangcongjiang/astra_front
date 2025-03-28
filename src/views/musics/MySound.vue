@@ -6,6 +6,9 @@
         <a-form-item label="朗读者">
           <a-input v-model:value="searchForm.reader" placeholder="输入朗读者" @pressEnter="handleSearch" />
         </a-form-item>
+        <a-form-item label="关联视频">
+          <a-input v-model:value="searchForm.video" placeholder="输入关联视频" @pressEnter="handleSearch" />
+        </a-form-item>
         <a-form-item label="文本内容">
           <a-input v-model:value="searchForm.text" placeholder="输入文本内容" @pressEnter="handleSearch" />
         </a-form-item>
@@ -66,6 +69,7 @@ import Pagination from '@/components/Pagination.vue';
 // 搜索表单
 const searchForm = reactive({
   reader: '',
+  video: '',
   text: ''
 });
 
@@ -143,8 +147,9 @@ const currentPageSounds = computed(() => {
 const filteredSounds = computed(() => {
   const filtered = soundData.value.filter(sound => {
     const readerMatch = sound.reader.toLowerCase().includes(searchForm.reader.toLowerCase());
+    const videoMatch = sound.video.toLowerCase().includes(searchForm.video.toLowerCase());
     const textMatch = sound.text.toLowerCase().includes(searchForm.text.toLowerCase());
-    return readerMatch && textMatch;
+    return readerMatch && videoMatch && textMatch;
   });
 
   pagination.total = filtered.length;
@@ -166,6 +171,7 @@ const handleSearch = () => {
 // 重置搜索
 const resetSearch = () => {
   searchForm.reader = '';
+  searchForm.video = '';
   searchForm.text = '';
   handleSearch();
 };
