@@ -74,16 +74,6 @@
                 <template #name="{ record }">
                     <div class="effect-name-container">
                         <span class="effect-name-text">{{ record.name }}</span>
-                        <span class="play-icon-wrapper" @click.stop="togglePlay(record)">
-                            <span class="play-icon"
-                                :class="{ 'playing': currentPlaying.id === record.id && isPlaying }">
-                                <span class="play-bar play-bar1"></span>
-                                <span class="play-bar play-bar2"></span>
-                                <span class="play-bar play-bar3"></span>
-                            </span>
-                        </span>
-                        <audio :ref="'audioPlayer_' + record.id" :src="record.audioUrl" @ended="handleAudioEnded"
-                            hidden></audio>
                     </div>
                 </template>
 
@@ -102,15 +92,20 @@
                 </template>
 
                 <template #action="{ record }">
-                    <a-button type="link" size="small" @click="showEditModal(record)">
-                        <EditOutlined /> 编辑
-                    </a-button>
-                    <a-popconfirm title="确认要删除这个特效音吗？" ok-text="确认" cancel-text="取消"
-                        @confirm="() => deleteEffect(record.id)">
-                        <a-button type="link" size="small" danger>
-                            <DeleteOutlined /> 删除
+                    <div style="display: flex; gap: 4px;">
+                        <a-button type="link" size="small" @click="togglePlay(record)">
+                            播放
                         </a-button>
-                    </a-popconfirm>
+                        <a-button type="link" size="small" @click="showEditModal(record)">
+                            编辑
+                        </a-button>
+                        <a-popconfirm title="确认要删除这个特效音吗？" ok-text="确认" cancel-text="取消"
+                            @confirm="() => deleteEffect(record.id)">
+                            <a-button type="link" size="small" danger>
+                                删除
+                            </a-button>
+                        </a-popconfirm>
+                    </div>
                 </template>
             </a-table>
         </div>
