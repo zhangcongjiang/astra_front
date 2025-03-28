@@ -16,32 +16,38 @@
 
       <div class="params-section">
         <div class="params-display">
-          <h3>模板默认参数</h3>
+          <div class="params-header">
+            <h3>模板默认参数</h3>
+            <div class="header-placeholder"></div>
+          </div>
           <div class="json-display">
             <pre>{{ formattedDefaultParams }}</pre>
           </div>
         </div>
 
         <div class="params-editor">
-          <h3>自定义参数配置</h3>
-          <div class="editor-toolbar">
-            <a-button @click="formatJson">
-              <template #icon><HighlightOutlined /></template>
-              格式化
-            </a-button>
-            <a-button @click="resetParams">
-              <template #icon><ReloadOutlined /></template>
-              重置
-            </a-button>
-            <a-button 
-              type="primary" 
-              @click="handleApply"
-              :loading="applying"
-              class="apply-btn"
-            >
-              <template #icon><RocketOutlined /></template>
-              生成视频
-            </a-button>
+          <div class="params-header">
+            <h3>自定义参数配置</h3>
+            <div class="editor-toolbar">
+              <a-button @click="formatJson" size="small">
+                <template #icon><HighlightOutlined /></template>
+                格式化
+              </a-button>
+              <a-button @click="resetParams" size="small">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+              <a-button 
+                type="primary" 
+                @click="handleApply"
+                :loading="applying"
+                size="small"
+                class="apply-btn"
+              >
+                <template #icon><RocketOutlined /></template>
+                生成视频
+              </a-button>
+            </div>
           </div>
 
           <div class="json-editor">
@@ -340,48 +346,56 @@ const goToMyVideos = () => {
 .params-section {
   display: flex;
   gap: 24px;
+  align-items: stretch;
 }
 
 .params-display, .params-editor {
   flex: 1;
   min-width: 0;
-}
-
-.json-display {
-  padding: 12px;
-  background: #f5f5f5;
-  border-radius: 4px;
-  border: 1px solid #d9d9d9;
-  font-family: monospace;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.editor-toolbar {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+}
+
+.params-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 16px;
+  min-height: 32px;
 }
 
-.apply-btn {
-  margin-left: auto;
+.header-placeholder {
+  width: 200px; /* 与按钮组宽度匹配 */
 }
 
-.json-editor {
-  position: relative;
+.json-display, .json-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
-.json-editor textarea {
-  width: 100%;
-  min-height: 300px;
+.json-display pre, .json-editor textarea {
+  flex: 1;
+  min-height: 400px;
   padding: 12px;
   font-family: monospace;
   font-size: 14px;
   border: 1px solid #d9d9d9;
   border-radius: 4px;
   resize: none;
+  width: 100%;
+}
+
+.json-display {
+  background: #f5f5f5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-y: auto;
+}
+
+.editor-toolbar {
+  display: flex;
+  gap: 8px;
 }
 
 .error-tip {
@@ -417,6 +431,21 @@ const goToMyVideos = () => {
   
   .params-display, .params-editor {
     width: 100%;
+  }
+
+  .params-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .header-placeholder {
+    display: none;
+  }
+
+  .editor-toolbar {
+    width: 100%;
+    justify-content: flex-end;
   }
 }
 </style>
