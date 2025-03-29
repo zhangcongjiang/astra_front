@@ -1,261 +1,261 @@
 <template>
-  <!-- 数据统计 -->
-  <div class="data-section">
-    <n-grid :x-gap="16" :y-gap="16" cols="1 s:1 m:2 l:2 xl:2 2xl:2" responsive="screen">
-      <!-- 视频统计 -->
-      <n-gi>
-        <n-card :bordered="false" class="data-card">
-          <div class="card-header">
-            <h3>视频创作统计</h3>
-          </div>
-          <div class="data-grid">
-            <div class="data-item">
-              <div class="data-box">
-                <p class="label">今日</p>
-                <p class="value">{{ statistics.todayVideos }}</p>
-              </div>
-            </div>
-            <div class="data-item">
-              <div class="data-box">
-                <p class="label">本周</p>
-                <p class="value">{{ statistics.weekVideos }}</p>
-              </div>
-            </div>
-            <div class="data-item">
-              <div class="data-box">
-                <p class="label">本月</p>
-                <p class="value">{{ statistics.monthVideos }}</p>
-              </div>
-            </div>
-          </div>
-        </n-card>
-      </n-gi>
+  <div class="dashboard-container">
+    <!-- 欢迎区域 -->
+    <div class="welcome-section">
+      <h1>欢迎回来！</h1>
+      <p>这里是您的创作控制中心，快速开始您的工作</p>
+    </div>
 
-      <!-- 图片统计 -->
-      <n-gi>
-        <n-card :bordered="false" class="data-card">
-          <div class="card-header">
-            <h3>图片收集统计</h3>
+    <!-- 快捷操作区域 -->
+    <div class="quick-actions">
+      <h2>快捷操作</h2>
+      <div class="action-grid">
+        <el-card 
+          v-for="action in quickActions" 
+          :key="action.id" 
+          shadow="hover" 
+          class="action-card"
+          @click="handleQuickAction(action.path)"
+        >
+          <div class="action-content">
+            <el-icon :size="32" :color="action.color">
+              <component :is="action.icon" />
+            </el-icon>
+            <span>{{ action.name }}</span>
           </div>
-          <div class="data-grid">
-            <div class="data-item">
-              <div class="data-box">
-                <p class="label">今日</p>
-                <p class="value">{{ statistics.todayImages }}</p>
-              </div>
-            </div>
-            <div class="data-item">
-              <div class="data-box">
-                <p class="label">本周</p>
-                <p class="value">{{ statistics.weekImages }}</p>
-              </div>
-            </div>
-            <div class="data-item">
-              <div class="data-box">
-                <p class="label">本月</p>
-                <p class="value">{{ statistics.monthImages }}</p>
-              </div>
-            </div>
-          </div>
-        </n-card>
-      </n-gi>
+        </el-card>
+      </div>
+    </div>
 
-      <!-- 新增音频统计 -->
-      <n-gi>
-        <n-card :bordered="false" class="data-card">
-          <div class="card-header">
-            <h3>音频收集统计</h3>
-          </div>
-          <div class="data-grid">
-            <div class="data-item">
-              <div class="data-box">
-                <p class="label">今日</p>
-                <p class="value">{{ statistics.todayAudios }}</p>
-              </div>
+    <!-- 数据统计区域 -->
+    <div class="stats-section">
+      <h2>数据概览</h2>
+      <div class="stats-grid">
+        <el-card 
+          v-for="stat in stats" 
+          :key="stat.id" 
+          shadow="hover" 
+          class="stat-card"
+        >
+          <div class="stat-content">
+            <div class="stat-icon" :style="{ backgroundColor: stat.bgColor }">
+              <el-icon :size="24" color="white">
+                <component :is="stat.icon" />
+              </el-icon>
             </div>
-            <div class="data-item">
-              <div class="data-box">
-                <p class="label">本周</p>
-                <p class="value">{{ statistics.weekAudios }}</p>
-              </div>
-            </div>
-            <div class="data-item">
-              <div class="data-box">
-                <p class="label">本月</p>
-                <p class="value">{{ statistics.monthAudios }}</p>
-              </div>
+            <div class="stat-info">
+              <div class="stat-value">{{ stat.value }}</div>
+              <div class="stat-label">{{ stat.label }}</div>
             </div>
           </div>
-        </n-card>
-      </n-gi>
-    </n-grid>
-  </div>
+        </el-card>
+      </div>
+    </div>
 
-  <!-- 趋势图表 -->
-  <div class="chart-section">
-    <n-card :bordered="false">
-      <LineChart :data="chartData" />
-    </n-card>
+    <!-- 最近活动 -->
+    <div class="recent-activity">
+      <h2>最近活动</h2>
+      <el-timeline>
+        <el-timeline-item
+          v-for="(activity, index) in activities"
+          :key="index"
+          :timestamp="activity.time"
+          :color="activity.color"
+          placement="top"
+        >
+          <el-card>
+            <div class="activity-content">
+              <el-icon :size="20" :color="activity.color">
+                <component :is="activity.icon" />
+              </el-icon>
+              <span>{{ activity.content }}</span>
+            </div>
+          </el-card>
+        </el-timeline-item>
+      </el-timeline>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import { Video, Photo } from '@vicons/tabler';
-import LineChart from '@/components/LineChart.vue';
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import {
+  Picture,
+  Headset,
+  VideoCamera,
+  MagicStick,
+  DataLine,
+  User,
+  Setting,
+  Clock,
+  DocumentAdd,
+  Collection,
+  VideoPlay
+} from '@element-plus/icons-vue'
 
-// 数据定义
-const statistics = ref({
-  todayVideos: 12,
-  weekVideos: 85,
-  monthVideos: 346,
-  todayImages: 56,
-  weekImages: 280,
-  monthImages: 1200,
-  todayAudios: 18, // 新增音频数据
-  weekAudios: 120,
-  monthAudios: 480
-});
+const router = useRouter()
 
-const maxTotal = computed(() => Math.max(
-  statistics.value.todayVideos + statistics.value.todayImages,
-  (statistics.value.weekVideos + statistics.value.weekImages) / 7,
-  (statistics.value.monthVideos + statistics.value.monthImages) / 30
-));
+// 快捷操作
+const quickActions = ref([
+  { id: 1, name: '新建图片', icon: Picture, color: '#67C23A', path: '/images' },
+  { id: 2, name: '添加音乐', icon: Headset, color: '#409EFF', path: '/musics' },
+  { id: 3, name: '创建视频', icon: VideoCamera, color: '#E6A23C', path: '/templates' },
+  { id: 4, name: '特效制作', icon: MagicStick, color: '#F56C6C', path: '/effects' },
+  { id: 5, name: '数据可视化', icon: DataLine, color: '#909399', path: '/data-visuals' },
+  { id: 6, name: '个人中心', icon: User, color: '#9C27B0', path: '/my-videos' }
+])
 
-// 图表数据
-const chartData = ref({
-  labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-  datasets: [
-    {
-      label: '视频创作量',
-      data: [15, 20, 18, 25, 30, 22, 28],
-      borderColor: '#1890ff',
-      backgroundColor: 'rgba(24, 144, 255, 0.1)',
-      borderWidth: 2,
-      pointRadius: 4,
-      pointBackgroundColor: '#1890ff',
-      tension: 0.4
-    },
-    {
-      label: '图片收集量',
-      data: [50, 60, 55, 70, 80, 65, 75],
-      borderColor: '#36cfc9',
-      backgroundColor: 'rgba(54, 207, 201, 0.1)',
-      borderWidth: 2,
-      pointRadius: 4,
-      pointBackgroundColor: '#36cfc9',
-      tension: 0.4
-    },
-    {
-      label: '音频收集量',
-      data: [10, 15, 12, 18, 20, 16, 22], // 新增音频数据
-      borderColor: '#722ed1',
-      backgroundColor: 'rgba(114, 46, 209, 0.1)',
-      borderWidth: 2,
-      pointRadius: 4,
-      pointBackgroundColor: '#722ed1',
-      tension: 0.4
-    }
-  ]
-});
+// 统计数据
+const stats = ref([
+  { id: 1, label: '图片数量', value: '128', icon: Collection, bgColor: '#67C23A' },
+  { id: 2, label: '音频数量', value: '56', icon: Headset, bgColor: '#409EFF' },
+  { id: 3, label: '视频模板', value: '24', icon: VideoPlay, bgColor: '#E6A23C' },
+  { id: 4, label: '我的作品', value: '18', icon: DocumentAdd, bgColor: '#F56C6C' }
+])
 
-// 样式优化
-const progressColors = [
-  { color: '#36cfc9', percentage: 20 },
-  { color: '#1890ff', percentage: 50 },
-  { color: '#722ed1', percentage: 80 },
-  { color: '#f5222d', percentage: 100 }
-];
+// 最近活动
+const activities = ref([
+  { 
+    time: '2023-11-15 14:30', 
+    content: '创建了新的视频作品《秋日回忆》', 
+    icon: VideoCamera, 
+    color: '#409EFF' 
+  },
+  { 
+    time: '2023-11-14 10:15', 
+    content: '上传了5张背景图片', 
+    icon: Picture, 
+    color: '#67C23A' 
+  },
+  { 
+    time: '2023-11-13 16:45', 
+    content: '修改了系统音频设置', 
+    icon: Setting, 
+    color: '#909399' 
+  },
+  { 
+    time: '2023-11-12 09:20', 
+    content: '添加了3首背景音乐', 
+    icon: Headset, 
+    color: '#409EFF' 
+  }
+])
+
+const handleQuickAction = (path) => {
+  router.push(path)
+}
 </script>
 
-<style lang="less" scoped>
+<style scoped>
 .dashboard-container {
-  max-width: 1200px; // 限制最大宽度
-  margin: 0 auto; // 居中显示
-  padding: 32px; // 增加左右边距
-}
-
-.data-card {
-  background: #ffffff;
-  border-radius: 12px;
   padding: 20px;
-
-  .card-header {
-    padding-left: 24px; // 增加标题左边距
-    h3 {
-      font-size: 24px;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 20px;
-    }
-  }
-
-  .data-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-
-    .data-item {
-      &:nth-child(1) .data-box {
-        background: linear-gradient(135deg, #e6f7ff, #bae7ff);
-      }
-
-      &:nth-child(2) .data-box {
-        background: linear-gradient(135deg, #f6ffed, #d9f7be);
-      }
-
-      &:nth-child(3) .data-box {
-        background: linear-gradient(135deg, #fff7e6, #ffe7ba);
-      }
-
-      .data-box {
-        border-radius: 12px;
-        padding: 20px;
-        text-align: center;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-
-        &:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        .label {
-          font-size: 18px;
-          color: #666;
-          margin-bottom: 12px;
-        }
-
-        .value {
-          font-size: 32px;
-          font-weight: 700;
-          color: #1890ff;
-        }
-      }
-    }
-  }
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.chart-section {
-  margin-top: 32px; // 增加顶部间距
-  padding: 20px; // 增加内边距
+.welcome-section {
+  margin-bottom: 30px;
 }
 
-// 新增音频统计卡片样式
-.data-card:nth-child(3) {
-  .data-grid {
-    .data-item {
-      &:nth-child(1) .data-box {
-        background: linear-gradient(135deg, #f0f5ff, #d6e4ff);
-      }
-      &:nth-child(2) .data-box {
-        background: linear-gradient(135deg, #f9f0ff, #efdbff);
-      }
-      &:nth-child(3) .data-box {
-        background: linear-gradient(135deg, #fff0f6, #ffd6e7);
-      }
-    }
-  }
+.welcome-section h1 {
+  font-size: 28px;
+  color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.welcome-section p {
+  font-size: 16px;
+  color: #7f8c8d;
+}
+
+.quick-actions,
+.stats-section,
+.recent-activity {
+  margin-bottom: 30px;
+}
+
+h2 {
+  font-size: 20px;
+  color: #2c3e50;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.action-card {
+  cursor: pointer;
+  transition: transform 0.3s;
+}
+
+.action-card:hover {
+  transform: translateY(-5px);
+}
+
+.action-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+}
+
+.action-content span {
+  margin-top: 10px;
+  font-size: 16px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.stat-card {
+  padding: 15px;
+}
+
+.stat-content {
+  display: flex;
+  align-items: center;
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 15px;
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #7f8c8d;
+}
+
+.activity-content {
+  display: flex;
+  align-items: center;
+}
+
+.activity-content span {
+  margin-left: 10px;
 }
 </style>
