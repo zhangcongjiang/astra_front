@@ -9,6 +9,8 @@ import MyVideo from '@/views/videos/MyVideo.vue'
 import EffectList from '@/views/musics/EffectList.vue'
 import VoiceList from '@/views/musics/VoiceList.vue'
 import MySound from '@/views/musics/MySound.vue'
+import SystemSoundSettings from '@/views/settings/SystemSoundSettings.vue'
+import SystemVideoSettings from '@/views/settings/SystemVideoSettings.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -66,11 +68,6 @@ const router = createRouter({
                     path: 'data-visuals',
                     name: 'data-visuals',
                     component: () => import('../views/Dashboard.vue') // 工作台组件
-                },
-                {
-                    path: 'my-images',
-                    name: 'my-images',
-                    component: () => import('../views/Dashboard.vue') // 工作台组件
                 }, {
                     path: 'my-sounds',
                     name: 'my-sounds',
@@ -82,9 +79,14 @@ const router = createRouter({
                     component: MyVideo // 工作台组件
                 },
                 {
-                    path: 'system',
-                    name: 'system',
-                    component: () => import('../views/Dashboard.vue') // 工作台组件
+                    path: 'system-video',
+                    name: 'system-video',
+                    component: SystemVideoSettings // 修改为新的系统视频设置组件
+                },
+                {
+                    path: 'system-sound',
+                    name: 'system-sound',
+                    component: SystemSoundSettings // 修改为新的系统音频设置组件
                 },
                 // 其他子路由...
             ]

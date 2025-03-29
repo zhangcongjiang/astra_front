@@ -78,16 +78,17 @@ const menuData = [
         id: 5,
         name: '个人中心',
         children: [
-            { id: 51, name: '我的图片', content: '这里是平台生成的图片内容...', path: '/my-images' },
+            { id: 51, name: '我的视频', content: '这里是平台生成的视频内容...', path: '/my-videos' },
             { id: 52, name: '我的音频', content: '这里是平台生成的音频内容...', path: '/my-sounds' },
-            { id: 53, name: '我的视频', content: '这里是平台生成的视频内容...', path: '/my-videos' }
+
         ]
     },
     {
         id: 6,
         name: '系统设置',
         children: [
-            { id: 61, name: '系统设置', content: '这里是系统设置内容...', path: '/system' }
+            { id: 61, name: '视频设置', content: '这里是系统设置内容...', path: '/system-video' },
+            { id: 62, name: '音频设置', content: '这里是系统设置内容...', path: '/system-sound' }
         ]
     }
 ];
