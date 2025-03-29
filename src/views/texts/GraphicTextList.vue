@@ -1,14 +1,26 @@
 <template>
-  <div class="graphic-text-container">
+  <div class="graphic-container">
     <!-- 搜索区域 -->
     <div class="search-area">
       <a-form layout="inline" :model="searchForm">
         <a-form-item label="图文标题">
-          <a-input v-model:value="searchForm.title" placeholder="输入图文标题" @pressEnter="handleSearch" />
+          <a-input v-model:value="searchForm.title" placeholder="输入标题查询" allow-clear />
+        </a-form-item>
+        <a-form-item label="状态">
+          <a-select v-model:value="searchForm.status" placeholder="全部状态" style="width: 120px" allow-clear>
+            <a-select-option value="published">已发布</a-select-option>
+            <a-select-option value="draft">未发布</a-select-option>
+          </a-select>
         </a-form-item>
         <a-form-item>
-          <a-button type="primary" @click="handleSearch">查询</a-button>
-          <a-button @click="resetSearch">重置</a-button>
+          <a-button type="primary" @click="handleSearch">
+            <template #icon><search-outlined /></template>
+            查询
+          </a-button>
+          <a-button @click="resetSearch" style="margin-left: 8px">
+            <template #icon><redo-outlined /></template>
+            重置
+          </a-button>
         </a-form-item>
       </a-form>
     </div>
@@ -16,70 +28,104 @@
     <!-- 操作按钮 -->
     <div class="action-area">
       <a-button type="primary" @click="showAddModal">
-        <plus-outlined /> 新增图文
+        <template #icon><plus-outlined /></template>
+        新增图文
       </a-button>
-      <a-button @click="showImportModal" style="margin-left: 10px">
-        <import-outlined /> 导入Markdown
+      <a-button @click="showImportModal" style="margin-left: 12px">
+        <template #icon><import-outlined /></template>
+        导入Markdown
       </a-button>
     </div>
 
-    <!-- 图文列表表格 -->
-    <div class="table-container">
-      <a-table 
-        :columns="columns" 
-        :dataSource="currentPageData" 
-        :pagination="false"
-        rowKey="id"
-        bordered
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'cover'">
-            <a-image
-              :width="80"
-              :src="record.cover"
-              :preview="{
-                src: record.cover,
-              }"
-            />
-          </template>
-          <template v-if="column.key === 'action'">
-            <a-button type="link" @click="publishItem(record)">发布</a-button>
-            <a-button type="link" @click="editItem(record)">编辑</a-button>
-            <a-button type="link" danger @click="deleteItem(record.id)">删除</a-button>
-          </template>
-        </template>
-      </a-table>
+    <!-- 卡片展示区域 -->
+    <div class="card-container">
+      <a-empty v-if="dataList.length === 0" description="暂无数据" />
+      <a-row v-else :gutter="[16, 16]">
+        <a-col 
+          v-for="item in currentPageData" 
+          :key="item.id" 
+          :xs="24" 
+          :sm="12" 
+          :md="8" 
+          :lg="6"
+        >
+          <a-card hoverable class="graphic-card">
+            <template #cover>
+              <a-image
+                :src="item.cover || defaultCover"
+                :preview="{ src: item.cover || defaultCover }"
+                height="160px"
+                :fallback="defaultCover"
+              />
+            </template>
+            <a-card-meta :title="item.title">
+              <template #description>
+                <div class="meta-info">
+                  <a-tag :color="item.status === 'published' ? 'green' : 'orange'">
+                    {{ item.status === 'published' ? '已发布' : '未发布' }}
+                  </a-tag>
+                  <span class="create-time">
+                    {{ formatTime(item.createTime) }}
+                  </span>
+                </div>
+                <div class="content-preview">
+                  {{ getPreviewText(item.content) }}
+                </div>
+              </template>
+            </a-card-meta>
+            <template #actions>
+              <a-tooltip title="发布" v-if="item.status !== 'published'">
+                <a-button type="text" size="small" @click="publishItem(item)">
+                  <send-outlined />
+                </a-button>
+              </a-tooltip>
+              <a-tooltip title="编辑">
+                <a-button type="text" size="small" @click="editItem(item)">
+                  <edit-outlined />
+                </a-button>
+              </a-tooltip>
+              <a-tooltip title="删除">
+                <a-button type="text" size="small" danger @click="deleteItem(item)">
+                  <delete-outlined />
+                </a-button>
+              </a-tooltip>
+            </template>
+          </a-card>
+        </a-col>
+      </a-row>
+    </div>
 
-      <!-- 分页控制 -->
-      <div class="pagination">
-        <a-pagination
-          v-model:current="pagination.current"
-          v-model:pageSize="pagination.pageSize"
-          :total="pagination.total"
-          show-size-changer
-          @change="handlePaginationChange"
-        />
-      </div>
+    <!-- 分页 -->
+    <div class="pagination" v-if="pagination.total > 0">
+      <a-pagination
+        v-model:current="pagination.current"
+        v-model:pageSize="pagination.pageSize"
+        :total="pagination.total"
+        show-size-changer
+        show-quick-jumper
+        :show-total="total => `共 ${total} 条`"
+        @change="handlePageChange"
+      />
     </div>
 
     <!-- 新增/编辑模态框 -->
     <a-modal
       v-model:visible="modalVisible"
       :title="modalTitle"
+      width="80%"
+      :confirm-loading="confirmLoading"
       @ok="handleSubmit"
       @cancel="closeModal"
-      width="90%"
-      :bodyStyle="{ height: '70vh', overflow: 'auto' }"
     >
       <a-form :model="formState" layout="vertical">
-        <a-row :gutter="16">
+        <a-row :gutter="24">
           <a-col :span="12">
-            <a-form-item label="图文标题" required>
+            <a-form-item label="图文标题" name="title" required>
               <a-input v-model:value="formState.title" />
             </a-form-item>
             <a-form-item label="封面图片">
               <a-upload
-                v-model:file-list="coverFileList"
+                v-model:file-list="fileList"
                 list-type="picture-card"
                 :max-count="1"
                 :before-upload="beforeUpload"
@@ -97,10 +143,10 @@
                 />
               </a-upload>
             </a-form-item>
-            <a-form-item label="Markdown内容" required>
+            <a-form-item label="Markdown内容" name="content" required>
               <a-textarea
-                v-model:value="formState.markdown"
-                :rows="10"
+                v-model:value="formState.content"
+                :rows="15"
                 placeholder="输入Markdown格式内容"
               />
             </a-form-item>
@@ -117,7 +163,7 @@
     <!-- 导入Markdown模态框 -->
     <a-modal
       v-model:visible="importModalVisible"
-      title="导入Markdown"
+      title="导入Markdown文件"
       @ok="handleImport"
       @cancel="closeImportModal"
     >
@@ -129,10 +175,10 @@
         accept=".md,.markdown"
       >
         <p class="ant-upload-drag-icon">
-          <inbox-outlined></inbox-outlined>
+          <inbox-outlined />
         </p>
-        <p class="ant-upload-text">点击或拖拽Markdown文件到此处</p>
-        <p class="ant-upload-hint">支持单个.md或.markdown文件</p>
+        <p class="ant-upload-text">点击或拖拽文件到此处上传</p>
+        <p class="ant-upload-hint">仅支持Markdown文件(.md/.markdown)</p>
       </a-upload-dragger>
     </a-modal>
   </div>
@@ -140,76 +186,44 @@
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue';
-import { PlusOutlined, ImportOutlined, InboxOutlined } from '@ant-design/icons-vue';
+import { 
+  SearchOutlined, RedoOutlined, PlusOutlined, 
+  ImportOutlined, EditOutlined, DeleteOutlined,
+  SendOutlined, InboxOutlined 
+} from '@ant-design/icons-vue';
 import { message, Modal } from 'ant-design-vue';
 import dayjs from 'dayjs';
-import { marked } from 'marked';  // Changed from default import to named import
+import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+
+// 默认封面图
+const defaultCover = 'https://via.placeholder.com/300x200?text=封面图片';
 
 // 搜索表单
 const searchForm = reactive({
   title: '',
+  status: ''
 });
 
 // 分页配置
 const pagination = reactive({
   current: 1,
-  pageSize: 10,
-  total: 0,
+  pageSize: 12,
+  total: 0
 });
 
-// 表格列配置
-const columns = [
-  {
-    title: '序号',
-    dataIndex: 'index',
-    width: '80px',
-    align: 'center',
-    customRender: ({ index }) => (pagination.current - 1) * pagination.pageSize + index + 1,
-  },
-  {
-    title: '封面',
-    dataIndex: 'cover',
-    key: 'cover',
-    width: '100px',
-  },
-  {
-    title: '图文标题',
-    dataIndex: 'title',
-    key: 'title',
-    width: '200px',
-  },
-  {
-    title: '创建时间',
-    dataIndex: 'createTime',
-    key: 'createTime',
-    width: '180px',
-    customRender: ({ text }) => dayjs(text).format('YYYY-MM-DD HH:mm'),
-  },
-  {
-    title: '状态',
-    dataIndex: 'status',
-    key: 'status',
-    width: '100px',
-    customRender: ({ text }) => text === 'published' ? '已发布' : '未发布',
-  },
-  {
-    title: '操作',
-    key: 'action',
-    width: '200px',
-    align: 'center',
-  },
-];
-
 // 模拟数据
-const mockData = Array.from({ length: 20 }, (_, i) => ({
-  id: i + 1,
-  title: `图文标题 ${i + 1}`,
-  cover: `https://picsum.photos/200/150?random=${i}`,
-  markdown: `# 图文标题 ${i + 1}\n\n这是第 ${i + 1} 个图文内容，使用Markdown格式编写。\n\n## 二级标题\n\n- 列表项1\n- 列表项2\n\n**加粗文本** *斜体文本*`,
-  createTime: dayjs().subtract(Math.floor(Math.random() * 30), 'day').format(),
-  status: Math.random() > 0.5 ? 'published' : 'draft',
-}));
+const dataList = ref([
+  {
+    id: 1,
+    title: '示例图文1',
+    cover: 'https://picsum.photos/300/200?random=1',
+    content: '# 标题1\n\n这是第一个示例图文内容\n\n- 列表项1\n- 列表项2',
+    status: 'published',
+    createTime: '2023-06-15T10:30:00'
+  },
+  // 更多模拟数据...
+]);
 
 // 当前页数据
 const currentPageData = computed(() => {
@@ -220,11 +234,17 @@ const currentPageData = computed(() => {
 
 // 过滤后的数据
 const filteredData = computed(() => {
-  let result = [...mockData];
+  let result = [...dataList.value];
   
   if (searchForm.title) {
     result = result.filter(item => 
-      item.title.toLowerCase().includes(searchForm.title.toLowerCase())
+      item.title.includes(searchForm.title)
+    );
+  }
+  
+  if (searchForm.status) {
+    result = result.filter(item => 
+      item.status === searchForm.status
     );
   }
   
@@ -232,7 +252,17 @@ const filteredData = computed(() => {
   return result;
 });
 
-// 搜索
+// 格式化时间
+const formatTime = time => dayjs(time).format('YYYY-MM-DD HH:mm');
+
+// 获取预览文本
+const getPreviewText = content => {
+  if (!content) return '';
+  const plainText = content.replace(/#+\s*/g, '').replace(/\*/g, '');
+  return plainText.length > 100 ? plainText.substring(0, 100) + '...' : plainText;
+};
+
+// 搜索处理
 const handleSearch = () => {
   pagination.current = 1;
 };
@@ -240,28 +270,103 @@ const handleSearch = () => {
 // 重置搜索
 const resetSearch = () => {
   searchForm.title = '';
+  searchForm.status = '';
   handleSearch();
 };
 
-// 分页变化处理
-const handlePaginationChange = (page, pageSize) => {
+// 分页变化
+const handlePageChange = (page, pageSize) => {
   pagination.current = page;
   pagination.pageSize = pageSize;
 };
 
-// 新增/编辑相关
+// 发布图文
+const publishItem = item => {
+  Modal.confirm({
+    title: '确认发布',
+    content: `确定要发布图文 "${item.title}" 吗?`,
+    onOk: () => {
+      item.status = 'published';
+      message.success('发布成功');
+    }
+  });
+};
+
+// 编辑图文
+const editItem = item => {
+  formState.value = { ...item };
+  modalTitle.value = '编辑图文';
+  modalVisible.value = true;
+};
+
+// 删除图文
+const deleteItem = item => {
+  Modal.confirm({
+    title: '确认删除',
+    content: `确定要删除图文 "${item.title}" 吗?`,
+    okText: '删除',
+    okType: 'danger',
+    onOk: () => {
+      dataList.value = dataList.value.filter(i => i.id !== item.id);
+      message.success('删除成功');
+    }
+  });
+};
+
+// 新增/编辑模态框相关
 const modalVisible = ref(false);
 const modalTitle = ref('新增图文');
-const formState = reactive({
+const confirmLoading = ref(false);
+const formState = ref({
   id: null,
   title: '',
   cover: '',
-  markdown: '',
-  status: 'draft',
+  content: '',
+  status: 'draft'
 });
-const coverFileList = ref([]);
+const fileList = ref([]);
 
-// 封面图片上传处理
+const showAddModal = () => {
+  formState.value = {
+    id: null,
+    title: '',
+    cover: '',
+    content: '',
+    status: 'draft'
+  };
+  modalTitle.value = '新增图文';
+  modalVisible.value = true;
+};
+
+const closeModal = () => {
+  modalVisible.value = false;
+};
+
+const handleSubmit = () => {
+  confirmLoading.value = true;
+  try {
+    if (formState.value.id) {
+      // 更新逻辑
+      const index = dataList.value.findIndex(item => item.id === formState.value.id);
+      dataList.value[index] = { ...formState.value };
+      message.success('更新成功');
+    } else {
+      // 新增逻辑
+      const newItem = {
+        ...formState.value,
+        id: Date.now(),
+        createTime: new Date().toISOString()
+      };
+      dataList.value.unshift(newItem);
+      message.success('新增成功');
+    }
+    modalVisible.value = false;
+  } finally {
+    confirmLoading.value = false;
+  }
+};
+
+// 封面图片上传
 const beforeUpload = file => {
   const isImage = file.type.startsWith('image/');
   if (!isImage) {
@@ -272,85 +377,15 @@ const beforeUpload = file => {
 
 const handleCoverChange = info => {
   if (info.file.status === 'done') {
-    // 这里应该是上传API调用成功后设置封面URL
-    formState.cover = URL.createObjectURL(info.file.originFileObj);
+    formState.value.cover = URL.createObjectURL(info.file.originFileObj);
   }
 };
 
 // Markdown预览
 const compiledMarkdown = computed(() => {
-  return DOMPurify.sanitize(marked.parse(formState.markdown));  // Added .parse()
+  if (!formState.value.content) return '';
+  return DOMPurify.sanitize(marked(formState.value.content));
 });
-
-// 显示新增模态框
-const showAddModal = () => {
-  modalTitle.value = '新增图文';
-  formState.id = null;
-  formState.title = '';
-  formState.cover = '';
-  formState.markdown = '';
-  formState.status = 'draft';
-  coverFileList.value = [];
-  modalVisible.value = true;
-};
-
-// 编辑项目
-const editItem = record => {
-  modalTitle.value = '编辑图文';
-  formState.id = record.id;
-  formState.title = record.title;
-  formState.cover = record.cover;
-  formState.markdown = record.markdown;
-  formState.status = record.status;
-  coverFileList.value = record.cover ? [{
-    uid: '-1',
-    name: 'cover',
-    status: 'done',
-    url: record.cover,
-  }] : [];
-  modalVisible.value = true;
-};
-
-// 发布项目
-const publishItem = record => {
-  Modal.confirm({
-    title: '确认发布',
-    content: `确定要发布图文"${record.title}"吗？`,
-    onOk() {
-      // 这里应该是API调用
-      message.success('发布成功');
-    },
-  });
-};
-
-// 关闭模态框
-const closeModal = () => {
-  modalVisible.value = false;
-};
-
-// 提交表单
-const handleSubmit = () => {
-  if (!formState.title || !formState.markdown) {
-    message.error('请填写完整信息');
-    return;
-  }
-
-  // 这里应该是API调用
-  message.success(`${modalTitle.value}成功`);
-  closeModal();
-};
-
-// 删除项目
-const deleteItem = id => {
-  Modal.confirm({
-    title: '确认删除',
-    content: '确定要删除这条图文吗？',
-    onOk() {
-      // 这里应该是API调用
-      message.success('删除成功');
-    },
-  });
-};
 
 // 导入Markdown相关
 const importModalVisible = ref(false);
@@ -366,7 +401,9 @@ const closeImportModal = () => {
 };
 
 const beforeImportUpload = file => {
-  const isMarkdown = file.name.endsWith('.md') || file.name.endsWith('.markdown');
+  const isMarkdown = file.type === 'text/markdown' || 
+                    file.name.endsWith('.md') || 
+                    file.name.endsWith('.markdown');
   if (!isMarkdown) {
     message.error('只能上传Markdown文件!');
   }
@@ -375,66 +412,104 @@ const beforeImportUpload = file => {
 
 const handleImport = () => {
   if (importFileList.value.length === 0) {
-    message.error('请选择要导入的Markdown文件');
+    message.warning('请先选择文件');
     return;
   }
-
-  const file = importFileList.value[0].originFileObj;
+  
+  const file = importFileList.value[0];
   const reader = new FileReader();
+  
   reader.onload = e => {
     const content = e.target.result;
-    formState.markdown = content;
-    formState.title = file.name.replace(/\.(md|markdown)$/, '');
-    closeImportModal();
-    modalVisible.value = true;
+    formState.value.content = content;
+    
+    // 尝试从内容中提取标题
+    const titleMatch = content.match(/^#\s+(.+)$/m);
+    if (titleMatch) {
+      formState.value.title = titleMatch[1];
+    }
+    
+    importModalVisible.value = false;
     modalTitle.value = '导入图文';
+    modalVisible.value = true;
   };
-  reader.readAsText(file);
+  
+  reader.readAsText(file.originFileObj);
 };
-
-// 初始化
-pagination.total = mockData.length;
 </script>
 
 <style scoped>
-.graphic-text-container {
-  padding: 20px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+.graphic-container {
+  padding: 16px;
+  background: #fff;
 }
 
 .search-area {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   padding: 16px;
-  background: #fff;
+  background: #fafafa;
   border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .action-area {
-  margin-bottom: 20px;
-  text-align: right;
+  margin-bottom: 16px;
 }
 
-.table-container {
-  flex: 1;
-  background: #fff;
+.card-container {
+  min-height: 400px;
+}
+
+.graphic-card {
+  margin-bottom: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.graphic-card :deep(.ant-card-body) {
   padding: 16px;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.graphic-card :deep(.ant-card-meta-title) {
+  margin-bottom: 8px;
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.create-time {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #999;
+}
+
+.content-preview {
+  color: #666;
+  font-size: 14px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pagination {
-  margin-top: 16px;
-  text-align: right;
+  margin-top: 24px;
+  text-align: center;
 }
 
 .markdown-preview {
-  padding: 16px;
-  border: 1px solid #d9d9d9;
+  padding: 12px;
+  border: 1px solid #f0f0f0;
   border-radius: 4px;
   height: 100%;
-  overflow: auto;
+  overflow-y: auto;
 }
 </style>
