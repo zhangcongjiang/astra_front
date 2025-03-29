@@ -1,5 +1,10 @@
 <template>
   <div class="music-list-container">
+    <!-- 调试信息 -->
+    <div v-if="false" style="color: red;">
+      isSelectMode: {{ isSelectMode }},
+      route.query: {{ route.query }}
+    </div>
     <!-- 搜索区域 -->
     <div class="search-area">
       <div class="search-header">
@@ -103,17 +108,20 @@
 
         <template #action="{ record }">
           <div style="display: flex; gap: 4px;">
+            <!-- 选择按钮（仅在选择模式显示） -->
+            <a-button v-if="isSelectMode" type="primary" size="small" @click.stop="handleSelect(record)">
+              选择
+            </a-button>
             <a-button type="link" size="small" @click="previewMusic(record)">
               播放
             </a-button>
             <a-button type="link" size="small" @click="showEditModal(record)">
               编辑
             </a-button>
-            <a-popconfirm title="确认要删除这首音乐吗？" ok-text="确认" cancel-text="取消"
-                @confirm="() => deleteMusic(record.id)">
-                <a-button type="link" size="small" danger>
-                  删除
-                </a-button>
+            <a-popconfirm title="确认要删除这首音乐吗？" ok-text="确认" cancel-text="取消" @confirm="() => deleteMusic(record.id)">
+              <a-button type="link" size="small" danger>
+                删除
+              </a-button>
             </a-popconfirm>
           </div>
         </template>
@@ -158,15 +166,25 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons-vue';
-import { message } from 'ant-design-vue';
-import dayjs from 'dayjs';
-import TagSearch from '@/components/TagSearch.vue';
-import Pagination from '@/components/Pagination.vue';
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { EditOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons-vue'
+import { message } from 'ant-design-vue'
+import dayjs from 'dayjs'
+import TagSearch from '@/components/TagSearch.vue'
+import Pagination from '@/components/Pagination.vue'
+import { useRoute, useRouter } from 'vue-router'
 
-// 搜索类型
-const searchType = ref('basic');
+// Initialize router and route
+const router = useRouter()
+const route = useRoute()
+
+// Search type should be defined before any computed properties that use it
+const searchType = ref('basic')
+
+// Ensure these are properly initialized
+const isSelectMode = computed(() => route.query?.selectMode === 'true')
+const returnPath = computed(() => route.query?.returnPath || '')
+const templateId = computed(() => route.query?.templateId || '')
 
 // 基础查询表单
 const basicForm = reactive({
@@ -286,7 +304,7 @@ const columns = [
   {
     title: '操作',
     key: 'action',
-    width: 150,
+    width: 220,  // 从150调整为220
     align: 'center',
     slots: { customRender: 'action' }
   }
@@ -531,6 +549,24 @@ const handleFileChange = (info) => {
     // 获取音频时长
     getAudioDuration(info.file).then(duration => {
       musicForm.duration = duration;
+    });
+  }
+};
+
+const handleSelect = (music) => {
+  if (isSelectMode.value) {
+    router.push({
+      path: returnPath.value,
+      query: {
+        ...route.query,  // 保留所有现有query参数
+        music: JSON.stringify({
+          id: music.id,
+          name: music.name,
+          url: music.audioUrl,
+          duration: music.duration
+        }),
+        templateId: templateId.value
+      }
     });
   }
 };

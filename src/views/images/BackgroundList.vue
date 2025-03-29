@@ -68,6 +68,10 @@
               </template>
             </a-card-meta>
             <template #actions>
+              <!-- 选择按钮（仅在选择模式显示） -->
+              <a-tooltip v-if="isSelectMode" title="选择此背景">
+                <check-outlined @click.stop="handleSelect(image)" />
+              </a-tooltip>
               <a-tooltip title="删除背景">
                 <delete-outlined @click.stop="showDeleteConfirm(image.id)" />
               </a-tooltip>
@@ -128,8 +132,38 @@
 </template>
 
 <script setup>
+import { useRoute, useRouter } from 'vue-router'
+
+const route = useRoute()
+const router = useRouter()
+
+// 检查是否是选择模式
+const isSelectMode = route.query.selectMode === 'true'
+const returnPath = route.query.returnPath
+const templateId = route.query.templateId
+
+// 选择背景图片的方法
+const handleSelect = (background) => {
+  if (isSelectMode) {
+    router.push({
+      path: returnPath,
+      query: {
+        ...route.query,  // 保留所有现有query参数
+        background: JSON.stringify(background),
+        templateId
+      }
+    })
+  }
+}
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
-import { UploadOutlined, LeftCircleOutlined, RightCircleOutlined, DeleteOutlined, TagsOutlined } from '@ant-design/icons-vue';
+import { 
+  UploadOutlined, 
+  LeftCircleOutlined, 
+  RightCircleOutlined, 
+  DeleteOutlined, 
+  TagsOutlined,
+  CheckOutlined  // 确保已导入
+} from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
 import { Modal, message } from 'ant-design-vue';
 import Pagination from '@/components/Pagination.vue';
@@ -447,6 +481,11 @@ const handleKeyDown = (e) => {
 
 // 生命周期钩子
 onMounted(() => {
+  console.log('路由参数:', route.query)
+  console.log('是否是选择模式:', isSelectMode)
+  console.log('返回路径:', returnPath)
+  console.log('模板ID:', templateId)
+  
   window.addEventListener('keydown', handleKeyDown);
   pagination.total = imageData.value.length;
 });

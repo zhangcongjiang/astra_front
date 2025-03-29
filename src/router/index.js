@@ -11,6 +11,8 @@ import VoiceList from '@/views/musics/VoiceList.vue'
 import MySound from '@/views/musics/MySound.vue'
 import SystemSoundSettings from '@/views/settings/SystemSoundSettings.vue'
 import SystemVideoSettings from '@/views/settings/SystemVideoSettings.vue'
+import DataVisualList from '@/views/videos/DataVisualList.vue'
+import DataVisualApply from '@/views/videos/DataVisualApply.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -33,8 +35,9 @@ const router = createRouter({
                 },
                 {
                     path: 'backgrounds',
-                    name: 'backgrounds',
-                    component: BackgroundList // 工作台组件
+                    name: 'BackgroundList',
+                    component: BackgroundList,
+                    meta: { title: '背景图片管理' }
                 },
                 {
                     path: 'musics',
@@ -67,8 +70,13 @@ const router = createRouter({
                 }, {
                     path: 'data-visuals',
                     name: 'data-visuals',
-                    component: () => import('../views/Dashboard.vue') // 工作台组件
-                }, {
+                    component: DataVisualList // 工作台组件
+                },{
+                    path: 'data-visuals/apply/:id',
+                    name: 'data-visuals-apply',
+                    component: DataVisualApply // 工作台组件
+                },  
+                {
                     path: 'my-sounds',
                     name: 'my-sounds',
                     component: MySound // 工作台组件
