@@ -50,45 +50,52 @@ const menuData = [
     },
     {
         id: 2,
-        name: '图像管理',
+        name: '文本素材',
         children: [
-            { id: 21, name: '图片列表', content: '这里是用户收集的普通图片...', path: '/images' },
-            { id: 22, name: '背景图片', content: '这里是用户可能使用到的背景图片...', path: '/backgrounds' }
+            { id: 21, name: '视频文案', content: '这里是视频文案管理...', path: '/video-texts' }
         ]
     },
     {
         id: 3,
+        name: '图像管理',
+        children: [
+            { id: 31, name: '图片列表', content: '这里是用户收集的普通图片...', path: '/images' },
+            { id: 32, name: '背景图片', content: '这里是用户可能使用到的背景图片...', path: '/backgrounds' }
+        ]
+    },
+    {
+        id: 4,  // 修改前是2，现在改为4
         name: '音频管理',
         children: [
-            { id: 31, name: '背景音乐', content: '这里是背景音乐的内容...', path: '/musics' },
-            { id: 32, name: '声音特效', content: '这里是声音特效的内容...', path: '/effects' },
-            { id: 33, name: '音色管理', content: '这里是朗读者音色的内容...', path: '/speakers' },
+            { id: 41, name: '背景音乐', content: '这里是背景音乐的内容...', path: '/musics' },
+            { id: 42, name: '声音特效', content: '这里是声音特效的内容...', path: '/effects' },
+            { id: 43, name: '音色管理', content: '这里是朗读者音色的内容...', path: '/speakers' },
         ]
     },
     {
-        id: 4,
+        id: 5,  // 修改前是4，现在改为5
         name: '视频管理',
         children: [
-            { id: 41, name: '视频模板', content: '这里是视频管理的内容...', path: '/templates' },
-            { id: 42, name: '沙雕动画', content: '这里是沙雕动画的内容...', path: '/shadiao' },
-            { id: 43, name: '数据可视化', content: '这里是数据列表动态生成视频的模板内容...', path: '/data-visuals' },
+            { id: 51, name: '视频模板', content: '这里是视频管理的内容...', path: '/templates' },
+            { id: 52, name: '沙雕动画', content: '这里是沙雕动画的内容...', path: '/shadiao' },
+            { id: 53, name: '数据可视化', content: '这里是数据列表动态生成视频的模板内容...', path: '/data-visuals' },
         ]
     },
     {
-        id: 5,
+        id: 6,  // 修改前是5，现在改为6
         name: '个人中心',
         children: [
-            { id: 51, name: '我的视频', content: '这里是平台生成的视频内容...', path: '/my-videos' },
-            { id: 52, name: '我的音频', content: '这里是平台生成的音频内容...', path: '/my-sounds' },
-
+            { id: 61, name: '我的图文', content: '这里是用户创建的图文内容...', path: '/my-graphics' },
+            { id: 62, name: '我的视频', content: '这里是平台生成的视频内容...', path: '/my-videos' },
+            { id: 63, name: '我的音频', content: '这里是平台生成的音频内容...', path: '/my-sounds' }
         ]
     },
     {
-        id: 6,
+        id: 7,  // 修改前是6，现在改为7
         name: '系统设置',
         children: [
-            { id: 61, name: '视频设置', content: '这里是系统设置内容...', path: '/system-video' },
-            { id: 62, name: '音频设置', content: '这里是系统设置内容...', path: '/system-sound' }
+            { id: 71, name: '视频设置', content: '这里是系统设置内容...', path: '/system-video' },
+            { id: 72, name: '音频设置', content: '这里是系统设置内容...', path: '/system-sound' }
         ]
     }
 ];

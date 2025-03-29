@@ -13,6 +13,8 @@ import SystemSoundSettings from '@/views/settings/SystemSoundSettings.vue'
 import SystemVideoSettings from '@/views/settings/SystemVideoSettings.vue'
 import DataVisualList from '@/views/videos/DataVisualList.vue'
 import DataVisualApply from '@/views/videos/DataVisualApply.vue'
+import VideoTextList from '@/views/texts/VideoTextList.vue'
+import GraphicTextList from '@/views/texts/GraphicTextList.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -96,7 +98,19 @@ const router = createRouter({
                     name: 'system-sound',
                     component: SystemSoundSettings // 修改为新的系统音频设置组件
                 },
-                // 其他子路由...
+                {
+                    path: 'video-texts',
+                    name: 'video-texts',
+                    component: VideoTextList,
+                    meta: { title: '视频文案管理' }
+                },
+                // 在children数组中添加
+                {
+                  path: 'my-graphics',
+                  name: 'my-graphics',
+                  component: GraphicTextList,
+                  meta: { title: '我的图文' }
+                }
             ]
         }
     ]
