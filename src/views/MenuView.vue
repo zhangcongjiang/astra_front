@@ -85,7 +85,7 @@ const menuData = [
         id: 6,  // 修改前是5，现在改为6
         name: '个人中心',
         children: [
-            { id: 61, name: '我的图文', content: '这里是用户创建的图文内容...', path: '/my-graphics' },
+            { id: 61, name: '我的图文', content: '这里是用户创建的图文内容...', path: '/texts' },
             { id: 62, name: '我的视频', content: '这里是平台生成的视频内容...', path: '/my-videos' },
             { id: 63, name: '我的音频', content: '这里是平台生成的音频内容...', path: '/my-sounds' }
         ]
@@ -96,6 +96,16 @@ const menuData = [
         children: [
             { id: 71, name: '视频设置', content: '这里是系统设置内容...', path: '/system-video' },
             { id: 72, name: '音频设置', content: '这里是系统设置内容...', path: '/system-sound' }
+        ]
+    },
+    {
+        id: 8,  // 新增实用工具菜单
+        name: '实用工具',
+        children: [
+            { id: 81, name: '文本工具', content: '提供各种文本处理工具...', path: '/text-tools' },
+            { id: 82, name: '图像工具', content: '提供图像处理和转换工具...', path: '/image-tools' },
+            { id: 83, name: '音频工具', content: '提供音频编辑和处理工具...', path: '/audio-tools' },
+            { id: 84, name: '视频工具', content: '提供视频编辑和处理工具...', path: '/video-tools' }
         ]
     }
 ];
@@ -140,8 +150,11 @@ const selectTopMenu = (index) => {
     activeTopMenu.value = index;
     activeLeftMenu.value = 0; // 重置二级菜单选中项
     // 跳转到该一级菜单的第一个二级菜单
-    if (menuData[index]?.children[0]?.path) {
+    if (menuData[index]?.children?.length > 0) {  // 修改这里，增加子菜单存在性检查
         router.push(menuData[index].children[0].path);
+    } else {
+        // 如果没有子菜单，可以跳转到默认页面或保持当前页面
+        router.push('/dashboard');
     }
 };
 
