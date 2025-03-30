@@ -49,27 +49,24 @@
           :md="8" 
           :lg="6"
         >
+          <!-- 卡片展示区域 -->
           <a-card hoverable class="graphic-card">
             <template #cover>
-              <a-image
-                :src="item.cover || defaultCover"
-                :preview="{ src: item.cover || defaultCover }"
-                height="160px"
-                :fallback="defaultCover"
-              />
+              <router-link :to="`/texts/detail/${item.id}`">
+                <a-image
+                  :src="item.cover || defaultCover"
+                  :preview="false"
+                  height="160px"
+                  :fallback="defaultCover"
+                />
+              </router-link>
             </template>
             <a-card-meta :title="item.title">
               <template #description>
                 <div class="meta-info">
-                  <a-tag :color="item.status === 'published' ? 'green' : 'orange'">
-                    {{ item.status === 'published' ? '已发布' : '未发布' }}
-                  </a-tag>
                   <span class="create-time">
                     {{ formatTime(item.createTime) }}
                   </span>
-                </div>
-                <div class="content-preview">
-                  {{ getPreviewText(item.content) }}
                 </div>
               </template>
             </a-card-meta>
