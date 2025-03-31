@@ -45,7 +45,6 @@ import DOMPurify from 'dompurify';
 import dayjs from 'dayjs';
 import { DownloadOutlined } from '@ant-design/icons-vue';
 import { Document, Paragraph, TextRun, HeadingLevel, ImageRun, Packer } from 'docx';
-import htmlDocx from 'html-docx-js';
 
 const route = useRoute();
 const docxContent = ref(null);
@@ -87,9 +86,6 @@ const exportToWord = async () => {
       }]
     });
 
-    // 方法2：使用html-docx-js从HTML生成Word
-    // const htmlContent = docxContent.value.innerHTML;
-    // const doc = htmlDocx.asBlob(htmlContent);
     
     Packer.toBlob(doc).then(blob => {
       const link = document.createElement('a');
