@@ -1,10 +1,5 @@
 <template>
   <div class="graphic-list-container">
-    <a-page-header title="图文列表" @back="() => $router.go(-1)">
-      <template #extra>
-        <a-button type="primary" @click="handleImport">导入图文</a-button>
-      </template>
-    </a-page-header>
 
     <!-- 搜索区域 -->
     <div class="search-area">
@@ -27,6 +22,11 @@
           <a-button @click="resetSearch">重置</a-button>
         </a-form-item>
       </a-form>
+    </div>
+
+    <!-- 导入按钮 -->
+    <div class="import-button-container">
+      <a-button type="primary" @click="handleImport">导入图文</a-button>
     </div>
 
     <!-- 文案列表表格 -->
@@ -234,9 +234,31 @@ pagination.total = mockData.length;
   background: #fff;
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.search-area .ant-form {
+  flex: 1;
+  margin-right: 16px;
+}
+
+.import-button-container {
+  margin: 16px 0;
+  text-align: right;
+}
+
+.search-area {
+  margin-bottom: 0;
+  padding: 16px;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .table-container {
+  margin-top: 16px;
   flex: 1;
   background: #fff;
   padding: 16px;
