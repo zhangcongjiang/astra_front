@@ -33,14 +33,17 @@
         bordered
       >
         <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'text'">
-            <div class="text-content" :title="record.text">
-              {{ record.text.length > 100 ? record.text.substring(0, 100) + '...' : record.text }}
+          <template v-if="column.key === 'text'">
+            <div class="text-content">
+              <div v-for="(paragraph, index) in record.text" :key="index" class="paragraph-item">
+                <p>{{ paragraph }}</p>
+              </div>
             </div>
           </template>
           <template v-if="column.key === 'action'">
             <a-button type="link" @click="editItem(record)">编辑</a-button>
             <a-button type="link" danger @click="deleteItem(record.id)">删除</a-button>
+            <a-button type="link" @click="applyTemplate(record)">应用模板</a-button>
           </template>
         </template>
       </a-table>
@@ -70,7 +73,28 @@
           <a-input v-model:value="formState.name" />
         </a-form-item>
         <a-form-item label="文案内容" required>
-          <a-textarea v-model:value="formState.text" :rows="8" />
+          <div class="paragraph-container">
+            <div v-for="(paragraph, index) in formState.text" :key="index" class="paragraph-item">
+              <a-textarea
+                v-model:value="formState.text[index]"
+                :rows="3"
+                :placeholder="`请输入第 ${index + 1} 段文案`"
+              />
+              <a-button
+                v-if="index > 0"
+                type="link"
+                danger
+                class="remove-btn"
+                @click="removeParagraph(index)"
+              >
+                删除该段
+              </a-button>
+            </div>
+            <a-button type="dashed" @click="addParagraph">
+              <plus-outlined />
+              添加新段落
+            </a-button>
+          </div>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -78,6 +102,8 @@
 </template>
 
 <script setup>
+import { useRouter } from 'vue-router'
+const router = useRouter()
 import { ref, reactive, computed } from 'vue';
 import { PlusOutlined } from '@ant-design/icons-vue';
 import { message, Modal } from 'ant-design-vue';
@@ -130,14 +156,6 @@ const columns = [
     align: 'center',
   },
 ];
-
-// 模拟数据
-const mockData = Array.from({ length: 50 }, (_, i) => ({
-  id: i + 1,
-  name: `视频文案 ${i + 1}`,
-  text: `这是第 ${i + 1} 个视频的文案内容，这里包含了视频的主要描述和关键信息。文案内容可以很长，用于详细描述视频的内容和特点。`,
-  createTime: dayjs().subtract(Math.floor(Math.random() * 30), 'day').format(),
-}));
 
 // 当前页数据
 const currentPageData = computed(() => {
@@ -194,15 +212,25 @@ const modalTitle = ref('新增文案');
 const formState = reactive({
   id: null,
   name: '',
-  text: '',
+  text: [''], // 默认包含一个空段落
 });
+
+// 添加段落
+const addParagraph = () => {
+  formState.text.push('');
+};
+
+// 删除段落
+const removeParagraph = (index) => {
+  formState.text.splice(index, 1);
+};
 
 // 显示新增模态框
 const showAddModal = () => {
   modalTitle.value = '新增文案';
   formState.id = null;
   formState.name = '';
-  formState.text = '';
+  formState.text = ['']; // 初始化时包含一个空段落
   modalVisible.value = true;
 };
 
@@ -211,26 +239,55 @@ const editItem = (record) => {
   modalTitle.value = '编辑文案';
   formState.id = record.id;
   formState.name = record.name;
-  formState.text = record.text;
+  formState.text = [...record.text]; // 复制文案数组
   modalVisible.value = true;
-};
-
-// 关闭模态框
-const closeModal = () => {
-  modalVisible.value = false;
 };
 
 // 提交表单
 const handleSubmit = () => {
-  if (!formState.name || !formState.text) {
+  if (!formState.name || formState.text.some(p => !p.trim())) {
     message.error('请填写完整信息');
     return;
   }
 
+  // 过滤空段落
+  const paragraphs = formState.text
+    .map(p => p.trim())
+    .filter(p => p.length > 0);
+
   // 这里应该是API调用
+  const newItem = {
+    id: formState.id || Date.now(),
+    name: formState.name,
+    text: paragraphs,
+    createTime: new Date().toISOString()
+  };
+
+  // 更新数据
+  if (formState.id) {
+    // 编辑
+    const index = mockData.findIndex(item => item.id === formState.id);
+    mockData.splice(index, 1, newItem);
+  } else {
+    // 新增
+    mockData.unshift(newItem);
+  }
+
   message.success(`${modalTitle.value}成功`);
   closeModal();
 };
+
+// 模拟数据调整
+const mockData = Array.from({ length: 5 }, (_, i) => ({
+  id: i + 1,
+  name: `视频文案 ${i + 1}`,
+  text: [
+    `这是第 ${i + 1} 个视频的第一段文案。`,
+    `这是第二段文案，用于详细描述视频的内容。`,
+    `这是第三段文案，包含视频的关键信息。`
+  ],
+  createTime: dayjs().subtract(Math.floor(Math.random() * 30), 'day').format(),
+}));
 
 // 删除项目
 const deleteItem = (id) => {
@@ -243,6 +300,16 @@ const deleteItem = (id) => {
       // 这里应该是API调用
       message.success('删除成功');
     },
+  });
+};
+
+// 应用模板
+const applyTemplate = (record) => {
+  router.push({
+    path: '/templates',
+    state: {
+      sourceRecord: record // 传递当前文案数据
+    }
   });
 };
 
@@ -285,10 +352,35 @@ pagination.total = mockData.length;
 }
 
 .text-content {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.paragraph-item {
+  padding: 8px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.paragraph-item p {
+  margin: 0;
+}
+
+.paragraph-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.paragraph-item {
+  position: relative;
+  padding-bottom: 24px;
+}
+
+.remove-btn {
+  position: absolute;
+  right: 0;
+  bottom: 0;
 }
 </style>
