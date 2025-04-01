@@ -77,9 +77,8 @@ const menuData = [
         name: '视频管理',
         children: [
             { id: 51, name: '视频模板', content: '这里是视频管理的内容...', path: '/templates' },
-            { id: 52, name: '沙雕动画', content: '这里是沙雕动画的内容...', path: '/shadiao' },
-            { id: 53, name: '数据可视化', content: '这里是数据列表动态生成视频的模板内容...', path: '/data-visuals' },
-            { id: 54, name: '转场视频', content: '这里是转场视频内容列表...', path: '/transitions' },
+            { id: 52, name: '数据可视化', content: '这里是数据列表动态生成视频的模板内容...', path: '/data-visuals' },
+            { id: 53, name: '转场视频', content: '这里是转场视频内容列表...', path: '/transitions' },
         ]
     },
     {

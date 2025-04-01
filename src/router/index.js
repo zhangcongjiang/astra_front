@@ -67,11 +67,7 @@ const router = createRouter({
                     component: VideoTemplateApply,
                     props: true
                 },
-                {
-                    path: 'shadiao',
-                    name: 'shadiao',
-                    component: () => import('../views/Dashboard.vue') // 工作台组件
-                }, {
+                 {
                     path: 'data-visuals',
                     name: 'data-visuals',
                     component: DataVisualList // 工作台组件
