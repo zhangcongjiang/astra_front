@@ -1,218 +1,146 @@
 <template>
-  <div class="graphic-detail-container">
-    <a-page-header
-      title="图文详情"
-      @back="() => $router.go(-1)"
-    />
-    
-    <div class="toolbar">
-      <a-button type="primary" @click="exportToWord">
-        <template #icon><download-outlined /></template>
-        导出Word
-      </a-button>
+  <div class="article-container">
+    <!-- 文章头部 -->
+    <div class="article-header">
+      <h1 class="article-title">{{ article.title }}</h1>
+      <div class="article-meta">
+        <span class="create-time">{{ formatTime(article.createTime) }}</span>
+        <a-button type="link" @click="handleBack">返回列表</a-button>
+      </div>
     </div>
-    
-    <div class="detail-content" ref="docxContent">
-      <h1 class="title">{{ detailData.title }}</h1>
-      
-      <div class="meta">
-        <span class="create-time">
-          {{ formatTime(detailData.createTime) }}
-        </span>
-        <a-tag :color="detailData.status === 'published' ? 'green' : 'orange'">
-          {{ detailData.status === 'published' ? '已发布' : '未发布' }}
-        </a-tag>
-      </div>
-      
-      <div class="cover-image" v-if="detailData.cover">
-        <a-image
-          :src="detailData.cover"
-          :preview="{ src: detailData.cover }"
-        />
-      </div>
-      
-      <div class="markdown-content" v-html="compiledMarkdown"></div>
+
+    <!-- 文章内容 -->
+    <div class="article-content">
+      <div v-html="formatContent(article.content)"></div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
-import { useRoute } from 'vue-router';
-import { message } from 'ant-design-vue';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
+import { ref, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import dayjs from 'dayjs';
-import { DownloadOutlined } from '@ant-design/icons-vue';
-import { Document, Paragraph, TextRun, HeadingLevel, ImageRun, Packer } from 'docx';
+import { message } from 'ant-design-vue';
 
 const route = useRoute();
-const docxContent = ref(null);
-const detailData = ref({
-  id: null,
+const router = useRouter();
+const article = ref({
   title: '',
-  cover: '',
   content: '',
-  status: '',
   createTime: ''
 });
 
-// 导出为Word文档
-const exportToWord = async () => {
-  try {
-    // 方法1：使用docx.js生成标准Word文档
-    const doc = new Document({
-      sections: [{
-        properties: {},
-        children: [
-          new Paragraph({
-            text: detailData.value.title,
-            heading: HeadingLevel.HEADING_1,
-            spacing: { after: 200 }
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `创建时间: ${formatTime(detailData.value.createTime)}`,
-                size: 22
-              })
-            ]
-          }),
-          new Paragraph({
-            text: detailData.value.content,
-            spacing: { before: 200, after: 200 }
-          })
-        ]
-      }]
-    });
-
-    
-    Packer.toBlob(doc).then(blob => {
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `${detailData.value.title}.docx`;
-      link.click();
-      URL.revokeObjectURL(link.href);
-    });
-    
-    message.success('导出成功');
-  } catch (error) {
-    message.error('导出失败');
-    console.error(error);
-  }
+// 格式化时间
+const formatTime = (time) => {
+  return dayjs(time).format('YYYY-MM-DD HH:mm');
 };
 
-// 获取图文详情
-const fetchDetail = async (id) => {
+// 格式化内容
+const formatContent = (content) => {
+  // 将换行符转换为<br>
+  return content.replace(/\n/g, '<br>');
+};
+
+// 获取文章详情
+// 修改模拟数据
+const fetchArticleDetail = async (id) => {
   try {
-    // 这里替换为实际API调用
-    // const res = await api.getTextDetail(id);
-    // detailData.value = res;
-    
+    // 这里应该是API调用
     // 模拟数据
-    detailData.value = {
-      id: 1,
-      title: '示例图文详情',
-      cover: 'https://picsum.photos/800/400?random=1',
-      content: '# 标题1\n\n这是图文详情内容\n\n![图片](https://picsum.photos/400/200?random=2)\n\n- 列表项1\n- 列表项2\n\n## 二级标题\n\n更多内容...',
-      status: 'published',
-      createTime: '2023-06-15T10:30:00'
+    article.value = {
+      title: `图文标题 ${id}`,
+      content: `这是第 ${id} 个图文的内容，这里包含了图文的主要描述和关键信息。\n\n内容可以很长，用于详细描述图文的内容和特点。\n\n![示例图片](https://picsum.photos/800/400?random=${id})`,
+      createTime: dayjs().subtract(Math.floor(Math.random() * 30), 'day').format(),
+      images: [
+        `https://picsum.photos/800/400?random=${id}1`,
+        `https://picsum.photos/800/400?random=${id}2`
+      ]
     };
   } catch (error) {
-    message.error('获取详情失败');
+    message.error('获取文章详情失败');
   }
 };
 
-// 格式化时间
-const formatTime = time => dayjs(time).format('YYYY-MM-DD HH:mm');
-
-// Markdown渲染
-const compiledMarkdown = computed(() => {
-  if (!detailData.value.content) return '';
-  return DOMPurify.sanitize(marked(detailData.value.content));
-});
+// 返回列表
+const handleBack = () => {
+  router.push({ name: 'texts' });
+};
 
 onMounted(() => {
-  fetchDetail(route.params.id);
+  fetchArticleDetail(route.params.id);
 });
 </script>
 
 <style scoped>
-.graphic-detail-container {
-  padding: 16px;
-  background: #fff;
-}
-
-.toolbar {
-  margin-bottom: 16px;
-  padding: 0 24px;
-}
-
-/* 添加Word文档样式 */
-.detail-content {
-  max-width: 900px;
+.article-container {
+  max-width: 800px;
   margin: 0 auto;
-  padding: 24px;
-  background: white;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-  font-family: "Times New Roman", Times, serif;
-  font-size: 12pt;
-  line-height: 1.5;
+  padding: 20px;
 }
 
-.title {
-  font-size: 16pt;
-  font-weight: bold;
+.article-header {
+  margin-bottom: 40px;
   text-align: center;
-  margin-bottom: 12pt;
 }
 
-.meta {
-  text-align: center;
-  margin-bottom: 12pt;
-  font-size: 10pt;
-  color: #666;
-}
-
-.cover-image {
-  text-align: center;
-  margin: 12pt 0;
-}
-
-.markdown-content {
-  line-height: 1.5;
-}
-
-.markdown-content :deep(p) {
-  margin: 0 0 12pt 0;
-  text-indent: 24pt;
-}
-
-.markdown-content :deep(h1) {
-  font-size: 16pt;
+.article-title {
+  font-size: 28px;
   font-weight: bold;
-  margin: 24pt 0 12pt 0;
+  margin-bottom: 20px;
 }
 
-.markdown-content :deep(h2) {
-  font-size: 14pt;
-  font-weight: bold;
-  margin: 18pt 0 10pt 0;
+.article-meta {
+  color: #999;
+  font-size: 14px;
+  margin-bottom: 10px;
 }
 
-.markdown-content :deep(ul),
-.markdown-content :deep(ol) {
-  margin-left: 24pt;
-  margin-bottom: 12pt;
+.create-time {
+  margin-right: 20px;
 }
 
-.markdown-content :deep(li) {
-  margin-bottom: 6pt;
+.article-content {
+  font-size: 16px;
+  line-height: 1.8;
+  color: #333;
 }
 
-.markdown-content :deep(img) {
+.article-content >>> img {
   max-width: 100%;
   height: auto;
-  margin: 6pt 0;
+  margin: 20px 0;
+  border-radius: 4px;
+}
+
+.article-content >>> p {
+  margin: 20px 0;
+}
+
+.content-image {
+  max-width: 100%;
+  height: auto;
+  margin: 20px 0;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.image-gallery {
+  margin: 20px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.gallery-image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.gallery-image:hover {
+  transform: scale(1.02);
 }
 </style>

@@ -15,6 +15,7 @@ import DataVisualList from '@/views/videos/DataVisualList.vue'
 import DataVisualApply from '@/views/videos/DataVisualApply.vue'
 import VideoTextList from '@/views/texts/VideoTextList.vue'
 import GraphicTextList from '@/views/texts/GraphicTextList.vue'
+import GraphicTextDetail from '@/views/texts/GraphicTextDetail.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -113,8 +114,8 @@ const router = createRouter({
                 },
                 {
                     path: '/texts/detail/:id',
-                    name: 'TextDetail',
-                    component: () => import('@/views/texts/GraphicTextDetail.vue'),
+                    name: 'GraphicTextDetail',
+                    component: GraphicTextDetail,
                     meta: { title: '图文详情' }
                 },
                 {
