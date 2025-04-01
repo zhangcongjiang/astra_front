@@ -16,6 +16,7 @@ import DataVisualApply from '@/views/videos/DataVisualApply.vue'
 import VideoTextList from '@/views/texts/VideoTextList.vue'
 import GraphicTextList from '@/views/texts/GraphicTextList.vue'
 import GraphicTextDetail from '@/views/texts/GraphicTextDetail.vue'
+import TransitionList from '@/views/videos/TransitionList.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -146,6 +147,12 @@ const router = createRouter({
                     meta: { title: '视频工具' },
                     props: { category: 'video' }
                 },
+                {
+                    path: '/transitions',
+                    name: 'transitions',
+                    component: TransitionList,
+                    meta: { title: '转场视频管理' }
+                }
             ]
         }
     ]
