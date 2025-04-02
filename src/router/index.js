@@ -13,10 +13,11 @@ import SystemSoundSettings from '@/views/settings/SystemSoundSettings.vue'
 import SystemVideoSettings from '@/views/settings/SystemVideoSettings.vue'
 import DataVisualList from '@/views/videos/DataVisualList.vue'
 import DataVisualApply from '@/views/videos/DataVisualApply.vue'
-import VideoTextList from '@/views/texts/VideoTextList.vue'
+import VideoTextList from '@/views/videos/VideoTextList.vue'
 import GraphicTextList from '@/views/texts/GraphicTextList.vue'
 import GraphicTextDetail from '@/views/texts/GraphicTextDetail.vue'
 import TransitionList from '@/views/videos/TransitionList.vue'
+import VideoList from '@/views/videos/VideoList.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -147,6 +148,12 @@ const router = createRouter({
                     path: '/transitions',
                     name: 'transitions',
                     component: TransitionList,
+                    meta: { title: '转场视频管理' }
+                },
+                {
+                    path: '/videos',
+                    name: 'videos',
+                    component: VideoList,
                     meta: { title: '转场视频管理' }
                 }
             ]

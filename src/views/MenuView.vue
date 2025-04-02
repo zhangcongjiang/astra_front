@@ -50,35 +50,36 @@ const menuData = [
     },
     {
         id: 2,
-        name: '文本素材',
+        name: '图像素材',
         children: [
-            { id: 21, name: '视频文案', content: '这里是视频文案管理...', path: '/video-texts' }
+            { id: 21, name: '图片列表', content: '这里是用户收集的普通图片...', path: '/images' },
+            { id: 12, name: '背景图片', content: '这里是用户可能使用到的背景图片...', path: '/backgrounds' }
         ]
     },
     {
-        id: 3,
-        name: '图像管理',
+        id: 3,  // 修改前是2，现在改为4
+        name: '音频素材',
         children: [
-            { id: 31, name: '图片列表', content: '这里是用户收集的普通图片...', path: '/images' },
-            { id: 32, name: '背景图片', content: '这里是用户可能使用到的背景图片...', path: '/backgrounds' }
+            { id: 31, name: '背景音乐', content: '这里是背景音乐的内容...', path: '/musics' },
+            { id: 32, name: '声音特效', content: '这里是声音特效的内容...', path: '/effects' },
+            { id: 33, name: '音色管理', content: '这里是朗读者音色的内容...', path: '/speakers' },
         ]
-    },
-    {
-        id: 4,  // 修改前是2，现在改为4
-        name: '音频管理',
+    }, {
+        id: 4,
+        name: '视频素材',
         children: [
-            { id: 41, name: '背景音乐', content: '这里是背景音乐的内容...', path: '/musics' },
-            { id: 42, name: '声音特效', content: '这里是声音特效的内容...', path: '/effects' },
-            { id: 43, name: '音色管理', content: '这里是朗读者音色的内容...', path: '/speakers' },
+            { id: 41, name: '视频素材', content: '这里是视频素材内容列表...', path: '/videos' },
+            { id: 42, name: '转场视频', content: '这里是转场视频内容列表...', path: '/transitions' },
+            { id: 43, name: '视频文案', content: '这里是视频文案管理...', path: '/video-texts' }
         ]
     },
     {
         id: 5,  // 修改前是4，现在改为5
-        name: '视频管理',
+        name: '视频模板',
         children: [
             { id: 51, name: '视频模板', content: '这里是视频管理的内容...', path: '/templates' },
             { id: 52, name: '数据可视化', content: '这里是数据列表动态生成视频的模板内容...', path: '/data-visuals' },
-            { id: 53, name: '转场视频', content: '这里是转场视频内容列表...', path: '/transitions' },
+
         ]
     },
     {
