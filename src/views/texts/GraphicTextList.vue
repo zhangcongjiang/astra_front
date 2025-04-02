@@ -1,7 +1,5 @@
 <template>
   <div class="graphic-list-container">
-
-    <!-- 搜索区域 -->
     <div class="search-area">
       <a-form layout="inline" :model="searchForm">
         <a-form-item label="图文标题">
@@ -18,12 +16,7 @@
           <a-range-picker v-model:value="searchForm.dateRange" format="YYYY-MM-DD" :placeholder="['开始时间', '结束时间']" />
         </a-form-item>
         <a-form-item label="所属账号">
-          <a-select
-            v-model:value="searchForm.account"
-            placeholder="选择账号"
-            style="width: 120px"
-            allowClear
-          >
+          <a-select v-model:value="searchForm.account" placeholder="选择账号" style="width: 120px" allowClear>
             <a-select-option :value="undefined">全部</a-select-option>
             <a-select-option v-for="account in uniqueAccounts" :key="account" :value="account">
               {{ account }}
@@ -37,31 +30,21 @@
       </a-form>
     </div>
 
-    <!-- 导入按钮 -->
-    <div class="import-button-container">
-      <a-button type="primary" @click="handleImport">导入图文</a-button>
-    </div>
+      <div class="button-group" style="margin-left: auto;">
+        <a-button type="primary" @click="handleCreate" :icon="h(PlusOutlined)">
+          创建图文
+        </a-button>
+        <a-button type="primary" @click="handleImport">导入图文</a-button>
+      </div>
+    
 
-    <!-- 文案列表表格 -->
     <div class="table-container">
-      <a-table 
-        :columns="columns" 
-        :dataSource="currentPageData" 
-        :pagination="false"
-        rowKey="id"
-        :customRow="handleRowClick"
-        :rowClassName="rowClassName"
-      >
+      <a-table :columns="columns" :dataSource="currentPageData" :pagination="false" rowKey="id"
+        :customRow="handleRowClick" :rowClassName="rowClassName">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'title'">
             <div class="title-content">
-              <a-avatar 
-                v-if="record.cover" 
-                :src="record.cover" 
-                shape="square" 
-                size="large"
-                class="cover-image"
-              />
+              <a-avatar v-if="record.cover" :src="record.cover" shape="square" size="large" class="cover-image" />
               <span class="title-text">{{ record.title }}</span>
             </div>
           </template>
@@ -82,11 +65,7 @@
           <template v-if="column.key === 'action'">
             <div class="action-buttons">
               <a-button type="link" @click="handleDownload(record)">下载</a-button>
-              <a-button 
-                type="link" 
-                :disabled="record.status === 'published'" 
-                @click="handlePublish(record)"
-              >
+              <a-button type="link" :disabled="record.status === 'published'" @click="handlePublish(record)">
                 发布
               </a-button>
               <a-button type="link" danger @click="handleDelete(record.id)">删除</a-button>
@@ -95,14 +74,11 @@
         </template>
       </a-table>
 
-      <div class="pagination">
-        <Pagination 
-          v-model:current="pagination.current" 
-          v-model:pageSize="pagination.pageSize"
-          :total="pagination.total" 
-          @change="handlePaginationChange"
-        />
-      </div>
+
+    </div>
+    <div class="pagination">
+      <Pagination v-model:current="pagination.current" v-model:pageSize="pagination.pageSize" :total="pagination.total"
+        @change="handlePaginationChange" />
     </div>
   </div>
 </template>
@@ -180,6 +156,7 @@ const currentPageData = computed(() => {
 
 
 // 唯一账号列表
+// 在script setup部分确保uniqueAccounts已定义
 const uniqueAccounts = computed(() => {
   const accounts = new Set(mockData.map(item => item.account));
   return Array.from(accounts);
@@ -315,12 +292,12 @@ const handleImport = () => {
   Modal.confirm({
     title: '导入图文',
     content: h('div', { style: 'text-align: center;' }, [
-      h('div', { 
+      h('div', {
         style: 'border: 2px dashed #d9d9d9; padding: 20px; border-radius: 4px;',
         onDrop: (e) => handleFileDrop(e),
         onDragOver: (e) => e.preventDefault()
       }, '将Markdown或Word文档拖拽到这里，或点击选择文件'),
-      h('input', { 
+      h('input', {
         type: 'file',
         id: 'fileInput',
         style: 'display: none;',
@@ -369,6 +346,10 @@ const uploadFile = async (file) => {
   }
 };
 
+
+const handleCreate = () => {
+  router.push({ name: 'GraphicTextCreate' });
+};
 // 获取数据
 const fetchData = () => {
   pagination.total = mockData.length;
@@ -384,22 +365,6 @@ pagination.total = mockData.length;
   height: 100%;
   display: flex;
   flex-direction: column;
-}
-
-.search-area {
-  margin-bottom: 20px;
-  padding: 16px;
-  background: #fff;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.search-area .ant-form {
-  flex: 1;
-  margin-right: 16px;
 }
 
 .import-button-container {
@@ -453,6 +418,26 @@ pagination.total = mockData.length;
 .action-buttons {
   display: flex;
   gap: 8px;
+}
+
+.button-group {
+  display: flex;
+  gap: 8px;
+}
+
+.search-area {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+}
+
+.search-area .ant-form {
+  flex: 1;
+  margin-right: 16px;
 }
 
 :deep(.ant-table-row) {

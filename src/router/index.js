@@ -155,7 +155,13 @@ const router = createRouter({
                     name: 'videos',
                     component: VideoList,
                     meta: { title: '转场视频管理' }
-                }
+                },
+                {
+                    path: '/texts/create',
+                    name: 'GraphicTextCreate',
+                    component: () => import('@/views/texts/GraphicTextCreate.vue'),
+                    meta: { title: '创建图文' }
+                  }
             ]
         }
     ]
