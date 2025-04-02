@@ -218,7 +218,7 @@ const selectLeftMenu = (index) => {
 }
 
 .logo-text {
-    font-size: 18px;
+    font-size: 22px;
     font-weight: bold;
     color: #ffffff;
     letter-spacing: 1px;
@@ -235,7 +235,7 @@ const selectLeftMenu = (index) => {
     line-height: 60px;
     cursor: pointer;
     transition: all 0.3s;
-    font-size: 18px;
+    font-size: 22px;
     position: relative;
 }
 
@@ -278,7 +278,7 @@ const selectLeftMenu = (index) => {
     cursor: pointer;
     transition: all 0.3s;
     color: #555;
-    font-size: 18px;
+    font-size: 22px;
     border-left: 3px solid transparent;
 }
 
