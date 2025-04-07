@@ -263,11 +263,11 @@ const handleEnterHome = (account) => {
   padding-top: 8px;
   border-top: 1px solid #f0f0f0;
   background: #fafafa;
-  text-align: right;
+  text-align: left;
   white-space: nowrap; /* 防止按钮换行 */
 }
 
 .account-actions .ant-btn {
-  margin-left: 8px; /* 调整按钮间距 */
+  margin-right: 4px; /* 调整按钮间距 */
 }
 </style>
