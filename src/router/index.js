@@ -167,7 +167,13 @@ const router = createRouter({
                     name: 'AccountManage',
                     component: () => import('@/views/account/AccountManage.vue'),
                     meta: { title: '账号管理' }
-                }
+                },
+                {
+                    path: '/my-tasks',
+                    name: 'MyTasks',
+                    component: () => import('@/views/tasks/TaskManagement.vue'),
+                    meta: { title: '我的任务' }
+                },
             ]
         }
     ]
