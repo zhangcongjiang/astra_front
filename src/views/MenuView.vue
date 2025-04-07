@@ -88,7 +88,8 @@ const menuData = [
         children: [
             { id: 61, name: '我的图文', content: '这里是用户创建的图文内容...', path: '/texts' },
             { id: 62, name: '我的视频', content: '这里是平台生成的视频内容...', path: '/my-videos' },
-            { id: 63, name: '我的音频', content: '这里是平台生成的音频内容...', path: '/my-sounds' }
+            { id: 63, name: '我的音频', content: '这里是平台生成的音频内容...', path: '/my-sounds' },
+            { id: 63, name: '我的账号', content: '这里是我各个平台的账号...', path: '/my-accounts'}
         ]
     },
     {

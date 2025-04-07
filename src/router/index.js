@@ -161,7 +161,13 @@ const router = createRouter({
                     name: 'GraphicTextCreate',
                     component: () => import('@/views/texts/GraphicTextCreate.vue'),
                     meta: { title: '创建图文' }
-                  }
+                },
+                {
+                    path: '/my-accounts',
+                    name: 'AccountManage',
+                    component: () => import('@/views/account/AccountManage.vue'),
+                    meta: { title: '账号管理' }
+                }
             ]
         }
     ]
