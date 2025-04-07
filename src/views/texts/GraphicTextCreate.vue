@@ -41,7 +41,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { message } from 'ant-design-vue';
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
@@ -49,6 +50,33 @@ import DOMPurify from 'dompurify';
 const md = new MarkdownIt();
 const title = ref('');
 const content = ref('');
+const route = useRoute();
+
+// 获取图文详情
+const fetchGraphicText = async (id) => {
+  try {
+    // 这里替换为实际API调用
+    const mockData = {
+      title: `图文标题 ${id}`,
+      content: `这是第 ${id} 个图文的内容示例\n\n## 二级标题\n\n- 列表项1\n- 列表项2\n\n![示例图片](https://picsum.photos/800/400?random=${id})`
+    };
+    title.value = mockData.title;
+    content.value = mockData.content;
+  } catch (error) {
+    message.error('获取图文详情失败');
+  }
+};
+
+// 初始化时检查是否有ID参数
+onMounted(() => {
+  if (route.params.id) {
+    fetchGraphicText(route.params.id);
+  } else {
+    // 清空表单
+    title.value = '';
+    content.value = '';
+  }
+});
 
 // 实时渲染Markdown
 const compiledMarkdown = computed(() => {

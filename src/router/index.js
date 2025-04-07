@@ -15,7 +15,6 @@ import DataVisualList from '@/views/videos/DataVisualList.vue'
 import DataVisualApply from '@/views/videos/DataVisualApply.vue'
 import VideoTextList from '@/views/videos/VideoTextList.vue'
 import GraphicTextList from '@/views/texts/GraphicTextList.vue'
-import GraphicTextDetail from '@/views/texts/GraphicTextDetail.vue'
 import TransitionList from '@/views/videos/TransitionList.vue'
 import VideoList from '@/views/videos/VideoList.vue'
 
@@ -111,12 +110,6 @@ const router = createRouter({
                     meta: { title: '我的图文' }
                 },
                 {
-                    path: '/texts/detail/:id',
-                    name: 'GraphicTextDetail',
-                    component: GraphicTextDetail,
-                    meta: { title: '图文详情' }
-                },
-                {
                     path: 'text-tools',
                     name: 'text-tools',
                     component: () => import('@/views/tools/ToolPage.vue'),
@@ -157,7 +150,7 @@ const router = createRouter({
                     meta: { title: '转场视频管理' }
                 },
                 {
-                    path: '/texts/create',
+                    path: '/texts/create/:id?',
                     name: 'GraphicTextCreate',
                     component: () => import('@/views/texts/GraphicTextCreate.vue'),
                     meta: { title: '创建图文' }

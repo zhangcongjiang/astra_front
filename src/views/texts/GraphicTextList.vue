@@ -197,9 +197,8 @@ const handleRowClick = (record) => {
   return {
     onClick: () => {
       router.push({
-        name: 'GraphicTextDetail',
-        params: { id: record.id },
-        query: { from: 'list' }
+        name: 'GraphicTextCreate',
+        params: { id: record.id }
       });
     }
   };
