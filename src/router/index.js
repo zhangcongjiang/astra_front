@@ -174,6 +174,12 @@ const router = createRouter({
                     component: () => import('@/views/tasks/TaskManagement.vue'),
                     meta: { title: '我的任务' }
                 },
+                {
+                    path: '/tasks/:id',
+                    name: 'task-detail',
+                    component: () => import('@/views/tasks/TaskDetail.vue'),
+                    meta: { title: '任务详情' }
+                }
             ]
         }
     ]

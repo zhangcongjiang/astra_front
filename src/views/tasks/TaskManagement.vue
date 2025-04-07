@@ -85,9 +85,11 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import Pagination from '@/components/Pagination.vue';
 import { UploadOutlined } from '@ant-design/icons-vue';
+import { useRouter } from 'vue-router';
 
 // 加载状态
 const loading = ref(false);
+const router = useRouter();
 
 // 搜索表单
 const searchForm = reactive({
@@ -184,8 +186,9 @@ const toggleStatus = (record) => {
 };
 
 // 查看任务详情
+// 修改 showDetail 方法
 const showDetail = (record) => {
-    console.log('查看详情', record);
+  router.push(`/tasks/${record.id}`);
 };
 
 // 删除任务
