@@ -89,27 +89,26 @@ const menuData = [
             { id: 61, name: '我的图文', content: '这里是用户创建的图文内容...', path: '/texts' },
             { id: 62, name: '我的视频', content: '这里是平台生成的视频内容...', path: '/my-videos' },
             { id: 63, name: '我的音频', content: '这里是平台生成的音频内容...', path: '/my-sounds' },
-            { id: 63, name: '我的账号', content: '这里是我各个平台的账号...', path: '/my-accounts'}
+            { id: 63, name: '我的账号', content: '这里是我各个平台的账号...', path: '/my-accounts' }
         ]
     },
     {
-        id: 7,  // 修改前是6，现在改为7
-        name: '系统设置',
-        children: [
-            { id: 71, name: '视频设置', content: '这里是系统设置内容...', path: '/system-video' },
-            { id: 72, name: '音频设置', content: '这里是系统设置内容...', path: '/system-sound' }
-        ]
-    },
-    {
-        id: 8,  // 新增实用工具菜单
+        id: 7,  // 新增实用工具菜单
         name: '实用工具',
         children: [
-            { id: 81, name: '文本工具', content: '提供各种文本处理工具...', path: '/text-tools' },
-            { id: 82, name: '图像工具', content: '提供图像处理和转换工具...', path: '/image-tools' },
-            { id: 83, name: '音频工具', content: '提供音频编辑和处理工具...', path: '/audio-tools' },
-            { id: 84, name: '视频工具', content: '提供视频编辑和处理工具...', path: '/video-tools' }
+            { id: 71, name: '文本工具', content: '提供各种文本处理工具...', path: '/text-tools' },
+            { id: 72, name: '图像工具', content: '提供图像处理和转换工具...', path: '/image-tools' },
+            { id: 73, name: '音频工具', content: '提供音频编辑和处理工具...', path: '/audio-tools' },
+            { id: 74, name: '视频工具', content: '提供视频编辑和处理工具...', path: '/video-tools' }
         ]
-    }
+    }, {
+        id: 8,  // 修改前是6，现在改为7
+        name: '系统设置',
+        children: [
+            { id: 81, name: '视频设置', content: '这里是系统设置内容...', path: '/system-video' },
+            { id: 82, name: '音频设置', content: '这里是系统设置内容...', path: '/system-sound' }
+        ]
+    },
 ];
 
 const goToDashboard = () => {
