@@ -172,6 +172,32 @@ const router = createRouter({
                     name: 'task-detail',
                     component: () => import('@/views/tasks/TaskDetail.vue'),
                     meta: { title: '任务详情' }
+                },
+                // 添加异常页面路由
+                {
+                  path: '/exception/403',
+                  name: '403',
+                  component: () => import('@/views/exception/403.vue'),
+                  meta: { title: '403 无权限' }
+                },
+                {
+                  path: '/exception/404',
+                  name: '404',
+                  component: () => import('@/views/exception/404.vue'),
+                  meta: { title: '404 页面未找到' }
+                },
+                {
+                  path: '/exception/500',
+                  name: '500',
+                  component: () => import('@/views/exception/500.vue'),
+                  meta: { title: '500 服务器错误' }
+                },
+                // 添加404通配符路由，必须放在最后
+                {
+                  path: '/:pathMatch(.*)*',
+                  name: 'not-found',
+                  component: () => import('@/views/exception/404.vue'),
+                  meta: { title: '404 页面未找到' }
                 }
             ]
         }
