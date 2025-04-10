@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 // 设置基础URL
-const BASE_URL =  'http://localhost:5174/api/';
+const BASE_URL =  'http://localhost:8080/api/';
 
 axios.defaults.withCredentials = true;
 
@@ -16,7 +16,7 @@ const instance = axios.create({
     'Content-Type': 'application/json',
     // Authorization: Token 654321
     // 如果有需要，可以在这里添加认证信息，如：Authorization: `Bearer ${token}`
-    'Authorization': 'Token 3b11510777d2fcbcc4b91aeea007d9019d946388',
+    'Authorization': 'Token 76801daaa6067b5f3a2179b3d6251e659feb512e',
   }
 });
 

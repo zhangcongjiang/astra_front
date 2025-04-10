@@ -51,7 +51,6 @@
 import { ref, computed, onMounted, watch } from 'vue'; // Add watch to the imports
 import { PlusOutlined } from '@ant-design/icons-vue';
 import { PictureOutlined } from '@ant-design/icons-vue';
-import defaultLogo from '@/assets/default-tool-logo.png';
 import { message } from 'ant-design-vue';
 
 const props = defineProps({
@@ -102,7 +101,7 @@ const loadTools = async () => {
     loading.value = true;
     
     // 使用import语法加载图片
-    const logoPath = new URL('@/assets/logo.png', import.meta.url).href;
+    const logoPath = new URL('@/assets/logo/logo.png', import.meta.url).href;
 
     // 模拟从数据库获取数据
     const mockTools = [

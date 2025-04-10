@@ -4,7 +4,7 @@
         <div class="top-nav">
             <!-- Logo区域 -->
             <div class="logo-container" @click="goToDashboard">
-                <img src="@/assets/logo.png" alt="Logo" class="logo">
+                <img src="@/assets/logo/logo.png" alt="Logo" class="logo">
                 <span class="logo-text">ASTRA</span>
             </div>
 
