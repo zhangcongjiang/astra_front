@@ -18,6 +18,7 @@ export const request = async ({ method, url, params = {}, data = null, responseT
     const response = await axiosInstance[method.toLowerCase()](url, method.toLowerCase() === "get" ? { params, responseType } : data);
     return response.data;
   } catch (error) {
+    console.error(`请求出错1:`, error);
     handleError(error);
   }
 };

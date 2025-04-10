@@ -128,6 +128,12 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { UploadOutlined, LeftCircleOutlined, RightCircleOutlined, DeleteOutlined, TagsOutlined } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
+
+// 格式化日期函数
+const formatDate = (date) => {
+  if (!date) return '未知';
+  return dayjs(date).format('YYYY-MM-DD HH:mm');
+};
 import { Modal, message } from 'ant-design-vue';
 import Pagination from '@/components/Pagination.vue';
 import TagSearch from '@/components/TagSearch.vue';
@@ -172,13 +178,46 @@ const tagCategories = ref([
 // 选中的标签
 const selectedTags = ref([]);
 
+// 上传文件列表
+const fileList = ref([]);
+
+// 标签编辑模态框
+const tagModalVisible = ref(false);
+const tagForm = reactive({
+  imageId: null,
+  currentTags: []
+});
+
 // 图片数据
 const imageData = ref([]);
+
+// 加载状态
+const loading = ref(false);
+
+// 分页配置
+const pagination = ref({
+  current: 1,
+  pageSize: 10,
+  total: 0
+});
+
+// 当前页面显示的图片
+const currentPageImages = computed(() => {
+  return imageData.value;
+});
 
 // 添加预览相关状态
 const previewVisible = ref(false);
 const currentPreviewIndex = ref(0);
 const currentPreviewImage = ref({});
+
+// 预览图片样式
+const previewImageStyle = computed(() => {
+  return {
+    maxWidth: '100%',
+    maxHeight: '70vh'
+  };
+});
 
 // 获取图片列表
 const fetchImageList = async () => {
@@ -191,16 +230,16 @@ const fetchImageList = async () => {
     const response = await getImageList(params);
     console.log("**img response**:",response);
     // 添加空值检查
-    if (response && response.data) {
-      imageData.value = response.data.map(item => ({
+    if (response && response.code === 0 && response.data && Array.isArray(response.data.results)) {
+      imageData.value = response.data.results.map(item => ({
         id: item.id,
-        name: item.name,
-        url: item.url,
-        uploader: item.uploader,
-        uploadTime: item.uploadTime,
+        name: item.img_name,
+        url: item.url || `/api/image/${item.id}/content/`,
+        uploader: item.creator || '未知',
+        uploadTime: item.created_at,
         tags: item.tags || []
       }));
-      pagination.value.total = response.total || 0;
+      pagination.value.total = response.data.count || 0;
     } else {
       message.warning('获取的图片列表为空');
       imageData.value = [];
@@ -305,18 +344,18 @@ const showPrevImage = () => {
   if (currentPreviewIndex.value > 0) {
     currentPreviewIndex.value--;
   } else {
-    currentPreviewIndex.value = filteredImages.value.length - 1;
+    currentPreviewIndex.value = imageData.value.length - 1;
   }
-  currentPreviewImage.value = filteredImages.value[currentPreviewIndex.value];
+  currentPreviewImage.value = imageData.value[currentPreviewIndex.value];
 };
 
 const showNextImage = () => {
-  if (currentPreviewIndex.value < filteredImages.value.length - 1) {
+  if (currentPreviewIndex.value < imageData.value.length - 1) {
     currentPreviewIndex.value++;
   } else {
     currentPreviewIndex.value = 0;
   }
-  currentPreviewImage.value = filteredImages.value[currentPreviewIndex.value];
+  currentPreviewImage.value = imageData.value[currentPreviewIndex.value];
 };
 
 // 键盘事件处理
@@ -392,12 +431,27 @@ const handleTagSubmit = () => {
   }
 };
 
+// 获取标签名称
+const getTagNames = (tagIds) => {
+  if (!tagIds || !Array.isArray(tagIds)) return [];
+  
+  const tagNames = [];
+  tagCategories.value.forEach(category => {
+    category.tags.forEach(tag => {
+      if (tagIds.includes(tag.id)) {
+        tagNames.push(tag.name);
+      }
+    });
+  });
+  return tagNames;
+};
+
 // 初始化
 onMounted(() => {
   handleResize();
   window.addEventListener('resize', handleResize);
   window.addEventListener('keydown', handleKeyDown);
-  pagination.total = imageData.value.length;
+  fetchImageList(); // 初始化时加载数据
 });
 
 onUnmounted(() => {
@@ -406,47 +460,7 @@ onUnmounted(() => {
 });
 </script>
 
-<script>
-import { ref, onMounted } from 'vue';
-import { getImageList } from '@/api/modules/imageApi';
-
-const loading = ref(false);
-const imageList = ref([]);
-const pagination = ref({
-  current: 1,
-  pageSize: 10,
-  total: 0
-});
-
-// 获取图片列表
-const fetchImageList = async () => {
-  try {
-    loading.value = true;
-    const params = {
-      page: pagination.value.current,
-      pageSize: pagination.value.pageSize
-    };
-    const response = await getImageList(params);
-    imageList.value = response.data;
-    pagination.value.total = response.total;
-  } catch (error) {
-    console.error('获取图片列表失败:', error);
-  } finally {
-    loading.value = false;
-  }
-};
-
-// 分页变化
-const handlePageChange = (page) => {
-  pagination.value.current = page;
-  fetchImageList();
-};
-
-// 初始化加载
-onMounted(() => {
-  fetchImageList();
-});
-</script>
+<!-- 移除重复的script标签，相关功能已在setup script中实现 -->
 
 <style scoped>
 .image-list-container {

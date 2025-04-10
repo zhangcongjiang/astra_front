@@ -2,7 +2,8 @@
 import axios from 'axios';
 
 // 设置基础URL
-const BASE_URL =  'http://localhost:8080/api/';
+// 使用相对路径，这样请求会通过vite代理转发
+const BASE_URL = '/api/api/';
 
 axios.defaults.withCredentials = true;
 
@@ -24,22 +25,22 @@ const instance = axios.create({
 instance.interceptors.request.use(config => {
   // 在发送请求之前做些什么，例如添加Token
   // config.headers.Authorization = `Bearer ${localStorage.getItem('token')}`;
-//   csrftoken=BLzyqj8tNVrBm3iWHV1A0ehoqKgMFX2r; sessionid=iebi9o6m3qtn9qu3rpbemo0wes8wjh3i
-    // 加入cookie信息
-    //     'Authorization': 'Token 654321'
+  //   csrftoken=BLzyqj8tNVrBm3iWHV1A0ehoqKgMFX2r; sessionid=iebi9o6m3qtn9qu3rpbemo0wes8wjh3i
+  // 加入cookie信息
+  //     'Authorization': 'Token 654321'
   config.headers.Authorization = 'Token 76801daaa6067b5f3a2179b3d6251e659feb512e'
 
   return config;
 }, error => {
   // 对请求错误做些什么
+  logger.error('请求拦截器出错:', error);
   return Promise.reject(error);
 });
 
 // 响应拦截器
 instance.interceptors.response.use(response => {
-  // 对响应数据做点什么
   // 去除CORS限制
-  // console.log(response.data);
+  console.log(response.data);
   return response;
 }, error => {
   // 对响应错误做点什么，例如错误提示
