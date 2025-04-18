@@ -128,16 +128,16 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { UploadOutlined, LeftCircleOutlined, RightCircleOutlined, DeleteOutlined, TagsOutlined } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
+import { Modal, message } from 'ant-design-vue';
+import Pagination from '@/components/Pagination.vue';
+import TagSearch from '@/components/TagSearch.vue';
+import { getImageList, getImageContent } from '@/api/modules/imageApi';
 
 // 格式化日期函数
 const formatDate = (date) => {
   if (!date) return '未知';
   return dayjs(date).format('YYYY-MM-DD HH:mm');
 };
-import { Modal, message } from 'ant-design-vue';
-import Pagination from '@/components/Pagination.vue';
-import TagSearch from '@/components/TagSearch.vue';
-import { getImageList } from '@/api/modules/imageApi';
 
 // 搜索类型
 const searchType = ref('basic');
@@ -228,17 +228,35 @@ const fetchImageList = async () => {
       pageSize: pagination.value.pageSize
     };
     const response = await getImageList(params);
-    console.log("**img response**:",response);
+    console.log("**img response**:", response);
     // 添加空值检查
     if (response && response.code === 0 && response.data && Array.isArray(response.data.results)) {
-      imageData.value = response.data.results.map(item => ({
-        id: item.id,
-        name: item.img_name,
-        url: item.url || `/api/image/${item.id}/content/`,
-        uploader: item.creator || '未知',
-        uploadTime: item.created_at,
-        tags: item.tags || []
+      // 使用 Promise.all 处理所有图片的 Blob 数据
+      const images = await Promise.all(response.data.results.map(async (item) => {
+        try {
+          const image_content = await getImageContent(item.id, {
+            responseType: 'blob' // 确保返回的是 Blob
+          });
+          console.log("**img content response**:",typeof image_content);
+
+          // 检查 response 是否是 Blob 对象
+          const url = URL.createObjectURL(image_content);
+          return {
+            id: item.id,
+            name: item.img_name,
+            url: url,
+            uploader: item.creator || '未知',
+            uploadTime: item.created_at,
+            tags: item.tags.map(tag => tag.tag_name)
+          };
+
+        } catch (error) {
+          console.error('Error fetching image content:', error);
+          return null;
+        }
       }));
+      // 过滤掉 null 值
+      imageData.value = images.filter(image => image !== null);
       pagination.value.total = response.data.count || 0;
     } else {
       message.warning('获取的图片列表为空');
@@ -277,6 +295,7 @@ const handleResize = () => {
     imageHeight.value = 220;
   }
 };
+
 // 分页变化处理
 const handlePaginationChange = ({ current, pageSize }) => {
   pagination.value.current = current;
@@ -310,7 +329,6 @@ const resetBasicSearch = () => {
   basicForm.endTime = null;
   handleSearch();
 };
-
 
 // 上传处理
 const handleUploadChange = (info) => {
@@ -389,12 +407,6 @@ const deleteImage = (imageId) => {
   const index = imageData.value.findIndex(img => img.id === imageId);
   if (index !== -1) {
     imageData.value.splice(index, 1);
-    message.success('图片删除成功');
-    if (previewVisible.value && currentPreviewImage.value.id === imageId) {
-      closePreview();
-    }
-  } else {
-    message.error('图片删除失败');
   }
 };
 
@@ -434,7 +446,7 @@ const handleTagSubmit = () => {
 // 获取标签名称
 const getTagNames = (tagIds) => {
   if (!tagIds || !Array.isArray(tagIds)) return [];
-  
+
   const tagNames = [];
   tagCategories.value.forEach(category => {
     category.tags.forEach(tag => {
@@ -455,12 +467,14 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  // 释放所有 Blob URL
+  imageData.value.forEach(image => {
+    URL.revokeObjectURL(image.url);
+  });
   window.removeEventListener('resize', handleResize);
   window.removeEventListener('keydown', handleKeyDown);
 });
 </script>
-
-<!-- 移除重复的script标签，相关功能已在setup script中实现 -->
 
 <style scoped>
 .image-list-container {
@@ -528,6 +542,12 @@ onUnmounted(() => {
   }
 }
 
+@media (max-width: 576px) {
+  .image-card {
+    margin-bottom: 16px;
+  }
+}
+
 .image-card {
   width: 100%;
   height: 100%;
@@ -547,7 +567,6 @@ onUnmounted(() => {
 .image-preview {
   width: 100%;
   object-fit: cover;
-  transition: height 0.3s;
 }
 
 .image-meta {
@@ -699,12 +718,6 @@ onUnmounted(() => {
     display: block;
     margin-right: 0;
     margin-bottom: 4px;
-  }
-}
-
-@media (max-width: 576px) {
-  .image-card {
-    margin-bottom: 16px;
   }
 }
 </style>

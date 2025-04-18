@@ -40,7 +40,7 @@ instance.interceptors.request.use(config => {
 // 响应拦截器
 instance.interceptors.response.use(response => {
   // 去除CORS限制
-  console.log(response.data);
+  // console.log(response.data);
   return response;
 }, error => {
   // 对响应错误做点什么，例如错误提示
