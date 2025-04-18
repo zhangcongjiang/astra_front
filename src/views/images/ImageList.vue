@@ -59,7 +59,7 @@
             <a-card-meta :title="image.name">
               <template #description>
                 <div class="image-meta">
-                  <div>上传者: {{ image.uploader }}</div>
+                  <!-- <div>上传者: {{ image.uploader }}</div> -->
                   <div>上传时间: {{ formatDate(image.uploadTime) }}</div>
                   <div class="image-tags">
                     <a-tag v-for="tag in getTagNames(image.tags)" :key="tag" color="blue">{{ tag }}</a-tag>
