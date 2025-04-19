@@ -38,8 +38,13 @@
 
     <!-- 操作按钮 -->
     <div class="action-area">
-      <a-upload v-model:file-list="fileList" name="file" :multiple="true" action="/api/upload"
-        @change="handleUploadChange">
+      <a-upload
+        v-model:file-list="fileList"
+        :multiple="true"
+        :show-upload-list="false"
+        :before-upload="beforeUpload"
+        :customRequest="handleUpload"
+      >
         <a-button type="primary">
           <upload-outlined /> 上传图片
         </a-button>
@@ -132,6 +137,7 @@ import { Modal, message } from 'ant-design-vue';
 import Pagination from '@/components/Pagination.vue';
 import TagSearch from '@/components/TagSearch.vue';
 import { getImageList, getImageSummary, getImageDetail } from '@/api/modules/imageApi';
+import { uploadImages } from '@/api/modules/imageApi';
 
 // 格式化日期函数
 const formatDate = (date) => {
@@ -333,15 +339,7 @@ const resetBasicSearch = () => {
 // 上传处理
 const handleUploadChange = (info) => {
   if (info.file.status === 'done') {
-    message.success(`${info.file.name} 上传成功`);
-    imageData.value.unshift({
-      id: Date.now(),
-      name: info.file.name,
-      url: URL.createObjectURL(info.file.originFileObj),
-      uploader: '当前用户',
-      uploadTime: new Date().toISOString(),
-      tags: []
-    });
+    // 已经在customRequest中处理
   } else if (info.file.status === 'error') {
     message.error(`${info.file.name} 上传失败`);
   }
@@ -773,3 +771,83 @@ onUnmounted(() => {
   }
 }
 </style>
+
+// 上传前校验
+const beforeUpload = (file) => {
+  const isImage = ['image/jpeg', 'image/png','image/jpg', 'image/gif'].includes(file.type);
+  if (!isImage) {
+    message.error('只能上传图片文件!');
+    return false;
+  }
+  const isLt50M = file.size / 1024 / 1024 < 50;
+  if (!isLt5M) {
+    message.error('图片大小不能超过5MB!');
+    return false;
+  }
+  return true;
+};
+
+// 自定义上传处理
+const handleUpload = async ({ file, onProgress, onSuccess, onError }) => {
+  try {
+    const response = await uploadImages(
+      [file], 
+      'normal', 
+      (progress) => onProgress({ percent: progress })
+    );
+    
+    // 上传成功后添加到图片列表
+    const newImage = {
+      id: response.data.id || Date.now(),
+      name: file.name,
+      url: URL.createObjectURL(file),
+      uploader: '当前用户',
+      uploadTime: new Date().toISOString(),
+      tags: []
+    };
+    imageData.value.unshift(newImage);
+    
+    onSuccess(response, file);
+    message.success(`${file.name} 上传成功`);
+  } catch (error) {
+    onError(error);
+    message.error(`${file.name} 上传失败: ${error.message}`);
+  }
+};
+
+// 处理多文件上传
+const handleMultiUpload = async (files) => {
+  try {
+    loading.value = true;
+    const validFiles = files.filter(file => beforeUpload(file));
+    
+    if (validFiles.length === 0) {
+      return;
+    }
+    
+    const response = await uploadImages(validFiles, 'normal', (progress) => {
+      console.log(`总进度: ${progress}%`);
+    });
+    
+    // 处理上传成功的图片
+    const newImages = await Promise.all(
+      validFiles.map(async (file, index) => {
+        return {
+          id: response.data[index].id || Date.now() + index,
+          name: file.name,
+          url: URL.createObjectURL(file),
+          uploader: '当前用户',
+          uploadTime: new Date().toISOString(),
+          tags: []
+        };
+      })
+    );
+    
+    imageData.value.unshift(...newImages);
+    message.success(`成功上传 ${newImages.length} 张图片`);
+  } catch (error) {
+    message.error(`上传失败: ${error.message}`);
+  } finally {
+    loading.value = false;
+  }
+};
