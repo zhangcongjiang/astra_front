@@ -38,13 +38,8 @@
 
     <!-- 操作按钮 -->
     <div class="action-area">
-      <a-upload
-        v-model:file-list="fileList"
-        :multiple="true"
-        :show-upload-list="false"
-        :before-upload="beforeUpload"
-        :customRequest="handleUpload"
-      >
+      <a-upload v-model:file-list="fileList" :multiple="true" :show-upload-list="false" :before-upload="beforeUpload"
+        :customRequest="handleUpload">
         <a-button type="primary">
           <upload-outlined /> 上传图片
         </a-button>
@@ -136,8 +131,8 @@ import dayjs from 'dayjs';
 import { Modal, message } from 'ant-design-vue';
 import Pagination from '@/components/Pagination.vue';
 import TagSearch from '@/components/TagSearch.vue';
-import { getImageList, getImageSummary, getImageDetail } from '@/api/modules/imageApi';
-import { uploadImages } from '@/api/modules/imageApi';
+import { getImageList, getImageSummary, getImageDetail, deleteImages, uploadImages } from '@/api/modules/imageApi';
+
 
 // 格式化日期函数
 const formatDate = (date) => {
@@ -243,7 +238,7 @@ const fetchImageList = async () => {
           const image_content = await getImageSummary(item.id, {
             responseType: 'blob' // 确保返回的是 Blob
           });
-          console.log("**img content response**:",typeof image_content);
+          console.log("**img content response**:", typeof image_content);
 
           // 检查 response 是否是 Blob 对象
           const url = URL.createObjectURL(image_content);
@@ -351,7 +346,7 @@ const openPreview = async (image, index) => {
     loading.value = true;
     const response = await getImageDetail(image.id);
     const hdImageUrl = URL.createObjectURL(response.data);
-    
+
     currentPreviewIndex.value = index;
     currentPreviewImage.value = {
       ...image,
@@ -403,12 +398,12 @@ const loadHdImage = async (index) => {
     const image = imageData.value[index];
     const response = await getImageDetail(image.id);
     const hdImageUrl = URL.createObjectURL(response.data);
-    
+
     // 释放之前的高清图片URL
     if (currentPreviewImage.value.url && currentPreviewImage.value.url.startsWith('blob:')) {
       URL.revokeObjectURL(currentPreviewImage.value.url);
     }
-    
+
     currentPreviewImage.value = {
       ...image,
       url: hdImageUrl
@@ -434,8 +429,87 @@ const handleKeyDown = (e) => {
     closePreview();
   }
 };
+// 上传前校验
+const beforeUpload = (file) => {
+  const isImage = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'].includes(file.type);
+  if (!isImage) {
+    message.error('只能上传图片文件!');
+    return false;
+  }
+  const isLt50M = file.size / 1024 / 1024 < 50;
+  if (!isLt5M) {
+    message.error('图片大小不能超过5MB!');
+    return false;
+  }
+  return true;
+};
 
+// 自定义上传处理
+const handleUpload = async ({ file, onProgress, onSuccess, onError }) => {
+  try {
+    const response = await uploadImages(
+      [file],
+      'normal',
+      (progress) => onProgress({ percent: progress })
+    );
+
+    // 上传成功后添加到图片列表
+    const newImage = {
+      id: response.data.id || Date.now(),
+      name: file.name,
+      url: URL.createObjectURL(file),
+      uploader: '当前用户',
+      uploadTime: new Date().toISOString(),
+      tags: []
+    };
+    imageData.value.unshift(newImage);
+
+    onSuccess(response, file);
+    message.success(`${file.name} 上传成功`);
+  } catch (error) {
+    onError(error);
+    message.error(`${file.name} 上传失败: ${error.message}`);
+  }
+};
+
+// 处理多文件上传
+const handleMultiUpload = async (files) => {
+  try {
+    loading.value = true;
+    const validFiles = files.filter(file => beforeUpload(file));
+
+    if (validFiles.length === 0) {
+      return;
+    }
+
+    const response = await uploadImages(validFiles, 'normal', (progress) => {
+      console.log(`总进度: ${progress}%`);
+    });
+
+    // 处理上传成功的图片
+    const newImages = await Promise.all(
+      validFiles.map(async (file, index) => {
+        return {
+          id: response.data[index].id || Date.now() + index,
+          name: file.name,
+          url: URL.createObjectURL(file),
+          uploader: '当前用户',
+          uploadTime: new Date().toISOString(),
+          tags: []
+        };
+      })
+    );
+
+    imageData.value.unshift(...newImages);
+    message.success(`成功上传 ${newImages.length} 张图片`);
+  } catch (error) {
+    message.error(`上传失败: ${error.message}`);
+  } finally {
+    loading.value = false;
+  }
+};
 // 删除图片功能
+// 修改删除确认对话框
 const showDeleteConfirm = (imageId) => {
   Modal.confirm({
     title: '确认删除图片',
@@ -444,15 +518,27 @@ const showDeleteConfirm = (imageId) => {
     okType: 'danger',
     cancelText: '取消',
     onOk() {
-      deleteImage(imageId);
+      handleDeleteImage(imageId);
     }
   });
 };
 
-const deleteImage = (imageId) => {
-  const index = imageData.value.findIndex(img => img.id === imageId);
-  if (index !== -1) {
-    imageData.value.splice(index, 1);
+// 新增删除处理方法
+const handleDeleteImage = async (imageId) => {
+  try {
+    await deleteImages([imageId]);
+    const index = imageData.value.findIndex(img => img.id === imageId);
+    if (index !== -1) {
+      // 释放图片的Blob URL
+      if (imageData.value[index].url && imageData.value[index].url.startsWith('blob:')) {
+        URL.revokeObjectURL(imageData.value[index].url);
+      }
+      imageData.value.splice(index, 1);
+      message.success('图片删除成功');
+    }
+  } catch (error) {
+    console.error('删除图片失败:', error);
+    message.error('图片删除失败');
   }
 };
 
@@ -771,83 +857,3 @@ onUnmounted(() => {
   }
 }
 </style>
-
-// 上传前校验
-const beforeUpload = (file) => {
-  const isImage = ['image/jpeg', 'image/png','image/jpg', 'image/gif'].includes(file.type);
-  if (!isImage) {
-    message.error('只能上传图片文件!');
-    return false;
-  }
-  const isLt50M = file.size / 1024 / 1024 < 50;
-  if (!isLt5M) {
-    message.error('图片大小不能超过5MB!');
-    return false;
-  }
-  return true;
-};
-
-// 自定义上传处理
-const handleUpload = async ({ file, onProgress, onSuccess, onError }) => {
-  try {
-    const response = await uploadImages(
-      [file], 
-      'normal', 
-      (progress) => onProgress({ percent: progress })
-    );
-    
-    // 上传成功后添加到图片列表
-    const newImage = {
-      id: response.data.id || Date.now(),
-      name: file.name,
-      url: URL.createObjectURL(file),
-      uploader: '当前用户',
-      uploadTime: new Date().toISOString(),
-      tags: []
-    };
-    imageData.value.unshift(newImage);
-    
-    onSuccess(response, file);
-    message.success(`${file.name} 上传成功`);
-  } catch (error) {
-    onError(error);
-    message.error(`${file.name} 上传失败: ${error.message}`);
-  }
-};
-
-// 处理多文件上传
-const handleMultiUpload = async (files) => {
-  try {
-    loading.value = true;
-    const validFiles = files.filter(file => beforeUpload(file));
-    
-    if (validFiles.length === 0) {
-      return;
-    }
-    
-    const response = await uploadImages(validFiles, 'normal', (progress) => {
-      console.log(`总进度: ${progress}%`);
-    });
-    
-    // 处理上传成功的图片
-    const newImages = await Promise.all(
-      validFiles.map(async (file, index) => {
-        return {
-          id: response.data[index].id || Date.now() + index,
-          name: file.name,
-          url: URL.createObjectURL(file),
-          uploader: '当前用户',
-          uploadTime: new Date().toISOString(),
-          tags: []
-        };
-      })
-    );
-    
-    imageData.value.unshift(...newImages);
-    message.success(`成功上传 ${newImages.length} 张图片`);
-  } catch (error) {
-    message.error(`上传失败: ${error.message}`);
-  } finally {
-    loading.value = false;
-  }
-};

@@ -1,4 +1,5 @@
 import { request } from "../config/request";
+import formatParams from "@/utils/formatParams";
 
 export const getImageList = async (params) => {
   try {
@@ -58,4 +59,16 @@ export const uploadImages = (files, category = 'normal', onProgress) => {
       }
     }
   });
+};
+
+export const deleteImages = async (imageIds) => {
+  try {
+    const response = await request.post('/image/delete/', {
+      image_ids: imageIds
+    });
+    return response;
+  } catch (error) {
+    console.error('删除图片失败:', error);
+    throw error;
+  }
 };
