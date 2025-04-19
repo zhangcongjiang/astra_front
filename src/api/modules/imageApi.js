@@ -11,10 +11,19 @@ export const getImageList = async (params) => {
   }
 };
 
-export const getImageContent = (id, config = {}) => {
+export const getImageSummary = (id, config = {}) => {
   return request({
     method: 'get',
-    url: `/image/${id}/content/`,
+    url: `/image/${id}/summary/`,
+    responseType: 'blob', // 确保返回的是 Blob
+    ...config
+  });
+};
+
+export const getImageDetail = (id, config = {}) => {
+  return request({
+    method: 'get',
+    url: `/image/${id}/detail/`,
     responseType: 'blob', // 确保返回的是 Blob
     ...config
   });

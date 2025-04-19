@@ -131,7 +131,7 @@ import dayjs from 'dayjs';
 import { Modal, message } from 'ant-design-vue';
 import Pagination from '@/components/Pagination.vue';
 import TagSearch from '@/components/TagSearch.vue';
-import { getImageList, getImageContent } from '@/api/modules/imageApi';
+import { getImageList, getImageSummary, getImageDetail } from '@/api/modules/imageApi';
 
 // 格式化日期函数
 const formatDate = (date) => {
@@ -234,7 +234,7 @@ const fetchImageList = async () => {
       // 使用 Promise.all 处理所有图片的 Blob 数据
       const images = await Promise.all(response.data.results.map(async (item) => {
         try {
-          const image_content = await getImageContent(item.id, {
+          const image_content = await getImageSummary(item.id, {
             responseType: 'blob' // 确保返回的是 Blob
           });
           console.log("**img content response**:",typeof image_content);
@@ -348,32 +348,80 @@ const handleUploadChange = (info) => {
 };
 
 // 图片预览功能
-const openPreview = (image, index) => {
-  currentPreviewIndex.value = index;
-  currentPreviewImage.value = image;
-  previewVisible.value = true;
+const openPreview = async (image, index) => {
+  try {
+    loading.value = true;
+    const response = await getImageDetail(image.id);
+    const hdImageUrl = URL.createObjectURL(response.data);
+    
+    currentPreviewIndex.value = index;
+    currentPreviewImage.value = {
+      ...image,
+      url: hdImageUrl  // 使用高清图片URL替换缩略图URL
+    };
+    previewVisible.value = true;
+  } catch (error) {
+    console.error('获取高清图片失败:', error);
+    message.error('获取高清图片失败');
+    // 失败时仍然显示缩略图
+    currentPreviewIndex.value = index;
+    currentPreviewImage.value = image;
+    previewVisible.value = true;
+  } finally {
+    loading.value = false;
+  }
 };
 
 const closePreview = () => {
+  // 释放高清图片的Blob URL
+  if (currentPreviewImage.value.url && currentPreviewImage.value.url.startsWith('blob:')) {
+    URL.revokeObjectURL(currentPreviewImage.value.url);
+  }
   previewVisible.value = false;
 };
 
-const showPrevImage = () => {
+const showPrevImage = async () => {
   if (currentPreviewIndex.value > 0) {
     currentPreviewIndex.value--;
   } else {
     currentPreviewIndex.value = imageData.value.length - 1;
   }
-  currentPreviewImage.value = imageData.value[currentPreviewIndex.value];
+  await loadHdImage(currentPreviewIndex.value);
 };
 
-const showNextImage = () => {
+const showNextImage = async () => {
   if (currentPreviewIndex.value < imageData.value.length - 1) {
     currentPreviewIndex.value++;
   } else {
     currentPreviewIndex.value = 0;
   }
-  currentPreviewImage.value = imageData.value[currentPreviewIndex.value];
+  await loadHdImage(currentPreviewIndex.value);
+};
+
+// 新增方法：加载高清图片
+const loadHdImage = async (index) => {
+  try {
+    loading.value = true;
+    const image = imageData.value[index];
+    const response = await getImageDetail(image.id);
+    const hdImageUrl = URL.createObjectURL(response.data);
+    
+    // 释放之前的高清图片URL
+    if (currentPreviewImage.value.url && currentPreviewImage.value.url.startsWith('blob:')) {
+      URL.revokeObjectURL(currentPreviewImage.value.url);
+    }
+    
+    currentPreviewImage.value = {
+      ...image,
+      url: hdImageUrl
+    };
+  } catch (error) {
+    console.error('获取高清图片失败:', error);
+    // 失败时显示缩略图
+    currentPreviewImage.value = imageData.value[index];
+  } finally {
+    loading.value = false;
+  }
 };
 
 // 键盘事件处理
@@ -467,6 +515,10 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  // 释放预览图片的Blob URL
+  if (currentPreviewImage.value.url && currentPreviewImage.value.url.startsWith('blob:')) {
+    URL.revokeObjectURL(currentPreviewImage.value.url);
+  }
   // 释放所有 Blob URL
   imageData.value.forEach(image => {
     URL.revokeObjectURL(image.url);
