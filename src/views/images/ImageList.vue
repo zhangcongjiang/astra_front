@@ -132,6 +132,7 @@ import { Modal, message } from 'ant-design-vue';
 import Pagination from '@/components/Pagination.vue';
 import TagSearch from '@/components/TagSearch.vue';
 import { getImageList, getImageSummary, getImageDetail, deleteImages, uploadImages } from '@/api/modules/imageApi';
+import { getTagsByCategory } from '@/api/modules/tagApi';
 
 
 // 格式化日期函数
@@ -152,29 +153,6 @@ const basicForm = reactive({
   endTime: null
 });
 
-// 标签数据
-const tagCategories = ref([
-  {
-    id: 1,
-    name: '类型',
-    tags: [
-      { id: 'type_1', name: '风景' },
-      { id: 'type_2', name: '人物' },
-      { id: 'type_3', name: '动物' },
-      { id: 'type_4', name: '建筑' }
-    ]
-  },
-  {
-    id: 2,
-    name: '颜色',
-    tags: [
-      { id: 'color_1', name: '红色' },
-      { id: 'color_2', name: '蓝色' },
-      { id: 'color_3', name: '绿色' },
-      { id: 'color_4', name: '黑白' }
-    ]
-  }
-]);
 
 // 选中的标签
 const selectedTags = ref([]);
@@ -271,7 +249,28 @@ const fetchImageList = async () => {
 // 修改获取标签名称的方法
 const getTagNames = (tags) => {
   if (!tags || !Array.isArray(tags)) return [];
-  return tags.map(tag => tag.tag_name); // 直接从标签对象中获取名称
+
+  // 扁平化所有标签
+  const allTags = [];
+  const flattenTags = (categories) => {
+    categories.forEach(category => {
+      allTags.push({
+        id: category.id,
+        name: category.tag_name // 使用tag_name字段
+      });
+      if (category.children && category.children.length > 0) {
+        flattenTags(category.children);
+      }
+    });
+  };
+
+  flattenTags(tagCategories.value);
+
+  // 匹配并返回标签名称
+  return tags.map(tagId => {
+    const found = allTags.find(t => t.id === tagId);
+    return found ? found.name : '';
+  }).filter(name => name);
 };
 
 // 初始化
@@ -545,11 +544,13 @@ const handleDeleteImage = async (imageId) => {
 };
 
 // 标签编辑功能
+// 修改标签编辑方法
 const showTagModal = (image) => {
   tagForm.imageId = image.id;
-  tagForm.currentTags = [...image.tags]; // 这里已经是标签ID数组
+  tagForm.currentTags = [...image.tags];
   tagModalVisible.value = true;
 };
+
 
 const closeTagModal = () => {
   tagModalVisible.value = false;
@@ -578,26 +579,31 @@ const handleTagSubmit = () => {
 };
 
 
-// 初始化
+// 修改标签数据获取方式
+const tagCategories = ref([]);
+
+// 在onMounted中添加获取标签分类的逻辑
 onMounted(() => {
   handleResize();
   window.addEventListener('resize', handleResize);
   window.addEventListener('keydown', handleKeyDown);
-  fetchImageList(); // 初始化时加载数据
+  fetchImageList();
+  fetchTagCategories(); // 新增方法调用
 });
 
-onUnmounted(() => {
-  // 释放预览图片的Blob URL
-  if (currentPreviewImage.value.url && currentPreviewImage.value.url.startsWith('blob:')) {
-    URL.revokeObjectURL(currentPreviewImage.value.url);
+// 新增获取标签分类方法
+const fetchTagCategories = async () => {
+  try {
+    const response = await getTagsByCategory({ category: 'IMAGE' });
+    if (response?.code === 0 && Array.isArray(response.data)) {
+      tagCategories.value = response.data;
+      console.log("**tagCategories**:", tagCategories.value);
+    }
+  } catch (error) {
+    console.error('获取标签分类失败:', error);
+    message.error('获取标签分类失败');
   }
-  // 释放所有 Blob URL
-  imageData.value.forEach(image => {
-    URL.revokeObjectURL(image.url);
-  });
-  window.removeEventListener('resize', handleResize);
-  window.removeEventListener('keydown', handleKeyDown);
-});
+};
 </script>
 
 <style scoped>
@@ -845,3 +851,5 @@ onUnmounted(() => {
   }
 }
 </style>
+
+

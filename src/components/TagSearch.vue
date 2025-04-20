@@ -235,15 +235,50 @@ const formRules = {
 };
 
 // 计算属性
+// 修改标签展示逻辑
 const visibleSecondLevelTags = computed(() => {
-  if (showHoverPreview.value && selectedFirstLevelTags.value.length === 0) {
-    return hoverSecondLevelTags.value;
-  }
-  if (selectedFirstLevelTags.value.length > 0) {
-    return getSelectedSecondLevelTags();
-  }
-  return allSecondLevelTags.value;
+// 处理后端返回的树形结构
+if (showHoverPreview.value && selectedFirstLevelTags.value.length === 0) {
+return hoverSecondLevelTags.value;
+}
+
+if (selectedFirstLevelTags.value.length > 0) {
+const tags = [];
+props.tags.forEach(category => {
+if (selectedFirstLevelTags.value.includes(category.id)) {
+// 处理一级标签的子标签
+if (category.children?.length) {
+tags.push(...category.children);
+}
+}
 });
+return tags;
+}
+
+// 扁平化所有二级标签
+const allTags = [];
+props.tags.forEach(category => {
+if (category.children?.length) {
+allTags.push(...category.children);
+}
+});
+return allTags;
+});
+
+// 修改初始化方法
+const initSecondLevelTags = () => {
+let arr = [];
+props.tags.forEach(category => {
+if (category.children?.length) {
+arr = [...arr, ...category.children];
+}
+});
+allSecondLevelTags.value = arr;
+
+if (props.allowImageTagging) {
+selectedTags.value = [...props.imageTags];
+}
+};
 
 const parentTagOptions = computed(() => {
   return props.tags.map(tag => ({
@@ -338,19 +373,6 @@ const handleSearch = () => {
   emit('search');
 };
 
-const initSecondLevelTags = () => {
-  let arr = [];
-  props.tags.forEach(v => {
-    if (v.tags?.length) {
-      arr = [...arr, ...v.tags];
-    }
-  });
-  allSecondLevelTags.value = arr;
-  
-  if (props.allowImageTagging) {
-    selectedTags.value = [...props.imageTags];
-  }
-};
 
 // 标签管理相关方法
 const showAddModal = (parentId = null) => {
