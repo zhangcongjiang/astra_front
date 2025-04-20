@@ -220,7 +220,7 @@ const previewImageStyle = computed(() => {
   };
 });
 
-// 获取图片列表
+// 修改获取图片列表的方法
 const fetchImageList = async () => {
   try {
     loading.value = true;
@@ -230,25 +230,21 @@ const fetchImageList = async () => {
     };
     const response = await getImageList(params);
     console.log("**img response**:", response);
-    // 添加空值检查
     if (response && response.code === 0 && response.data && Array.isArray(response.data.results)) {
-      // 使用 Promise.all 处理所有图片的 Blob 数据
       const images = await Promise.all(response.data.results.map(async (item) => {
         try {
           const image_content = await getImageSummary(item.id, {
-            responseType: 'blob' // 确保返回的是 Blob
+            responseType: 'blob'
           });
-          console.log("**img content response**:", typeof image_content);
 
-          // 检查 response 是否是 Blob 对象
           const url = URL.createObjectURL(image_content);
           return {
             id: item.id,
             name: item.img_name,
             url: url,
             uploader: item.creator || '未知',
-            uploadTime: item.created_at,
-            tags: item.tags.map(tag => tag.tag_name)
+            uploadTime: item.create_time,
+            tags: item.tags || [] // 直接使用后端返回的标签数组
           };
 
         } catch (error) {
@@ -256,7 +252,7 @@ const fetchImageList = async () => {
           return null;
         }
       }));
-      // 过滤掉 null 值
+
       imageData.value = images.filter(image => image !== null);
       pagination.value.total = response.data.count || 0;
     } else {
@@ -270,6 +266,12 @@ const fetchImageList = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+// 修改获取标签名称的方法
+const getTagNames = (tags) => {
+  if (!tags || !Array.isArray(tags)) return [];
+  return tags.map(tag => tag.tag_name); // 直接从标签对象中获取名称
 };
 
 // 初始化
@@ -545,7 +547,7 @@ const handleDeleteImage = async (imageId) => {
 // 标签编辑功能
 const showTagModal = (image) => {
   tagForm.imageId = image.id;
-  tagForm.currentTags = [...image.tags];
+  tagForm.currentTags = [...image.tags]; // 这里已经是标签ID数组
   tagModalVisible.value = true;
 };
 
@@ -569,26 +571,12 @@ const removeImageTag = (tagId) => {
 const handleTagSubmit = () => {
   const imageIndex = imageData.value.findIndex(img => img.id === tagForm.imageId);
   if (imageIndex !== -1) {
-    imageData.value[imageIndex].tags = [...tagForm.currentTags];
+    imageData.value[imageIndex].tags = [...tagForm.currentTags]; // 直接存储标签ID数组
     message.success('标签更新成功');
     closeTagModal();
   }
 };
 
-// 获取标签名称
-const getTagNames = (tagIds) => {
-  if (!tagIds || !Array.isArray(tagIds)) return [];
-
-  const tagNames = [];
-  tagCategories.value.forEach(category => {
-    category.tags.forEach(tag => {
-      if (tagIds.includes(tag.id)) {
-        tagNames.push(tag.name);
-      }
-    });
-  });
-  return tagNames;
-};
 
 // 初始化
 onMounted(() => {
