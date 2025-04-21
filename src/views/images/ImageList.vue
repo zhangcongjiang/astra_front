@@ -192,9 +192,14 @@ const currentPreviewImage = ref({});
 
 // 预览图片样式
 const previewImageStyle = computed(() => {
+  const maxWidth = window.innerWidth * 0.9; // 最大宽度为视窗宽度的90%
+  const maxHeight = window.innerHeight * 0.8; // 最大高度为视窗高度的80%
   return {
-    maxWidth: '100%',
-    maxHeight: '70vh'
+    maxWidth: `${maxWidth}px`,
+    maxHeight: `${maxHeight}px`,
+    width: 'auto',
+    height: 'auto',
+    objectFit: 'contain', // 确保图片完整显示
   };
 });
 
@@ -393,7 +398,7 @@ const loadHdImage = async (index) => {
     loading.value = true;
     const image = imageData.value[index];
     const response = await getImageDetail(image.id);
-    const hdImageUrl = URL.createObjectURL(response.data);
+    const hdImageUrl = URL.createObjectURL(response);
 
     // 释放之前的高清图片URL
     if (currentPreviewImage.value.url && currentPreviewImage.value.url.startsWith('blob:')) {
@@ -402,7 +407,7 @@ const loadHdImage = async (index) => {
 
     currentPreviewImage.value = {
       ...image,
-      url: hdImageUrl
+      url: hdImageUrl,
     };
   } catch (error) {
     console.error('获取高清图片失败:', error);
