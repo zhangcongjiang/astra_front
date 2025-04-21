@@ -439,7 +439,7 @@ const beforeUpload = (file) => {
   }
   const isLt50M = file.size / 1024 / 1024 < 50;
   if (!isLt50M) {
-    message.error('图片大小不能超过5MB!');
+    message.error('图片大小不能超过50MB!');
     return false;
   }
   return true;
