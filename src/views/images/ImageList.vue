@@ -255,27 +255,8 @@ const fetchImageList = async () => {
 const getTagNames = (tags) => {
   if (!tags || !Array.isArray(tags)) return [];
 
-  // 扁平化所有标签
-  const allTags = [];
-  const flattenTags = (categories) => {
-    categories.forEach(category => {
-      allTags.push({
-        id: category.id,
-        name: category.tag_name // 使用tag_name字段
-      });
-      if (category.children && category.children.length > 0) {
-        flattenTags(category.children);
-      }
-    });
-  };
-
-  flattenTags(tagCategories.value);
-
-  // 匹配并返回标签名称
-  return tags.map(tagId => {
-    const found = allTags.find(t => t.id === tagId);
-    return found ? found.name : '';
-  }).filter(name => name);
+  // 直接返回标签名称
+  return tags.map(tag => tag.tag_name).filter(name => name);
 };
 
 // 初始化
