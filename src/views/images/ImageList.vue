@@ -344,25 +344,20 @@ const handleUploadChange = (info) => {
 // 图片预览功能
 const openPreview = async (image, index) => {
   try {
-    loading.value = true;
     const response = await getImageDetail(image.id);
-    const hdImageUrl = URL.createObjectURL(response.data);
-
-    currentPreviewIndex.value = index;
-    currentPreviewImage.value = {
-      ...image,
-      url: hdImageUrl  // 使用高清图片URL替换缩略图URL
-    };
-    previewVisible.value = true;
+    if (response instanceof Blob) {
+      currentPreviewImage.value = {
+        ...image,
+        url: URL.createObjectURL(response)
+      };
+      currentPreviewIndex.value = index;
+      previewVisible.value = true;
+    } else {
+      throw new Error('获取的图片数据无效');
+    }
   } catch (error) {
     console.error('获取高清图片失败:', error);
     message.error('获取高清图片失败');
-    // 失败时仍然显示缩略图
-    currentPreviewIndex.value = index;
-    currentPreviewImage.value = image;
-    previewVisible.value = true;
-  } finally {
-    loading.value = false;
   }
 };
 
