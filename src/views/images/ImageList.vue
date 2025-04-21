@@ -572,12 +572,23 @@ onMounted(() => {
   fetchTagCategories(); // 新增方法调用
 });
 
-// 新增获取标签分类方法
 const fetchTagCategories = async () => {
   try {
     const response = await getTagsByCategory({ category: 'IMAGE' });
     if (response?.code === 0 && Array.isArray(response.data)) {
-      tagCategories.value = response.data;
+      // 将嵌套结构扁平化
+      const flattenTags = (categories) => {
+        return categories.reduce((acc, category) => {
+          acc.push({
+            id: category.id,
+            name: category.tag_name,
+            children: category.children ? flattenTags(category.children) : []
+          });
+          return acc;
+        }, []);
+      };
+
+      tagCategories.value = flattenTags(response.data);
       console.log("**tagCategories**:", tagCategories.value);
     }
   } catch (error) {
