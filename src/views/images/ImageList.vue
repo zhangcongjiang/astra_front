@@ -12,9 +12,6 @@
       <!-- 基础查询表单 -->
       <div class="basic-search" v-if="searchType === 'basic'">
         <a-form layout="inline" :model="basicForm">
-          <a-form-item label="图片名称">
-            <a-input v-model:value="basicForm.name" placeholder="输入图片名称" @pressEnter="handleSearch" />
-          </a-form-item>
           <a-form-item label="上传者">
             <a-input v-model:value="basicForm.uploader" placeholder="输入上传者名称" @pressEnter="handleSearch" />
           </a-form-item>
@@ -209,7 +206,10 @@ const fetchImageList = async () => {
     loading.value = true;
     const params = {
       page: pagination.value.current,
-      pageSize: pagination.value.pageSize
+      pageSize: pagination.value.pageSize,
+      creator: basicForm.uploader, // 创建人查询条件
+      start_datetime: basicForm.startTime ? dayjs(basicForm.startTime).format('YYYY-MM-DDTHH:mm:ss') : null, // 开始时间
+      end_datetime: basicForm.endTime ? dayjs(basicForm.endTime).format('YYYY-MM-DDTHH:mm:ss') : null, // 结束时间
     };
     const response = await getImageList(params);
     console.log("**img response**:", response);
