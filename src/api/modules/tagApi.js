@@ -10,3 +10,14 @@ export const getTagsByCategory = async (params) => {
     throw error;
   }
 };
+
+
+export const addTag = async (data) => {
+  try {
+    const response = await request.post('/tag/add/', data);
+    return response;
+  } catch (error) {
+    console.error('新增标签失败:', error);
+    throw error;
+  }
+};

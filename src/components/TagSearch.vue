@@ -173,6 +173,7 @@
 import { ref, watch, computed, nextTick } from 'vue';
 import { message } from 'ant-design-vue';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons-vue';
+import { addTag } from '@/api/modules/tagApi';
 
 const props = defineProps({
   tags: {
@@ -194,6 +195,10 @@ const props = defineProps({
   allowImageTagging: {
     type: Boolean,
     default: false
+  },
+  category: {
+    type: String,
+    required: true
   }
 });
 
@@ -418,15 +423,12 @@ const resetModal = () => {
 const handleModalOk = async () => {
   try {
     await tagFormRef.value.validate();
-    
+    console.log('category:', props.category);
     const tagData = {
-      name: tagForm.value.name,
-      type: props.tagType
+      tag_name: tagForm.value.name,
+      parent: tagForm.value.type === 'main' ? '' : tagForm.value.parentId || '',
+      category: props.category // 使用从 ImageList 传递过来的 category
     };
-    
-    if (tagForm.value.type === 'sub') {
-      tagData.parentId = tagForm.value.parentId;
-    }
     
     if (currentTag.value) {
       // 更新标签逻辑
@@ -435,8 +437,7 @@ const handleModalOk = async () => {
       message.success('标签更新成功');
     } else {
       // 创建标签逻辑
-      // await api.createTag(tagData);
-      message.success('标签创建成功');
+      await handleAddTag(tagData); // 调用添加标签方法
     }
     
     // 刷新标签列表
@@ -455,6 +456,21 @@ const handleDeleteTag = async (tagId) => {
   } catch (error) {
     message.error('标签删除失败');
     console.error(error);
+  }
+};
+
+const handleAddTag = async (tagData) => {
+  try {
+    const response = await addTag(tagData);
+    if (response.code === 0) {
+      message.success('标签添加成功');
+      emit('update:tags'); // 触发标签列表更新
+    } else {
+      message.error(response.message || '标签添加失败');
+    }
+  } catch (error) {
+    console.error('标签添加失败:', error);
+    message.error('标签添加失败');
   }
 };
 

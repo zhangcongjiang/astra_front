@@ -28,8 +28,14 @@
 
       <!-- 标签查询 -->
       <div class="tag-search" v-if="searchType === 'tag'">
-        <TagSearch :tags="tagCategories" :showActions="true" v-model:selectedTags="selectedTags"
-          @search="handleTagSearch" />
+        <TagSearch 
+          :tags="tagCategories" 
+          :showActions="true" 
+          v-model:selectedTags="selectedTags" 
+          :category="IMAGE" 
+          @search="handleSearch" 
+          @update:tags="fetchTagCategories" 
+        />
       </div>
     </div>
 
@@ -173,7 +179,7 @@ const imageData = ref([]);
 
 // 加载状态
 const loading = ref(false);
-
+const IMAGE = 'IMAGE'; 
 // 分页配置
 const pagination = ref({
   current: 1,
