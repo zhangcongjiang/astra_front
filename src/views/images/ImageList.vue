@@ -58,8 +58,11 @@
                 <div class="image-meta">
                   <!-- <div>上传者: {{ image.uploader }}</div> -->
                   <div>上传时间: {{ formatDate(image.uploadTime) }}</div>
+                  <!-- 图片标签 -->
                   <div class="image-tags">
-                    <a-tag v-for="tag in getTagNames(image.tags)" :key="tag" color="blue">{{ tag }}</a-tag>
+                    <a-tag v-for="tag in getTagNames(image.tags)" :key="tag.id" color="blue" @click.stop="handleTagClick(tag.id)">
+                      {{ tag.name }}
+                    </a-tag>
                   </div>
                 </div>
               </template>
@@ -211,6 +214,11 @@ const fetchImageList = async () => {
       start_datetime: basicForm.startTime ? dayjs(basicForm.startTime).format('YYYY-MM-DDTHH:mm:ss') : null, // 开始时间
       end_datetime: basicForm.endTime ? dayjs(basicForm.endTime).format('YYYY-MM-DDTHH:mm:ss') : null, // 结束时间
     };
+    if (selectedTags.value.length > 0) {
+      selectedTags.value.forEach(tagId => {
+        params[`tag_ids[]`] = tagId;
+      });
+    }
     const response = await getImageList(params);
     console.log("**img response**:", response);
     if (response && response.code === 0 && response.data && Array.isArray(response.data.results)) {
@@ -250,13 +258,19 @@ const fetchImageList = async () => {
     loading.value = false;
   }
 };
-
+const handleTagClick = (tagId) => {
+  selectedTags.value = [tagId]; // 设置选中的标签
+  handleSearch(); // 触发查询
+};
 // 修改获取标签名称的方法
 const getTagNames = (tags) => {
   if (!tags || !Array.isArray(tags)) return [];
 
-  // 直接返回标签名称
-  return tags.map(tag => tag.tag_name).filter(name => name);
+  // 返回包含标签名称和ID的对象数组
+  return tags.map(tag => ({
+    id: tag.id, // 标签ID
+    name: tag.tag_name // 标签名称
+  })).filter(tag => tag.name);
 };
 
 // 初始化
@@ -843,5 +857,3 @@ const fetchTagCategories = async () => {
   }
 }
 </style>
-
-
