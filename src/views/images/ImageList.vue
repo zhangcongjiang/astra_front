@@ -29,7 +29,7 @@
       <!-- 标签查询 -->
       <div class="tag-search" v-if="searchType === 'tag'">
         <TagSearch :tags="tagCategories" :showActions="true" v-model:selectedTags="selectedTags"
-          @search="handleSearch" />
+          @search="handleTagSearch" />
       </div>
     </div>
 
@@ -60,7 +60,8 @@
                   <div>上传时间: {{ formatDate(image.uploadTime) }}</div>
                   <!-- 图片标签 -->
                   <div class="image-tags">
-                    <a-tag v-for="tag in getTagNames(image.tags)" :key="tag.id" color="blue" @click.stop="handleTagClick(tag.id)">
+                    <a-tag v-for="tag in getTagNames(image.tags)" :key="tag.id" color="blue"
+                      @click.stop="handleTagClick(tag.id)">
                       {{ tag.name }}
                     </a-tag>
                   </div>
@@ -272,7 +273,10 @@ const getTagNames = (tags) => {
     name: tag.tag_name // 标签名称
   })).filter(tag => tag.name);
 };
-
+const handleTagSearch = () => {
+  pagination.value.current = 1; // 重置分页
+  fetchImageList(); // 触发查询
+};
 // 初始化
 onMounted(() => {
   handleResize();

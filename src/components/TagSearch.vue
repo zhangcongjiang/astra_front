@@ -323,19 +323,29 @@ const resetHoverPreview = () => {
 const handleFirstLevelChange = (category, checked) => {
   if (checked) {
     selectedFirstLevelTags.value.push(category.id);
+    // 将一级标签 ID 添加到 selectedTags
+    if (!selectedTags.value.includes(category.id)) {
+      selectedTags.value.push(category.id);
+    }
   } else {
     const index = selectedFirstLevelTags.value.indexOf(category.id);
     if (index > -1) {
       selectedFirstLevelTags.value.splice(index, 1);
     }
+    // 从 selectedTags 中移除一级标签 ID
+    const tagIndex = selectedTags.value.indexOf(category.id);
+    if (tagIndex > -1) {
+      selectedTags.value.splice(tagIndex, 1);
+    }
     if (category.tags) {
       selectedTags.value = selectedTags.value.filter(
         tagId => !category.tags.some(tag => tag.id === tagId)
       );
-      emit('update:selectedTags', selectedTags.value);
     }
   }
+  emit('update:selectedTags', selectedTags.value); // 更新选中的标签
   resetHoverPreview();
+  emit('search'); // 选择一级标签时自动触发查询
 };
 
 const handleSecondLevelChange = (tagId, checked) => {
@@ -357,6 +367,7 @@ const handleSecondLevelChange = (tagId, checked) => {
       }
     }
     emit('update:selectedTags', selectedTags.value);
+    emit('search'); // 点击标签时自动触发查询
   }
 };
 
