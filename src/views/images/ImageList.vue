@@ -138,7 +138,7 @@ import dayjs from 'dayjs';
 import { Modal, message } from 'ant-design-vue';
 import Pagination from '@/components/Pagination.vue';
 import TagSearch from '@/components/TagSearch.vue';
-import { getImageList, getImageSummary, getImageDetail, deleteImages, uploadImages } from '@/api/modules/imageApi';
+import { getImageList, getImageSummary, getImageContent,getImageDetail, deleteImages, uploadImages,bindTags } from '@/api/modules/imageApi';
 import { getTagsByCategory } from '@/api/modules/tagApi';
 
 
@@ -354,7 +354,7 @@ const handleUploadChange = (info) => {
 // 图片预览功能
 const openPreview = async (image, index) => {
   try {
-    const response = await getImageDetail(image.id);
+    const response = await getImageContent(image.id);
     if (response instanceof Blob) {
       currentPreviewImage.value = {
         ...image,
@@ -402,7 +402,7 @@ const loadHdImage = async (index) => {
   try {
     loading.value = true;
     const image = imageData.value[index];
-    const response = await getImageDetail(image.id);
+    const response = await getImageContent(image.id);
     const hdImageUrl = URL.createObjectURL(response);
 
     // 释放之前的高清图片URL
@@ -552,7 +552,7 @@ const handleDeleteImage = async (imageId) => {
 // 修改标签编辑方法
 const showTagModal = (image) => {
   tagForm.imageId = image.id;
-  tagForm.currentTags = [...image.tags];
+  tagForm.currentTags = image.tags.map(tag => tag.id); // 确保传递的是标签 ID 数组
   tagModalVisible.value = true;
 };
 
@@ -574,12 +574,32 @@ const removeImageTag = (tagId) => {
   }
 };
 
-const handleTagSubmit = () => {
-  const imageIndex = imageData.value.findIndex(img => img.id === tagForm.imageId);
-  if (imageIndex !== -1) {
-    imageData.value[imageIndex].tags = [...tagForm.currentTags]; // 直接存储标签ID数组
-    message.success('标签更新成功');
-    closeTagModal();
+const handleTagSubmit = async () => {
+  try {
+    const imageIndex = imageData.value.findIndex(img => img.id === tagForm.imageId);
+    if (imageIndex !== -1) {
+      // 调用绑定标签接口
+      const response = await bindTags({
+        image_id: tagForm.imageId,
+        tag_ids: tagForm.currentTags
+      });
+
+      if (response.code === 0) {
+        // 重新获取图片详情以更新标签数据
+        const updatedImage = await getImageDetail(tagForm.imageId);
+        if (updatedImage) {
+          // 更新本地图片标签数据
+          imageData.value[imageIndex].tags = updatedImage.tags || [];
+        }
+        message.success('标签更新成功');
+        closeTagModal();
+      } else {
+        message.error(response.message || '标签更新失败');
+      }
+    }
+  } catch (error) {
+    console.error('标签更新失败:', error);
+    message.error('标签更新失败');
   }
 };
 

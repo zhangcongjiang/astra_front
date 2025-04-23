@@ -11,6 +11,16 @@ export const getImageList = async (params) => {
   }
 };
 
+export const getImageDetail = async (id) => {
+  try {
+    const response = await request.get(`/image/${id}/`);
+    return response;
+  } catch (error) {
+    console.error(`获取图片详情出错:`, error);
+    throw error;
+  }
+};
+
 export const getImageSummary = (id, config = {}) => {
   return request({
     method: 'get',
@@ -20,7 +30,7 @@ export const getImageSummary = (id, config = {}) => {
   });
 };
 
-export const getImageDetail = (id, config = {}) => {
+export const getImageContent = (id, config = {}) => {
   return request({
     method: 'get',
     url: `/image/${id}/detail/`,
@@ -69,6 +79,26 @@ export const deleteImages = async (imageIds) => {
     return response;
   } catch (error) {
     console.error('删除图片失败:', error);
+    throw error;
+  }
+};
+
+export const bindTags = async (data) => {
+  try {
+    const response = await request.post('/image/bind-tags/', data);
+    return response;
+  } catch (error) {
+    console.error('绑定标签失败:', error);
+    throw error;
+  }
+};
+
+export const deleteTags = async (data) => {
+  try {
+    const response = await request.post('/image/delete-tags/', data);
+    return response;
+  } catch (error) {
+    console.error('删除标签失败:', error);
     throw error;
   }
 };
