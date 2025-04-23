@@ -59,7 +59,7 @@
             <template #cover>
               <img :src="image.url" class="image-preview" :style="{ height: `${imageHeight}px` }" />
             </template>
-            <a-card-meta :title="image.name">
+            <a-card-meta>
               <template #description>
                 <div class="image-meta">
                   <!-- <div>上传者: {{ image.uploader }}</div> -->
@@ -291,20 +291,26 @@ onMounted(() => {
   fetchImageList(); // 初始化时加载数据
 });
 
-const imageHeight = ref(200);
+const imageHeight = ref(200); // 保持默认高度
+const imageWidth = ref(300); // 新增宽度控制
 
 const handleResize = () => {
   const width = window.innerWidth;
   if (width < 576) {
     imageHeight.value = 120;
+    imageWidth.value = 180;
   } else if (width < 768) {
     imageHeight.value = 150;
+    imageWidth.value = 225;
   } else if (width < 992) {
     imageHeight.value = 180;
+    imageWidth.value = 270;
   } else if (width < 1200) {
     imageHeight.value = 200;
+    imageWidth.value = 300;
   } else {
     imageHeight.value = 220;
+    imageWidth.value = 330;
   }
 };
 
