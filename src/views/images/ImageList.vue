@@ -111,7 +111,7 @@
               <span>上传时间: {{ formatDate(currentPreviewImage.uploadTime) }}</span>
             </div>
             <div class="preview-tags">
-              <a-tag v-for="tag in getTagNames(currentPreviewImage.tags)" :key="tag" color="blue">{{ tag }}</a-tag>
+              <a-tag v-for="tag in getTagNames(currentPreviewImage.tags)" :key="tag" color="blue">{{ tag.name }}</a-tag>
             </div>
           </div>
         </div>
