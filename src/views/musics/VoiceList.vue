@@ -31,7 +31,7 @@
             <!-- 标签查询 -->
             <div class="tag-search" v-if="searchType === 'tag'">
                 <TagSearch :tags="tagCategories" :showActions="true" v-model:selectedTags="selectedTags"
-                    @search="handleSearch" />
+                    :category="TAG_CATEGORY" @search="handleSearch" @update:tags="fetchTagCategories" />
             </div>
         </div>
 
@@ -76,6 +76,10 @@
                     <div style="text-align: center;">
                         <div class="voice-tags">
                             <a-tag v-for="tag in getTagNames(record.tags)" :key="tag" color="blue">{{ tag }}</a-tag>
+                            <a-tooltip title="编辑标签">
+                                <tags-outlined @click.stop="showTagModal(record)"
+                                    style="margin-left: 8px; cursor: pointer;"></tags-outlined>
+                            </a-tooltip>
                         </div>
                     </div>
                 </template>
@@ -157,19 +161,25 @@
             </a-form>
         </a-modal>
     </div>
+    <!-- 标签编辑模态框 -->
+    <a-modal v-model:visible="tagModalVisible" title="编辑音色标签" @ok="handleTagSubmit" @cancel="closeTagModal"
+        width="800px">
+        <TagSearch :tags="tagCategories" :show-actions="false" :allow-image-tagging="true"
+            :image-tags="tagForm.currentTags" @add-image-tag="addImageTag" @remove-image-tag="removeImageTag" />
+    </a-modal>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, h } from 'vue';
-import { UploadOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined } from '@ant-design/icons-vue';
+import { UploadOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, TagsOutlined } from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
 import TagSearch from '@/components/TagSearch.vue';
 import Pagination from '@/components/Pagination.vue';
 import { addSpeaker, getSpeakerList, updateSpeaker } from '@/api/modules/voiceApi';
-
+import { getTagsByCategory } from '@/api/modules/tagApi';
 // 搜索类型
 const searchType = ref('basic');
-
+const TAG_CATEGORY = 'SPEAKER'; // 定义标签类别为 'voice'
 // 基础查询表单
 const basicForm = reactive({
     reader: '',
@@ -177,27 +187,12 @@ const basicForm = reactive({
 });
 
 // 标签数据
-const tagCategories = ref([
-    {
-        id: 1,
-        name: '音色类型',
-        tags: [
-            { id: 'type_1', name: '温暖' },
-            { id: 'type_2', name: '清亮' },
-            { id: 'type_3', name: '浑厚' }
-        ]
-    },
-    {
-        id: 2,
-        name: '适用场景',
-        tags: [
-            { id: 'scene_1', name: '新闻播报' },
-            { id: 'scene_2', name: '故事讲述' },
-            { id: 'scene_3', name: '广告配音' }
-        ]
-    }
-]);
-
+const tagCategories = ref([]);
+const tagModalVisible = ref(false);
+const tagForm = reactive({
+    voiceId: null,
+    currentTags: []
+});
 // 选中的标签
 const selectedTags = ref([]);
 
@@ -210,7 +205,58 @@ const pagination = reactive({
     pageSize: 10,
     total: 0
 });
+const fetchTagCategories = async () => {
+    try {
+        const response = await getTagsByCategory({ category: 'SPEAKER' });
+        if (response?.code === 0 && Array.isArray(response.data)) {
+            // 将嵌套结构扁平化
+            const flattenTags = (categories) => {
+                return categories.reduce((acc, category) => {
+                    acc.push({
+                        id: category.id,
+                        name: category.tag_name,
+                        children: category.children ? flattenTags(category.children) : []
+                    });
+                    return acc;
+                }, []);
+            };
+            tagCategories.value = flattenTags(response.data);
+        }
+    } catch (error) {
+        console.error('获取SPEAKER标签失败:', error);
+        message.error('获取SPEAKER标签失败');
+    }
+};
 
+const showTagModal = (voice) => {
+    tagForm.voiceId = voice.id;
+    tagForm.currentTags = voice.tags.map(tag => tag.id); // 确保传递的是标签ID数组
+    tagModalVisible.value = true;
+};
+
+const handleTagSubmit = async () => {
+    try {
+        const response = await bindTags({
+            voice_id: tagForm.voiceId,
+            tag_ids: tagForm.currentTags
+        });
+
+        if (response.code === 0) {
+            // 更新本地语音标签数据
+            const voiceIndex = voiceData.value.findIndex(v => v.id === tagForm.voiceId);
+            if (voiceIndex !== -1) {
+                voiceData.value[voiceIndex].tags = tagForm.currentTags;
+            }
+            message.success('标签更新成功');
+            tagModalVisible.value = false;
+        } else {
+            message.error(response.message || '标签更新失败');
+        }
+    } catch (error) {
+        console.error('标签更新失败:', error);
+        message.error('标签更新失败');
+    }
+};
 // 获取音色列表
 const fetchSpeakerList = async () => {
     try {
@@ -248,6 +294,7 @@ const fetchSpeakerList = async () => {
 // 初始化时调用
 onMounted(() => {
     fetchSpeakerList();
+    fetchTagCategories();
 });
 
 // 分页变化处理
@@ -311,35 +358,35 @@ const columns = [
 
 // 防抖函数
 const debounce = (fn, delay) => {
-  let timer = null;
-  return function (...args) {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => {
-      fn.apply(this, args);
-    }, delay);
-  };
+    let timer = null;
+    return function (...args) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+            fn.apply(this, args);
+        }, delay);
+    };
 };
 
 // 处理试听文本修改
 const handlePreviewTextChange = debounce(async (id, text) => {
-  try {
-    const formData = new FormData();
-    formData.append('speaker_id', id);
-    formData.append('sample', text);
-    const response = await updateSpeaker(formData);
-    if (response.code === 0) {
-      const index = voiceData.value.findIndex(v => v.id === id);
-      if (index !== -1) {
-        voiceData.value[index].preview_text = text;
-      }
-      message.success('试听文本更新成功');
-    } else {
-      message.error(response.message || '更新失败');
+    try {
+        const formData = new FormData();
+        formData.append('speaker_id', id);
+        formData.append('sample', text);
+        const response = await updateSpeaker(formData);
+        if (response.code === 0) {
+            const index = voiceData.value.findIndex(v => v.id === id);
+            if (index !== -1) {
+                voiceData.value[index].preview_text = text;
+            }
+            message.success('试听文本更新成功');
+        } else {
+            message.error(response.message || '更新失败');
+        }
+    } catch (error) {
+        console.error('更新试听文本失败:', error);
+        message.error('更新试听文本失败');
     }
-  } catch (error) {
-    console.error('更新试听文本失败:', error);
-    message.error('更新试听文本失败');
-  }
 }, 2000); // 500ms 延迟
 
 // 添加音色标签

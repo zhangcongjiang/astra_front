@@ -32,7 +32,7 @@
           :tags="tagCategories" 
           :showActions="true" 
           v-model:selectedTags="selectedTags" 
-          :category="IMAGE" 
+          :category="TAG_CATEGORY" 
           @search="handleSearch" 
           @update:tags="fetchTagCategories" 
         />
@@ -179,7 +179,7 @@ const imageData = ref([]);
 
 // 加载状态
 const loading = ref(false);
-const IMAGE = 'IMAGE'; 
+const TAG_CATEGORY = 'IMAGE'; 
 // 分页配置
 const pagination = ref({
   current: 1,
@@ -279,10 +279,7 @@ const getTagNames = (tags) => {
     name: tag.tag_name // 标签名称
   })).filter(tag => tag.name);
 };
-const handleTagSearch = () => {
-  pagination.value.current = 1; // 重置分页
-  fetchImageList(); // 触发查询
-};
+
 // 初始化
 onMounted(() => {
   handleResize();
