@@ -153,6 +153,7 @@ import { UploadOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined } from
 import { message } from 'ant-design-vue';
 import TagSearch from '@/components/TagSearch.vue';
 import Pagination from '@/components/Pagination.vue';
+import { addSpeaker } from '@/api/modules/voiceApi';
 
 // 搜索类型
 const searchType = ref('basic');
@@ -304,27 +305,42 @@ const closeUploadModal = () => {
 // 处理文件选择
 const handleFileChange = (info) => {
     if (info.file) {
-        uploadForm.seedFile = info.file;
+        uploadForm.seedFile = info.file; // 确保上传的是文件对象
     }
 };
 
-// 提交上传
 const handleUploadSubmit = async () => {
     try {
         await uploadFormRef.value.validate();
 
-        voiceData.value.unshift({
-            id: Date.now(),
-            reader: uploadForm.reader,
-            gender: uploadForm.gender,
-            seed: `SEED-${Math.floor(Math.random() * 10000)}`,
-            tags: [...uploadForm.tags]
-        });
+        // 创建 FormData 对象
+        const formData = new FormData();
+        formData.append('name', uploadForm.reader);
+        formData.append('gender', uploadForm.gender);
+        formData.append('voice_style_file', uploadForm.seedFile); // 添加文件
+        uploadForm.tags.forEach(tag => formData.append('tags', tag)); // 直接传递标签 ID 列表
 
-        message.success('上传成功');
-        closeUploadModal();
+        // 调用新增朗读者接口
+        const response = await addSpeaker(formData);
+
+        if (response.code === 0) {
+            // 接口调用成功后，将新朗读者添加到列表中
+            voiceData.value.unshift({
+                id: response.data.id,
+                reader: uploadForm.reader,
+                gender: uploadForm.gender,
+                seed: response.data.seed,
+                tags: uploadForm.tags // 直接使用标签 ID 列表
+            });
+
+            message.success('上传成功');
+            closeUploadModal();
+        } else {
+            message.error(response.message || '上传失败');
+        }
     } catch (error) {
         console.error('表单验证失败:', error);
+        message.error('上传失败');
     }
 };
 
