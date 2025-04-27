@@ -255,6 +255,18 @@ const applyTemplate = (template) => {
   });
 };
 
+// 选择模板
+const selectTemplate = (template) => {
+  const sourceRecord = route.state?.sourceRecord;
+  router.push({
+    path: '/templates/apply',
+    state: {
+      template: JSON.parse(JSON.stringify(template)),
+      sourceRecord: sourceRecord ? JSON.parse(JSON.stringify(sourceRecord)) : null
+    }
+  });
+};
+
 // 搜索
 const handleSearch = () => {
     pagination.current = 1;

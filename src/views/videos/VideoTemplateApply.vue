@@ -184,6 +184,14 @@ const loadTemplateData = async () => {
     let templateData = route.state?.template 
                     || JSON.parse(sessionStorage.getItem(`template-${route.params.id}`))
     
+    // 获取来源文案数据
+    const sourceRecord = route.state?.sourceRecord;
+    if (sourceRecord) {
+      // 这里可以根据需要将文案数据填充到模板参数中
+      templateData.params.text = sourceRecord.text;
+      templateData.params.title = sourceRecord.name;
+    }
+
     // 如果都没有，可以尝试从API获取（示例）
     if (!templateData) {
       // 这里可以替换为实际的API请求

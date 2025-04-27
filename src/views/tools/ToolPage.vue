@@ -8,68 +8,28 @@
       </a-button>
     </div>
 
-    <a-input-search
-      v-model:value="searchText"
-      placeholder="搜索工具..."
-      style="width: 300px; margin-bottom: 20px"
-      @search="handleSearch"
-    />
+    <div class="tool-grid">
+      <div v-for="item in filteredTools" :key="item.id" class="tool-item" :title="item.description">
+        <div class="tool-content">
+          <div class="tool-logo-wrapper">
+            <img v-if="item.logo" :src="item.logo" class="tool-logo" />
+            <div v-else class="default-logo">
+              <picture-outlined style="font-size: 18px; color: #ccc" />
+            </div>
+          </div>
+          <div class="tool-name">{{ item.name }}</div>
+        </div>
+      </div>
+    </div>
 
-    <a-list
-      :grid="{ gutter: 16, xs: 1, sm: 2, md: 3, lg: 4, xl: 5, xxl: 6 }"
-      :data-source="filteredTools"
-      :loading="loading"
-    >
-      <template #renderItem="{ item }">
-        <a-list-item>
-          <a-card hoverable>
-            <template #cover>
-              <img 
-                v-if="item.logo" 
-                :src="item.logo.startsWith('blob:') ? item.logo : `/uploads/${item.logo}`" 
-                class="tool-logo" 
-              />
-              <div v-else class="default-logo">
-                <picture-outlined style="font-size: 48px; color: #ccc" />
-              </div>
-            </template>
-            <a-card-meta :title="item.name">
-              <template #description>
-                <a :href="item.url" target="_blank">{{ item.url }}</a>
-              </template>
-            </a-card-meta>
-            <template #actions>
-              <a-button type="link" @click="editTool(item)">编辑</a-button>
-              <a-popconfirm
-                title="确定要删除这个工具吗？"
-                @confirm="deleteTool(item)"
-              >
-                <a-button type="link" danger>删除</a-button>
-              </a-popconfirm>
-            </template>
-          </a-card>
-        </a-list-item>
-      </template>
-    </a-list>
-
-    <a-modal
-      v-model:visible="modalVisible"
-      :title="modalTitle"
-      @ok="handleSubmit"
-      :confirm-loading="submitting"
-    >
+    <a-modal v-model:visible="modalVisible" :title="modalTitle" @ok="handleSubmit" :confirm-loading="submitting">
       <a-form :model="toolForm" :label-col="{ span: 4 }">
         <a-form-item label="工具名称" required>
           <a-input v-model:value="toolForm.name" />
         </a-form-item>
         <a-form-item label="Logo">
-          <a-upload
-            v-model:file-list="fileList"
-            list-type="picture-card"
-            :max-count="1"
-            :before-upload="beforeUpload"
-            @change="handleUploadChange"
-          >
+          <a-upload v-model:file-list="fileList" list-type="picture-card" :max-count="1" :before-upload="beforeUpload"
+            @change="handleUploadChange">
             <div v-if="!toolForm.logo">
               <plus-outlined />
               <div style="margin-top: 8px">上传Logo</div>
@@ -88,10 +48,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue'; // Add watch to the imports
 import { PlusOutlined } from '@ant-design/icons-vue';
-import { PictureOutlined } from '@ant-design/icons-vue'; // Use PictureOutlined instead of ImageOutlined
-import defaultLogo from '@/assets/default-tool-logo.png';
+import { PictureOutlined } from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
 
 const props = defineProps({
@@ -129,59 +88,65 @@ const toolForm = ref({
 });
 
 const filteredTools = computed(() => {
-  return tools.value.filter(tool => 
+  return tools.value.filter(tool =>
     tool.category === props.category &&
-    (!searchText.value || 
-     tool.name.includes(searchText.value) || 
-     tool.description.includes(searchText.value))
+    (!searchText.value ||
+      tool.name.includes(searchText.value) ||
+      tool.description.includes(searchText.value))
   );
 });
 
 const loadTools = async () => {
   try {
     loading.value = true;
-    // 模拟数据 - 根据当前category过滤
-    const allTools = [
-      // 文本工具
-      {
-        id: 1,
-        name: 'JSON格式化工具',
-        logo: '',
-        url: 'https://jsonformatter.org',
-        description: '在线JSON格式化验证工具',
-        category: 'text'
-      },
-      // 图像工具
-      {
-        id: 2,
-        name: 'TinyPNG压缩',
-        logo: '',
-        url: 'https://tinypng.com',
-        description: '智能PNG和JPEG图片压缩',
-        category: 'image'
-      },
-      // 音频工具
-      {
-        id: 3,
-        name: '在线音频剪辑',
-        logo: '',
-        url: 'https://mp3cut.net',
-        description: '免费在线音频剪辑工具',
-        category: 'audio'
-      },
-      // 视频工具
-      {
-        id: 4,
-        name: 'Clipchamp编辑器',
-        logo: '',
-        url: 'https://clipchamp.com',
-        description: '在线视频编辑制作工具',
-        category: 'video'
-      }
-    ];
     
-    tools.value = allTools.filter(tool => tool.category === props.category);
+    // 使用import语法加载图片
+    const logoPath = new URL('@/assets/logo/logo.png', import.meta.url).href;
+
+    // 模拟从数据库获取数据
+    const mockTools = [
+      // 文本工具 (10条)
+      ...Array.from({ length: 10 }, (_, i) => ({
+        id: i + 1,
+        name: `文本工具 ${i + 1}`,
+        logo: logoPath,
+        url: `https://text-tool-${i + 1}.com`,
+        description: `这是一个强大的文本处理工具 ${i + 1}`,
+        category: 'text'
+      })),
+      // 图像工具 (10条)
+      ...Array.from({ length: 10 }, (_, i) => ({
+        id: i + 11,
+        name: `图像工具 ${i + 1}`,
+        logo: logoPath,
+        url: `https://image-tool-${i + 1}.com`,
+        description: `这是一个专业的图像处理工具 ${i + 1}`,
+        category: 'image'
+      })),
+      // 音频工具 (10条)
+      ...Array.from({ length: 10 }, (_, i) => ({
+        id: i + 21,
+        name: `音频工具 ${i + 1}`,
+        logo: logoPath,
+        url: `https://audio-tool-${i + 1}.com`,
+        description: `这是一个高效的音频处理工具 ${i + 1}`,
+        category: 'audio'
+      })),
+      // 视频工具 (10条)
+      ...Array.from({ length: 10 }, (_, i) => ({
+        id: i + 31,
+        name: `视频工具 ${i + 1}`,
+        logo: logoPath,
+        url: `https://video-tool-${i + 1}.com`,
+        description: `这是一个全面的视频处理工具 ${i + 1}`,
+        category: 'video'
+      }))
+    ];
+
+    // 根据当前category过滤工具
+    tools.value = mockTools.filter(tool => tool.category === props.category);
   } catch (error) {
+    console.error('加载工具失败:', error);
     message.error('加载工具失败');
   } finally {
     loading.value = false;
@@ -242,6 +207,13 @@ const handleSearch = () => {
 };
 
 onMounted(() => {
+  console.log('当前工具类别:', props.category);
+  loadTools();
+});
+
+// 添加watch监听category变化
+watch(() => props.category, (newCategory) => {
+  console.log('工具类别变化:', newCategory);
   loadTools();
 });
 </script>
@@ -249,6 +221,8 @@ onMounted(() => {
 <style scoped>
 .tool-page {
   padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .tool-header {
@@ -258,18 +232,68 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  padding: 8px;
+}
+
+.tool-item {
+  height: 60px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 8px;
+  transition: all 0.2s;
+}
+
+.tool-item:hover {
+  border-color: #1890ff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.tool-content {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.tool-logo-wrapper {
+  width: 32px;
+  height: 32px;
+  margin-right: 8px;
+}
+
+.tool-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .default-logo {
-  height: 160px;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #f5f5f5;
+  border-radius: 4px;
 }
 
-.tool-logo {
-  height: 160px;
-  width: 100%;
-  object-fit: contain;
-  background: #f5f5f5;
+.tool-name {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .tool-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
 }
 </style>

@@ -13,8 +13,10 @@ import SystemSoundSettings from '@/views/settings/SystemSoundSettings.vue'
 import SystemVideoSettings from '@/views/settings/SystemVideoSettings.vue'
 import DataVisualList from '@/views/videos/DataVisualList.vue'
 import DataVisualApply from '@/views/videos/DataVisualApply.vue'
-import VideoTextList from '@/views/texts/VideoTextList.vue'
+import VideoTextList from '@/views/videos/VideoTextList.vue'
 import GraphicTextList from '@/views/texts/GraphicTextList.vue'
+import TransitionList from '@/views/videos/TransitionList.vue'
+import VideoList from '@/views/videos/VideoList.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -65,11 +67,7 @@ const router = createRouter({
                     component: VideoTemplateApply,
                     props: true
                 },
-                {
-                    path: 'shadiao',
-                    name: 'shadiao',
-                    component: () => import('../views/Dashboard.vue') // 工作台组件
-                }, {
+                 {
                     path: 'data-visuals',
                     name: 'data-visuals',
                     component: DataVisualList // 工作台组件
@@ -112,12 +110,6 @@ const router = createRouter({
                     meta: { title: '我的图文' }
                 },
                 {
-                    path: '/texts/detail/:id',
-                    name: 'TextDetail',
-                    component: () => import('@/views/texts/GraphicTextDetail.vue'),
-                    meta: { title: '图文详情' }
-                },
-                {
                     path: 'text-tools',
                     name: 'text-tools',
                     component: () => import('@/views/tools/ToolPage.vue'),
@@ -145,6 +137,68 @@ const router = createRouter({
                     meta: { title: '视频工具' },
                     props: { category: 'video' }
                 },
+                {
+                    path: '/transitions',
+                    name: 'transitions',
+                    component: TransitionList,
+                    meta: { title: '转场视频管理' }
+                },
+                {
+                    path: '/videos',
+                    name: 'videos',
+                    component: VideoList,
+                    meta: { title: '转场视频管理' }
+                },
+                {
+                    path: '/texts/create/:id?',
+                    name: 'GraphicTextCreate',
+                    component: () => import('@/views/texts/GraphicTextCreate.vue'),
+                    meta: { title: '创建图文' }
+                },
+                {
+                    path: '/my-accounts',
+                    name: 'AccountManage',
+                    component: () => import('@/views/account/AccountManage.vue'),
+                    meta: { title: '账号管理' }
+                },
+                {
+                    path: '/my-tasks',
+                    name: 'MyTasks',
+                    component: () => import('@/views/tasks/TaskManagement.vue'),
+                    meta: { title: '我的任务' }
+                },
+                {
+                    path: '/tasks/:id',
+                    name: 'task-detail',
+                    component: () => import('@/views/tasks/TaskDetail.vue'),
+                    meta: { title: '任务详情' }
+                },
+                // 添加异常页面路由
+                {
+                  path: '/exception/403',
+                  name: '403',
+                  component: () => import('@/views/exception/403.vue'),
+                  meta: { title: '403 无权限' }
+                },
+                {
+                  path: '/exception/404',
+                  name: '404',
+                  component: () => import('@/views/exception/404.vue'),
+                  meta: { title: '404 页面未找到' }
+                },
+                {
+                  path: '/exception/500',
+                  name: '500',
+                  component: () => import('@/views/exception/500.vue'),
+                  meta: { title: '500 服务器错误' }
+                },
+                // 添加404通配符路由，必须放在最后
+                {
+                  path: '/:pathMatch(.*)*',
+                  name: 'not-found',
+                  component: () => import('@/views/exception/404.vue'),
+                  meta: { title: '404 页面未找到' }
+                }
             ]
         }
     ]

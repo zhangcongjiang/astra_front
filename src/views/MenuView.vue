@@ -4,7 +4,7 @@
         <div class="top-nav">
             <!-- Logo区域 -->
             <div class="logo-container" @click="goToDashboard">
-                <img src="@/assets/logo.png" alt="Logo" class="logo">
+                <img src="@/assets/logo/logo.png" alt="Logo" class="logo">
                 <span class="logo-text">ASTRA</span>
             </div>
 
@@ -50,35 +50,36 @@ const menuData = [
     },
     {
         id: 2,
-        name: '文本素材',
+        name: '图像素材',
         children: [
-            { id: 21, name: '视频文案', content: '这里是视频文案管理...', path: '/video-texts' }
+            { id: 21, name: '图片列表', content: '这里是用户收集的普通图片...', path: '/images' },
+            { id: 12, name: '背景图片', content: '这里是用户可能使用到的背景图片...', path: '/backgrounds' }
         ]
     },
     {
-        id: 3,
-        name: '图像管理',
+        id: 3,  // 修改前是2，现在改为4
+        name: '音频素材',
         children: [
-            { id: 31, name: '图片列表', content: '这里是用户收集的普通图片...', path: '/images' },
-            { id: 32, name: '背景图片', content: '这里是用户可能使用到的背景图片...', path: '/backgrounds' }
+            { id: 31, name: '背景音乐', content: '这里是背景音乐的内容...', path: '/musics' },
+            { id: 32, name: '声音特效', content: '这里是声音特效的内容...', path: '/effects' },
+            { id: 33, name: '音色管理', content: '这里是朗读者音色的内容...', path: '/speakers' },
         ]
-    },
-    {
-        id: 4,  // 修改前是2，现在改为4
-        name: '音频管理',
+    }, {
+        id: 4,
+        name: '视频素材',
         children: [
-            { id: 41, name: '背景音乐', content: '这里是背景音乐的内容...', path: '/musics' },
-            { id: 42, name: '声音特效', content: '这里是声音特效的内容...', path: '/effects' },
-            { id: 43, name: '音色管理', content: '这里是朗读者音色的内容...', path: '/speakers' },
+            { id: 41, name: '视频素材', content: '这里是视频素材内容列表...', path: '/videos' },
+            { id: 42, name: '转场视频', content: '这里是转场视频内容列表...', path: '/transitions' },
+            { id: 43, name: '视频文案', content: '这里是视频文案管理...', path: '/video-texts' }
         ]
     },
     {
         id: 5,  // 修改前是4，现在改为5
-        name: '视频管理',
+        name: '视频模板',
         children: [
             { id: 51, name: '视频模板', content: '这里是视频管理的内容...', path: '/templates' },
-            { id: 52, name: '沙雕动画', content: '这里是沙雕动画的内容...', path: '/shadiao' },
-            { id: 53, name: '数据可视化', content: '这里是数据列表动态生成视频的模板内容...', path: '/data-visuals' },
+            { id: 52, name: '数据可视化', content: '这里是数据列表动态生成视频的模板内容...', path: '/data-visuals' },
+
         ]
     },
     {
@@ -87,27 +88,28 @@ const menuData = [
         children: [
             { id: 61, name: '我的图文', content: '这里是用户创建的图文内容...', path: '/texts' },
             { id: 62, name: '我的视频', content: '这里是平台生成的视频内容...', path: '/my-videos' },
-            { id: 63, name: '我的音频', content: '这里是平台生成的音频内容...', path: '/my-sounds' }
+            { id: 63, name: '我的音频', content: '这里是平台生成的音频内容...', path: '/my-sounds' },
+            { id: 64, name: '我的账号', content: '这里是我各个平台的账号...', path: '/my-accounts' },
+            { id: 65, name: '我的任务', content: '这里是我的任务...', path: '/my-tasks' }
         ]
     },
     {
-        id: 7,  // 修改前是6，现在改为7
-        name: '系统设置',
-        children: [
-            { id: 71, name: '视频设置', content: '这里是系统设置内容...', path: '/system-video' },
-            { id: 72, name: '音频设置', content: '这里是系统设置内容...', path: '/system-sound' }
-        ]
-    },
-    {
-        id: 8,  // 新增实用工具菜单
+        id: 7,  // 新增实用工具菜单
         name: '实用工具',
         children: [
-            { id: 81, name: '文本工具', content: '提供各种文本处理工具...', path: '/text-tools' },
-            { id: 82, name: '图像工具', content: '提供图像处理和转换工具...', path: '/image-tools' },
-            { id: 83, name: '音频工具', content: '提供音频编辑和处理工具...', path: '/audio-tools' },
-            { id: 84, name: '视频工具', content: '提供视频编辑和处理工具...', path: '/video-tools' }
+            { id: 71, name: '文本工具', content: '提供各种文本处理工具...', path: '/text-tools' },
+            { id: 72, name: '图像工具', content: '提供图像处理和转换工具...', path: '/image-tools' },
+            { id: 73, name: '音频工具', content: '提供音频编辑和处理工具...', path: '/audio-tools' },
+            { id: 74, name: '视频工具', content: '提供视频编辑和处理工具...', path: '/video-tools' }
         ]
-    }
+    }, {
+        id: 8,  // 修改前是6，现在改为7
+        name: '系统设置',
+        children: [
+            { id: 81, name: '视频设置', content: '这里是系统设置内容...', path: '/system-video' },
+            { id: 82, name: '音频设置', content: '这里是系统设置内容...', path: '/system-sound' }
+        ]
+    },
 ];
 
 const goToDashboard = () => {
@@ -217,7 +219,7 @@ const selectLeftMenu = (index) => {
 }
 
 .logo-text {
-    font-size: 18px;
+    font-size: 22px;
     font-weight: bold;
     color: #ffffff;
     letter-spacing: 1px;
@@ -234,7 +236,7 @@ const selectLeftMenu = (index) => {
     line-height: 60px;
     cursor: pointer;
     transition: all 0.3s;
-    font-size: 18px;
+    font-size: 22px;
     position: relative;
 }
 
@@ -277,7 +279,7 @@ const selectLeftMenu = (index) => {
     cursor: pointer;
     transition: all 0.3s;
     color: #555;
-    font-size: 18px;
+    font-size: 22px;
     border-left: 3px solid transparent;
 }
 
