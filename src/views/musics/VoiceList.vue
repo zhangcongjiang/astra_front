@@ -184,7 +184,7 @@ import { UploadOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, TagsO
 import { message } from 'ant-design-vue';
 import TagSearch from '@/components/TagSearch.vue';
 import Pagination from '@/components/Pagination.vue';
-import { addSpeaker, getSpeakerList, updateSpeaker } from '@/api/modules/voiceApi';
+import { addSpeaker, getSpeakerList, updateSpeaker,getSpeakerSample } from '@/api/modules/voiceApi';
 import { getTagsByCategory } from '@/api/modules/tagApi';
 // 搜索类型
 const searchType = ref('basic');
@@ -462,10 +462,30 @@ const removeVoiceTag = async (id, tagId) => {
 };
 
 // 添加试听方法
-const previewVoice = (record) => {
-    // 这里实现试听逻辑
-    console.log('试听音色:', record);
-    message.info(`正在试听 ${record.reader} 的声音`);
+const previewVoice = async (record) => {
+    try {
+        const response = await getSpeakerSample(record.id);
+        
+        // 创建Blob对象
+        console.log('获取到的音频数据:', response);
+        const blob = new Blob([response], { type: 'audio/wav' });
+        const audioUrl = URL.createObjectURL(blob);
+        
+        // 创建音频元素并播放
+        const audio = new Audio(audioUrl);
+        audio.play().catch(e => {
+            console.error('播放失败:', e);
+            message.error('播放失败，请检查音频文件');
+        });
+        
+        // 清理内存
+        audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+        };
+    } catch (error) {
+        console.error('试听出错:', error);
+        message.error('试听出错: ' + (error.response?.data?.message || error.message));
+    }
 };
 
 // 上传模态框相关状态

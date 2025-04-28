@@ -28,3 +28,17 @@ export const getSpeakerList = async (params) => {
         throw error;
     }
 };
+export const getSpeakerSample = async (id, config = {}) => {
+    try {
+        return request({
+            method: 'get',
+            url: `/voice/speakers/sample/${id}/`,
+            responseType: 'arraybuffer', 
+            ...config
+          });
+    } catch (error) {
+      console.error(`获取试听文件出错:`, error);
+      throw error;
+    }
+  };
+

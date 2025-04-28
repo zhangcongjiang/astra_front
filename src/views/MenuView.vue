@@ -36,7 +36,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 const router = useRouter();
 // 菜单数据
@@ -168,6 +168,33 @@ const selectLeftMenu = (index) => {
         router.push(currentMenu.path);
     }
 };
+
+// 监听路由变化并更新菜单选中状态
+onMounted(() => {
+    // 初始化时设置菜单状态
+    const currentPath = router.currentRoute.value.path;
+    menuData.forEach((topItem, topIndex) => {
+        topItem.children?.forEach((subItem, subIndex) => {
+            if (subItem.path === currentPath) {
+                activeTopMenu.value = topIndex;
+                activeLeftMenu.value = subIndex;
+            }
+        });
+    });
+    
+    // 监听路由变化
+    router.afterEach((to) => {
+        // 遍历menuData查找匹配的路由
+        menuData.forEach((topItem, topIndex) => {
+            topItem.children?.forEach((subItem, subIndex) => {
+                if (subItem.path === to.path) {
+                    activeTopMenu.value = topIndex;
+                    activeLeftMenu.value = subIndex;
+                }
+            });
+        });
+    });
+});
 </script>
 
 <style scoped>

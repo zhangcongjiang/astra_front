@@ -11,7 +11,7 @@ axios.defaults.withCredentials = true;
 // 创建axios实例
 const instance = axios.create({
   baseURL: BASE_URL, // api的基准URL
-  timeout: 10000, // 请求超时时间
+  timeout: 100000, // 请求超时时间
   withCredentials: true,
   headers: { // 默认请求头
     'Content-Type': 'application/json',

@@ -1,0 +1,19 @@
+- 项目类型: 这是一个基于 Vue 3 和 Vite 构建的前端项目。
+- 语言: 主要使用 JavaScript (ES Module 规范，由 "type": "module" 指定) 和 Vue 单文件组件 ( .vue )。
+- 包管理器: 使用 pnpm 管理项目依赖。安装新依赖时请使用 pnpm add <package_name> 。
+- UI 库: 项目同时使用了 Element Plus, Ant Design Vue, 和 Naive UI。在添加或修改 UI 元素时，请优先考虑复用现有库的组件，并保持风格统一。
+- 路由: 使用 vue-router (配置位于 `src\router` ) 进行页面导航。
+- HTTP 请求: 使用 axios (配置或封装可能位于 `src\api` ) 进行后端 API 交互。
+- 代码风格: 请遵循 Vue 3 的 `<script setup>` 语法糖风格。
+- 目录结构:
+- 组件: 可复用组件放在 `src\components` 。
+- 视图/页面: 页面级组件放在 `src\views` 。
+- API 请求: API 相关逻辑放在 `src\api` 。
+- 静态资源: 图片等静态资源放在 `src\assets` 。
+- 工具函数: 通用工具函数放在 `src\utils` 。
+- 路由配置: 路由定义在 `src\router` 下的 `index.js` 。
+- 入口文件: 应用入口为 `main.js` 。
+- 构建与开发:
+- 启动开发服务器: pnpm run dev (服务运行在 http://localhost:5174 或网络 IP 地址)
+- 构建生产版本: pnpm run build
+- 预览生产版本: pnpm run preview
