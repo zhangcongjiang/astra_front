@@ -28,14 +28,8 @@
 
       <!-- 标签查询 -->
       <div class="tag-search" v-if="searchType === 'tag'">
-        <TagSearch 
-          :tags="tagCategories" 
-          :showActions="true" 
-          v-model:selectedTags="selectedTags" 
-          :category="TAG_CATEGORY" 
-          @search="handleSearch" 
-          @update:tags="fetchTagCategories" 
-        />
+        <TagSearch :tags="tagCategories" :showActions="true" v-model:selectedTags="selectedTags"
+          :category="TAG_CATEGORY" @search="handleSearch" @update:tags="fetchTagCategories" />
       </div>
     </div>
 
@@ -138,7 +132,7 @@ import dayjs from 'dayjs';
 import { Modal, message } from 'ant-design-vue';
 import Pagination from '@/components/Pagination.vue';
 import TagSearch from '@/components/TagSearch.vue';
-import { getImageList, getImageSummary, getImageContent,getImageDetail, deleteImages, uploadImages,bindTags } from '@/api/modules/imageApi';
+import { getImageList, getImageSummary, getImageContent, getImageDetail, deleteImages, uploadImages, bindTags } from '@/api/modules/imageApi';
 import { getTagsByCategory } from '@/api/modules/tagApi';
 
 
@@ -179,7 +173,7 @@ const imageData = ref([]);
 
 // 加载状态
 const loading = ref(false);
-const TAG_CATEGORY = 'IMAGE'; 
+const TAG_CATEGORY = 'IMAGE';
 // 分页配置
 const pagination = ref({
   current: 1,
