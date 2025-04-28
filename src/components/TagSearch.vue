@@ -173,6 +173,7 @@
 import { ref, watch, computed, nextTick } from 'vue';
 import { message } from 'ant-design-vue';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons-vue';
+import { addTag } from '@/api/modules/tagApi';
 
 const props = defineProps({
   tags: {
@@ -194,6 +195,10 @@ const props = defineProps({
   allowImageTagging: {
     type: Boolean,
     default: false
+  },
+  category: {
+    type: String,
+    required: true
   }
 });
 
@@ -235,15 +240,50 @@ const formRules = {
 };
 
 // 计算属性
+// 修改标签展示逻辑
 const visibleSecondLevelTags = computed(() => {
-  if (showHoverPreview.value && selectedFirstLevelTags.value.length === 0) {
-    return hoverSecondLevelTags.value;
-  }
-  if (selectedFirstLevelTags.value.length > 0) {
-    return getSelectedSecondLevelTags();
-  }
-  return allSecondLevelTags.value;
+// 处理后端返回的树形结构
+if (showHoverPreview.value && selectedFirstLevelTags.value.length === 0) {
+return hoverSecondLevelTags.value;
+}
+
+if (selectedFirstLevelTags.value.length > 0) {
+const tags = [];
+props.tags.forEach(category => {
+if (selectedFirstLevelTags.value.includes(category.id)) {
+// 处理一级标签的子标签
+if (category.children?.length) {
+tags.push(...category.children);
+}
+}
 });
+return tags;
+}
+
+// 扁平化所有二级标签
+const allTags = [];
+props.tags.forEach(category => {
+if (category.children?.length) {
+allTags.push(...category.children);
+}
+});
+return allTags;
+});
+
+// 修改初始化方法
+const initSecondLevelTags = () => {
+let arr = [];
+props.tags.forEach(category => {
+if (category.children?.length) {
+arr = [...arr, ...category.children];
+}
+});
+allSecondLevelTags.value = arr;
+
+if (props.allowImageTagging) {
+selectedTags.value = [...props.imageTags];
+}
+};
 
 const parentTagOptions = computed(() => {
   return props.tags.map(tag => ({
@@ -288,19 +328,29 @@ const resetHoverPreview = () => {
 const handleFirstLevelChange = (category, checked) => {
   if (checked) {
     selectedFirstLevelTags.value.push(category.id);
+    // 将一级标签 ID 添加到 selectedTags
+    if (!selectedTags.value.includes(category.id)) {
+      selectedTags.value.push(category.id);
+    }
   } else {
     const index = selectedFirstLevelTags.value.indexOf(category.id);
     if (index > -1) {
       selectedFirstLevelTags.value.splice(index, 1);
     }
+    // 从 selectedTags 中移除一级标签 ID
+    const tagIndex = selectedTags.value.indexOf(category.id);
+    if (tagIndex > -1) {
+      selectedTags.value.splice(tagIndex, 1);
+    }
     if (category.tags) {
       selectedTags.value = selectedTags.value.filter(
         tagId => !category.tags.some(tag => tag.id === tagId)
       );
-      emit('update:selectedTags', selectedTags.value);
     }
   }
+  emit('update:selectedTags', selectedTags.value); // 更新选中的标签
   resetHoverPreview();
+  emit('search'); // 选择一级标签时自动触发查询
 };
 
 const handleSecondLevelChange = (tagId, checked) => {
@@ -322,6 +372,7 @@ const handleSecondLevelChange = (tagId, checked) => {
       }
     }
     emit('update:selectedTags', selectedTags.value);
+    emit('search'); // 点击标签时自动触发查询
   }
 };
 
@@ -338,19 +389,6 @@ const handleSearch = () => {
   emit('search');
 };
 
-const initSecondLevelTags = () => {
-  let arr = [];
-  props.tags.forEach(v => {
-    if (v.tags?.length) {
-      arr = [...arr, ...v.tags];
-    }
-  });
-  allSecondLevelTags.value = arr;
-  
-  if (props.allowImageTagging) {
-    selectedTags.value = [...props.imageTags];
-  }
-};
 
 // 标签管理相关方法
 const showAddModal = (parentId = null) => {
@@ -385,15 +423,12 @@ const resetModal = () => {
 const handleModalOk = async () => {
   try {
     await tagFormRef.value.validate();
-    
+    console.log('category:', props.category);
     const tagData = {
-      name: tagForm.value.name,
-      type: props.tagType
+      tag_name: tagForm.value.name,
+      parent: tagForm.value.type === 'main' ? '' : tagForm.value.parentId || '',
+      category: props.category // 使用从 ImageList 传递过来的 category
     };
-    
-    if (tagForm.value.type === 'sub') {
-      tagData.parentId = tagForm.value.parentId;
-    }
     
     if (currentTag.value) {
       // 更新标签逻辑
@@ -402,8 +437,7 @@ const handleModalOk = async () => {
       message.success('标签更新成功');
     } else {
       // 创建标签逻辑
-      // await api.createTag(tagData);
-      message.success('标签创建成功');
+      await handleAddTag(tagData); // 调用添加标签方法
     }
     
     // 刷新标签列表
@@ -422,6 +456,21 @@ const handleDeleteTag = async (tagId) => {
   } catch (error) {
     message.error('标签删除失败');
     console.error(error);
+  }
+};
+
+const handleAddTag = async (tagData) => {
+  try {
+    const response = await addTag(tagData);
+    if (response.code === 0) {
+      message.success('标签添加成功');
+      emit('update:tags'); // 触发标签列表更新
+    } else {
+      message.error(response.message || '标签添加失败');
+    }
+  } catch (error) {
+    console.error('标签添加失败:', error);
+    message.error('标签添加失败');
   }
 };
 
