@@ -16,7 +16,8 @@
                         <a-input v-model:value="basicForm.reader" placeholder="输入朗读者" @pressEnter="handleSearch" />
                     </a-form-item>
                     <a-form-item label="性别">
-                        <a-select v-model:value="basicForm.gender" placeholder="选择性别">
+                        <a-select v-model:value="basicForm.gender" placeholder="选择性别" style="width: 100px">
+                            <a-select-option value="不限">不限</a-select-option>
                             <a-select-option value="男">男</a-select-option>
                             <a-select-option value="女">女</a-select-option>
                         </a-select>
@@ -31,7 +32,7 @@
             <!-- 标签查询 -->
             <div class="tag-search" v-if="searchType === 'tag'">
                 <TagSearch :tags="tagCategories" :showActions="true" v-model:selectedTags="selectedTags"
-                    @search="handleSearch" />
+                    :category="TAG_CATEGORY" @search="handleSearch" @update:tags="fetchTagCategories" />
             </div>
         </div>
 
@@ -66,16 +67,23 @@
 
                 <template #preview_text="{ record }">
                     <div style="text-align: center;">
-                        <a-input v-model:value="record.preview_text" placeholder="请输入试听文本"
-                            @change="(e) => handlePreviewTextChange(record.id, e.target.value)"
-                            style="width: 100%; margin: 0 auto; display: block;"></a-input>
+                        <span>{{ record.preview_text }}</span>
                     </div>
                 </template>
 
                 <template #tags="{ record }">
                     <div style="text-align: center;">
                         <div class="voice-tags">
-                            <a-tag v-for="tag in getTagNames(record.tags)" :key="tag" color="blue">{{ tag }}</a-tag>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <a-tag v-for="tag in getTagNames(record.tags)" :key="tag.id" color="blue">{{
+                                        tag.name }}</a-tag>
+                                </div>
+                                <a-tooltip title="编辑标签">
+                                    <tags-outlined @click.stop="showTagModal(record)"
+                                        style="cursor: pointer; color: #1890ff;" />
+                                </a-tooltip>
+                            </div>
                         </div>
                     </div>
                 </template>
@@ -151,53 +159,49 @@
                     </div>
                 </a-form-item>
                 <a-form-item label="标签">
-                    <TagSearch :tags="tagCategories" :show-actions="false" :allow-voice-tagging="true"
+                    <TagSearch :tags="tagCategories" :show-actions="false" :allow-voice-tagging="true" 
                         :voice-tags="uploadForm.tags" @add-voice-tag="addVoiceTag" @remove-voice-tag="removeVoiceTag" />
                 </a-form-item>
             </a-form>
         </a-modal>
     </div>
+    <!-- 标签编辑模态框 -->
+    <a-modal v-model:visible="tagModalVisible" title="编辑音色标签" @ok="handleTagSubmit" @cancel="closeTagModal" width="800px">
+        <TagSearch 
+            :tags="tagCategories" 
+            :show-actions="false" 
+            :allow-voice-tagging="true"
+            v-model:selectedTags="tagForm.currentTags"
+            @add-voice-tag="addVoiceTag"
+            @remove-voice-tag="removeVoiceTag" 
+        />
+    </a-modal>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, h } from 'vue';
-import { UploadOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined } from '@ant-design/icons-vue';
+import { UploadOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, TagsOutlined } from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
 import TagSearch from '@/components/TagSearch.vue';
 import Pagination from '@/components/Pagination.vue';
-import { addSpeaker, getSpeakerList, updateSpeaker } from '@/api/modules/voiceApi';
-
+import { addSpeaker, getSpeakerList, updateSpeaker,getSpeakerSample } from '@/api/modules/voiceApi';
+import { getTagsByCategory } from '@/api/modules/tagApi';
 // 搜索类型
 const searchType = ref('basic');
-
+const TAG_CATEGORY = 'SPEAKER';
 // 基础查询表单
 const basicForm = reactive({
     reader: '',
-    gender: ''
+    gender: '不限' // 默认值为“不限”
 });
 
 // 标签数据
-const tagCategories = ref([
-    {
-        id: 1,
-        name: '音色类型',
-        tags: [
-            { id: 'type_1', name: '温暖' },
-            { id: 'type_2', name: '清亮' },
-            { id: 'type_3', name: '浑厚' }
-        ]
-    },
-    {
-        id: 2,
-        name: '适用场景',
-        tags: [
-            { id: 'scene_1', name: '新闻播报' },
-            { id: 'scene_2', name: '故事讲述' },
-            { id: 'scene_3', name: '广告配音' }
-        ]
-    }
-]);
-
+const tagCategories = ref([]);
+const tagModalVisible = ref(false);
+const tagForm = reactive({
+    voiceId: null,
+    currentTags: []
+});
 // 选中的标签
 const selectedTags = ref([]);
 
@@ -210,7 +214,72 @@ const pagination = reactive({
     pageSize: 10,
     total: 0
 });
+const fetchTagCategories = async () => {
+    try {
+        const response = await getTagsByCategory({ category: 'SPEAKER' });
+        if (response?.code === 0 && Array.isArray(response.data)) {
+            // 将嵌套结构扁平化
+            const flattenTags = (categories) => {
+                return categories.reduce((acc, category) => {
+                    acc.push({
+                        id: category.id,
+                        name: category.tag_name,
+                        children: category.children ? flattenTags(category.children) : []
+                    });
+                    return acc;
+                }, []);
+            };
+            tagCategories.value = flattenTags(response.data);
+        }
+    } catch (error) {
+        console.error('获取SPEAKER标签失败:', error);
+        message.error('获取SPEAKER标签失败');
+    }
+};
 
+const showTagModal = (voice) => {
+    tagForm.voiceId = voice.id;
+    // 确保传递的是标签ID数组，并且与 TagSearch 组件中的标签ID格式一致
+    tagForm.currentTags = voice.tags.map(tag => tag.id);
+    console.log('显示标签编辑模态框，当前标签ID：', tagForm.currentTags);
+    tagModalVisible.value = true;
+};
+
+// 关闭标签编辑模态框
+const closeTagModal = () => {
+    tagModalVisible.value = false;
+    tagForm.voiceId = null;
+    tagForm.currentTags = [];
+};
+
+// 提交标签编辑
+const handleTagSubmit = async () => {
+    try {
+        const formData = new FormData();
+        formData.append('speaker_id', tagForm.voiceId);
+        // 直接传递数组
+        tagForm.currentTags.forEach(tagId => {
+            formData.append('tag_ids[]', tagId);
+        });
+
+        const response = await updateSpeaker(formData);
+        if (response.code === 0) {
+            // 更新本地语音标签数据
+            const voiceIndex = voiceData.value.findIndex(v => v.id === tagForm.voiceId);
+            if (voiceIndex !== -1) {
+                voiceData.value[voiceIndex].tags = [...tagForm.currentTags]; // 使用展开运算符创建新数组
+            }
+            message.success('标签更新成功');
+            closeTagModal();
+            fetchSpeakerList(); // 新增：重新获取音色列表数据
+        } else {
+            message.error(response.message || '标签更新失败');
+        }
+    } catch (error) {
+        console.error('标签更新失败:', error);
+        message.error('标签更新失败');
+    }
+};
 // 获取音色列表
 const fetchSpeakerList = async () => {
     try {
@@ -218,9 +287,11 @@ const fetchSpeakerList = async () => {
             page: pagination.current,
             page_size: pagination.pageSize,
             name: basicForm.reader, // 添加名称查询条件
-            gender: basicForm.gender, // 添加性别查询条件
 
         };
+        if (basicForm.gender !== '不限') {
+            params.gender = basicForm.gender;
+        }
         if (selectedTags.value.length > 0) {
             selectedTags.value.forEach(tagId => {
                 params[`tag_ids`] = tagId;
@@ -248,6 +319,7 @@ const fetchSpeakerList = async () => {
 // 初始化时调用
 onMounted(() => {
     fetchSpeakerList();
+    fetchTagCategories();
 });
 
 // 分页变化处理
@@ -311,35 +383,35 @@ const columns = [
 
 // 防抖函数
 const debounce = (fn, delay) => {
-  let timer = null;
-  return function (...args) {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => {
-      fn.apply(this, args);
-    }, delay);
-  };
+    let timer = null;
+    return function (...args) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+            fn.apply(this, args);
+        }, delay);
+    };
 };
 
 // 处理试听文本修改
 const handlePreviewTextChange = debounce(async (id, text) => {
-  try {
-    const formData = new FormData();
-    formData.append('speaker_id', id);
-    formData.append('sample', text);
-    const response = await updateSpeaker(formData);
-    if (response.code === 0) {
-      const index = voiceData.value.findIndex(v => v.id === id);
-      if (index !== -1) {
-        voiceData.value[index].preview_text = text;
-      }
-      message.success('试听文本更新成功');
-    } else {
-      message.error(response.message || '更新失败');
+    try {
+        const formData = new FormData();
+        formData.append('speaker_id', id);
+        formData.append('sample', text);
+        const response = await updateSpeaker(formData);
+        if (response.code === 0) {
+            const index = voiceData.value.findIndex(v => v.id === id);
+            if (index !== -1) {
+                voiceData.value[index].preview_text = text;
+            }
+            message.success('试听文本更新成功');
+        } else {
+            message.error(response.message || '更新失败');
+        }
+    } catch (error) {
+        console.error('更新试听文本失败:', error);
+        message.error('更新试听文本失败');
     }
-  } catch (error) {
-    console.error('更新试听文本失败:', error);
-    message.error('更新试听文本失败');
-  }
 }, 2000); // 500ms 延迟
 
 // 添加音色标签
@@ -390,10 +462,30 @@ const removeVoiceTag = async (id, tagId) => {
 };
 
 // 添加试听方法
-const previewVoice = (record) => {
-    // 这里实现试听逻辑
-    console.log('试听音色:', record);
-    message.info(`正在试听 ${record.reader} 的声音`);
+const previewVoice = async (record) => {
+    try {
+        const response = await getSpeakerSample(record.id);
+        
+        // 创建Blob对象
+        console.log('获取到的音频数据:', response);
+        const blob = new Blob([response], { type: 'audio/wav' });
+        const audioUrl = URL.createObjectURL(blob);
+        
+        // 创建音频元素并播放
+        const audio = new Audio(audioUrl);
+        audio.play().catch(e => {
+            console.error('播放失败:', e);
+            message.error('播放失败，请检查音频文件');
+        });
+        
+        // 清理内存
+        audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+        };
+    } catch (error) {
+        console.error('试听出错:', error);
+        message.error('试听出错: ' + (error.response?.data?.message || error.message));
+    }
 };
 
 // 上传模态框相关状态
@@ -473,20 +565,22 @@ const voiceForm = reactive({
 const voiceFormRef = ref(null);
 
 // 根据标签ID获取标签名称
-const getTagNames = (tagIds) => {
-    const names = [];
-    tagIds.forEach(tagId => {
-        const foundTag = findTagById(tagId);
-        if (foundTag) names.push(foundTag.name);
-    });
-    return names;
+// 修改获取标签名称的方法
+const getTagNames = (tags) => {
+    if (!tags || !Array.isArray(tags)) return [];
+
+    // 返回包含标签名称和ID的对象数组
+    return tags.map(tag => ({
+        id: tag.id, // 标签ID
+        name: tag.tag_name // 标签名称
+    })).filter(tag => tag.name);
 };
 
 // 根据标签ID查找标签
 const findTagById = (tagId) => {
-    for (const category of tagCategories.value) {
-        const foundTag = category.tags.find(t => t.id === tagId);
-        if (foundTag) return foundTag;
+    // 直接遍历 tagCategories 查找标签
+    for (const tag of tagCategories.value) {
+        if (tag.id === tagId) return tag;
     }
     return null;
 };
@@ -505,7 +599,8 @@ const filteredVoices = computed(() => {
             const readerMatch = (voice.reader || '').toLowerCase().includes(
                 (basicForm.reader || '').toLowerCase()
             );
-            const genderMatch = !basicForm.gender || voice.gender === basicForm.gender;
+            // 修改性别匹配逻辑
+            const genderMatch = basicForm.gender === '不限' || voice.gender === basicForm.gender;
             return readerMatch && genderMatch;
         }
 
@@ -660,11 +755,12 @@ onMounted(() => {
 
 .voice-tags {
     display: flex;
+    align-items: center;
+    justify-content: center;
     gap: 8px;
-    flex-wrap: wrap;
 }
 
-.action-area {
-    margin-bottom: 20px;
+.voice-tags .ant-tag {
+    margin: 0;
 }
 </style>
