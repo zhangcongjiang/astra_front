@@ -88,10 +88,13 @@
                     </div>
                 </template>
 
+                // 修改操作列模板
                 <template #action="{ record }">
                     <div style="text-align: center;">
                         <div style="display: flex; gap: 4px; justify-content: center;">
-                            <a-button type="link" size="small" @click="previewVoice(record)">
+                            <a-button type="link" size="small" 
+                                @click="previewVoice(record)"
+                                :loading="previewLoading">
                                 试听
                             </a-button>
                             <a-button type="link" size="small" @click="showEditModal(record)">
@@ -462,7 +465,10 @@ const removeVoiceTag = async (id, tagId) => {
 };
 
 // 添加试听方法
+const previewLoading = ref(false); // 新增loading状态
+
 const previewVoice = async (record) => {
+    previewLoading.value = true; // 开始loading
     try {
         const response = await getSpeakerSample(record.id);
         
@@ -485,6 +491,8 @@ const previewVoice = async (record) => {
     } catch (error) {
         console.error('试听出错:', error);
         message.error('试听出错: ' + (error.response?.data?.message || error.message));
+    } finally {
+        previewLoading.value = false; // 结束loading
     }
 };
 
