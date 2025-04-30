@@ -333,10 +333,11 @@ const handleDateChange = (dates) => {
 const resetBasicSearch = () => {
   basicForm.name = '';
   basicForm.uploader = '';
-  basicForm.dateRange = [];
+  basicForm.dateRange = []; // 清空日期范围选择器
   basicForm.startTime = null;
   basicForm.endTime = null;
-  handleSearch();
+  selectedTags.value = []; // 新增：清空已选标签
+  handleSearch(); // 调用搜索方法更新列表
 };
 
 // 上传处理

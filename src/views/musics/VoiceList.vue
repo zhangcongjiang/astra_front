@@ -632,7 +632,7 @@ const handleSearch = () => {
 // 重置基础查询
 const resetBasicSearch = () => {
     basicForm.reader = '';
-    basicForm.gender = '';
+    basicForm.gender = '不限'; // 修改为默认值"不限"
     handleSearch(); // 调用搜索方法
 };
 
