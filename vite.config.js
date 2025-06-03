@@ -22,7 +22,7 @@ export default defineConfig({
     cors: true, // 允许跨域请求
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8080',
+        target: 'http://127.0.0.1:8088',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
         logLevel: 'debug',

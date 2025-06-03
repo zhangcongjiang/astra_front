@@ -42,3 +42,53 @@ export const getSpeakerSample = async (id, config = {}) => {
     }
   };
 
+export const syncSpeakerAudio = async () => {
+    try {
+        const response = await request.post("/voice/speakers/sync/");
+        return response;
+    } catch (error) {
+        console.error(`同步音频出错:`, error);
+        throw error;
+    }
+};
+
+export const getAllLanguages = async () => {
+    try {
+        const response = await request.get("/voice/languages/");
+        return response;
+    } catch (error) {
+        console.error(`获取所有语言出错:`, error);
+        throw error;
+    }
+};
+
+export const getLanguagesBySpeaker = async (speakerId) => {
+    try {
+        const response = await request.get(`/voice/languages/by-speaker/?speaker_id=${speakerId}`);
+        return response;
+    } catch (error) {
+        console.error(`获取朗读者语言出错:`, error);
+        throw error;
+    }
+};
+
+export const getAllEmotions = async () => {
+    try {
+        const response = await request.get("/voice/emotions/");
+        return response;
+    } catch (error) {
+        console.error(`获取所有情感出错:`, error);
+        throw error;
+    }
+};
+
+export const getEmotionsBySpeaker = async (speakerId) => {
+    try {
+        const response = await request.get(`/voice/emotions/by-speaker/?speaker_id=${speakerId}`);
+        return response;
+    } catch (error) {
+        console.error(`获取朗读者情感出错:`, error);
+        throw error;
+    }
+};
+
