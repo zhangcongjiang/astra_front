@@ -15,6 +15,11 @@ const handleError = (error) => {
 
 export const request = async ({ method, url, params = {}, data = null, responseType = "json" }) => {
   try {
+    if (url.startsWith("/media/")) {
+      axiosInstance.defaults.baseURL = "/api";
+    }else{
+      axiosInstance.defaults.baseURL = "/api/api/";
+    }
     const response = await axiosInstance[method.toLowerCase()](url, method.toLowerCase() === "get" ? { params, responseType } : data);
     return response.data;
   } catch (error) {

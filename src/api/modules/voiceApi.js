@@ -31,10 +31,10 @@ export const getSpeakerList = async (params) => {
 export const getSpeakerSample = async (params, config = {}) => {
     try {
         return request({
-            method: 'get',
+            method: 'post',
             url: `/voice/speakers/sample/`,
-            params: formatParams(params),
-            responseType: 'arraybuffer',
+            data: formatParams(params),
+            responseType: 'json',
             ...config
         });
     } catch (error) {

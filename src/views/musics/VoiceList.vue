@@ -231,6 +231,7 @@ import { addSpeaker,
     getAllLanguages,
     getLanguagesBySpeaker,
     getEmotionsBySpeaker } from '@/api/modules/voiceApi';
+import { request } from '@/api/config/request';
 import { getTagsByCategory } from '@/api/modules/tagApi';
 import { SyncOutlined } from '@ant-design/icons-vue';
 // 搜索类型
@@ -415,15 +416,30 @@ const previewVoice = async (record, isDefault = true) => {
 
         const response = await getSpeakerSample(params);
         
-        // 音频播放逻辑...
-        const blob = new Blob([response], { type: 'audio/wav' });
-        const audioUrl = URL.createObjectURL(blob);
-        const audio = new Audio(audioUrl);
-        audio.play();
-        
-        audio.onended = () => {
-            URL.revokeObjectURL(audioUrl);
-        };
+        // 检查响应结构并获取 file_path
+        if (response && response.data && response.data.file_path) {
+            const filePath = response.data.file_path;
+            // 根据 file_path 去后端获取音频文件
+            console.log('准备播放的文件路径:', filePath);
+            const audioResponse = await request({
+                method: 'get',
+                url: `/${filePath}`,
+                responseType: 'arraybuffer' // 获取二进制数据
+            });
+
+            // 音频播放逻辑
+            const blob = new Blob([audioResponse], { type: 'audio/wav' });
+            const audioUrl = URL.createObjectURL(blob);
+            const audio = new Audio(audioUrl);
+            audio.play();
+
+            audio.onended = () => {
+                URL.revokeObjectURL(audioUrl);
+            };
+        } else {
+            console.error('获取试听文件路径失败:', response);
+            message.error('获取试听文件路径失败');
+        }
     } catch (error) {
         console.error('试听出错:', error);
         message.error('试听出错: ' + (error.response?.data?.message || error.message));
