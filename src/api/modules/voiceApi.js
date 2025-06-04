@@ -28,19 +28,20 @@ export const getSpeakerList = async (params) => {
         throw error;
     }
 };
-export const getSpeakerSample = async (id, config = {}) => {
+export const getSpeakerSample = async (params, config = {}) => {
     try {
         return request({
             method: 'get',
-            url: `/voice/speakers/sample/${id}/`,
-            responseType: 'arraybuffer', 
+            url: `/voice/speakers/sample/`,
+            params: formatParams(params),
+            responseType: 'arraybuffer',
             ...config
-          });
+        });
     } catch (error) {
-      console.error(`获取试听文件出错:`, error);
-      throw error;
+        console.error(`获取试听文件出错:`, error);
+        throw error;
     }
-  };
+};
 
 export const syncSpeakerAudio = async () => {
     try {

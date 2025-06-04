@@ -16,7 +16,11 @@
                         <a-input v-model:value="basicForm.reader" placeholder="输入朗读者" @pressEnter="handleSearch" />
                     </a-form-item>
                     <a-form-item label="语言">
-                        <a-select v-model:value="basicForm.language" placeholder="选择语言" style="width: 120px"
+                        <a-select 
+                            v-model:value="basicForm.language" 
+                            placeholder="选择语言" 
+                            style="width: 120px"
+                            @dropdownVisibleChange="(open) => open && !languages.length && fetchOptionsData()"
                             :loading="!languages.length">
                             <a-select-option value="">全部</a-select-option>
                             <a-select-option v-for="lang in languages" :key="lang.id" :value="lang">
@@ -26,7 +30,11 @@
                     </a-form-item>
 
                     <a-form-item label="情感">
-                        <a-select v-model:value="basicForm.emotion" placeholder="选择情感" style="width: 120px"
+                        <a-select 
+                            v-model:value="basicForm.emotion" 
+                            placeholder="选择情感" 
+                            style="width: 120px"
+                            @dropdownVisibleChange="(open) => open && !emotions.length && fetchOptionsData()"
                             :loading="!emotions.length">
                             <a-select-option value="">全部</a-select-option>
                             <a-select-option v-for="emo in emotions" :key="emo.id" :value="emo">
@@ -67,27 +75,51 @@
 
                 <template #reader="{ record }">
                     <div style="text-align: center;">
-                        <span>{{ record.reader }}</span>
+                        <span>{{ record.name }}</span>
                     </div>
                 </template>
 
                 <template #language="{ record }">
                     <div style="text-align: center;">
-                        {{ record.language }}
+                        <a-select 
+                            v-model:value="record.language"
+                            :options="record.languageOptions || []"
+                            @dropdownVisibleChange="(open) => open && loadSpeakerLanguages(record)"
+                            @change="(value) => handleLanguageChange(record, value)"
+                            style="width: 120px"
+                        />
                     </div>
                 </template>
 
                 <template #emotion="{ record }">
                     <div style="text-align: center;">
-                        {{ record.emotion }}
+                        <a-select 
+                            v-model:value="record.emotion"
+                            :options="record.emotionOptions || []"
+                            @dropdownVisibleChange="(open) => open && loadSpeakerEmotions(record)"
+                            @change="(value) => handleEmotionChange(record, value)"
+                            style="width: 120px"
+                        />
                     </div>
                 </template>
 
                 <template #speed="{ record }">
                     <div style="text-align: center;">
-                        {{ record.speed }}
+                        <a-input-number 
+                            v-model:value="record.speed"
+                            :min="0.01"
+                            :max="2"
+                            :step="0.1"
+                            @change="(value) => handleSpeedChange(record, value)"
+                            style="width: 100px"
+                        />
                     </div>
                 </template>
+                <template #model="{ record }">
+    <div style="text-align: center;">
+        {{ record.model }}
+    </div>
+</template>
 
                 <template #tags="{ record }">
                     <div style="text-align: center;">
@@ -110,13 +142,57 @@
                 <template #action="{ record }">
                     <div style="text-align: center;">
                         <div style="display: flex; gap: 4px; justify-content: center;">
-                            <a-button type="link" size="small" @click="previewVoice(record)" :loading="previewLoading">
+                            <a-button type="link" size="small" 
+                                     @click="showPreviewModal(record)"
+                                     :loading="previewLoading">
                                 试听
                             </a-button>
                         </div>
                     </div>
                 </template>
             </a-table>
+            
+            <!-- 将试听模态框移到表格外部 -->
+            <a-modal v-model:visible="previewModalVisible" 
+                     title="试听选项" 
+                     width="600px"
+                     :footer="null"
+                     :maskClosable="false">
+                <a-card :bordered="false">
+                    <a-form layout="vertical">
+                        <a-form-item label="试听文本">
+                            <a-textarea v-model:value="previewText" 
+                                       :rows="4" 
+                                       placeholder="请输入试听文本"/>
+                        </a-form-item>
+                        
+                        <div class="preview-options">
+                            <div class="option-description">
+                                
+                                <a-button type="primary" 
+                                          @click="previewVoice(currentPreviewRecord, true)"
+                                          :loading="previewLoading">
+                                    <play-circle-outlined /> 试听音色
+                                </a-button>
+                                <a-tooltip title="播放当前朗读者的默认音色样本">
+                                        <question-circle-outlined style="margin-left: 8px; color: #999; cursor: help"/>
+                                    </a-tooltip>
+                            </div>
+                            
+                            <div class="option-description">
+                                
+                                <a-button @click="previewVoice(currentPreviewRecord, false)"
+                                          :loading="previewLoading">
+                                    <play-circle-outlined /> 试听文本
+                                </a-button>
+                                <a-tooltip title="播放您输入的文本使用当前朗读者的音色">
+                                        <question-circle-outlined style="margin-left: 8px; color: #999; cursor: help"/>
+                                    </a-tooltip>
+                            </div>
+                        </div>
+                    </a-form>
+                </a-card>
+            </a-modal>
         </div>
 
         <!-- 分页控制 -->
@@ -134,11 +210,27 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, h } from 'vue';
-import { UploadOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, TagsOutlined } from '@ant-design/icons-vue';
+// 在现有import部分添加
+import { 
+    UploadOutlined, 
+    EditOutlined, 
+    DeleteOutlined, 
+    PlayCircleOutlined, 
+    TagsOutlined,
+    QuestionCircleOutlined  // 新增
+} from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
 import TagSearch from '@/components/TagSearch.vue';
 import Pagination from '@/components/Pagination.vue';
-import { addSpeaker, getSpeakerList, updateSpeaker, getSpeakerSample, syncSpeakerAudio,getAllEmotions,getAllLanguages } from '@/api/modules/voiceApi';
+import { addSpeaker, 
+    getSpeakerList, 
+    updateSpeaker, 
+    getSpeakerSample, 
+    syncSpeakerAudio, 
+    getAllEmotions, 
+    getAllLanguages,
+    getLanguagesBySpeaker,
+    getEmotionsBySpeaker } from '@/api/modules/voiceApi';
 import { getTagsByCategory } from '@/api/modules/tagApi';
 import { SyncOutlined } from '@ant-design/icons-vue';
 // 搜索类型
@@ -199,6 +291,8 @@ const emotions = ref([]);
 
 // 获取语言和情感数据
 const fetchOptionsData = async () => {
+    if (languages.value.length && emotions.value.length) return;
+    
     try {
         const [langRes, emoRes] = await Promise.all([
             getAllLanguages(),
@@ -256,38 +350,27 @@ const handleTagSubmit = async () => {
     }
 };
 // 获取音色列表
+// 修改获取音色列表方法
 const fetchSpeakerList = async () => {
     try {
         const params = {
             page: pagination.current,
             page_size: pagination.pageSize,
-            name: basicForm.reader, // 添加名称查询条件
+            name: basicForm.reader,
+            language: basicForm.language || undefined,
+            emotion: basicForm.emotion || undefined
         };
-        if (basicForm.language !== '全部') {
-            params.language = basicForm.language;
-        }
-        if (basicForm.emotion !== '全部') {
-            params.emotion = basicForm.emotion;
-        }
+        
         if (selectedTags.value.length > 0) {
-            selectedTags.value.forEach(tagId => {
-                params[`tag_ids`] = tagId;
-            });
+            params.tag_ids = selectedTags.value.join(',');
         }
+
         const response = await getSpeakerList(params);
-        console.log('获取音色列表结果:', response);
-
-        // 将接口返回的数据映射为页面所需的数据结构
-        voiceData.value = response.map(item => ({
-            id: item.id,
-            reader: item.name, // 将 name 映射为 reader
-            language: item.language,
-            emotion: item.emotion,
-            speed: item.speed,
-            tags: item.tags
-        }));
-
-        pagination.total = response.total || 0; // 更新总条数
+        
+        // 确保数据结构正确
+        voiceData.value = response.data?.list || response.data || response || [];
+        pagination.total = response.data?.total || response.total || voiceData.value.length;
+        
     } catch (error) {
         console.error('获取音色列表失败:', error);
         message.error('获取音色列表失败');
@@ -308,168 +391,36 @@ const handlePaginationChange = ({ current, pageSize }) => {
     fetchSpeakerList(); // 重新获取数据
 };
 
-// 试听文本相关状态
-const previewText = ref('欢迎使用语音合成系统，这是一个默认的试听文本。');
+// 试听相关状态和方法
 const previewModalVisible = ref(false);
+const previewText = ref('欢迎使用语音合成系统，这是一个默认的试听文本。');
+const currentPreviewRecord = ref(null);
+const previewLoading = ref(false);
 
-// 修改表格列定义
-const columns = [
-    {
-        title: '序号',
-        key: 'index',
-        width: 60,
-        align: 'center',
-        slots: { customRender: 'index' }
-    },
-    {
-        title: '朗读者',
-        dataIndex: 'reader',
-        key: 'reader',
-        align: 'center',
-        width: 150,
-        slots: { customRender: 'reader' }
-    },
-    {
-        title: '语言',
-        dataIndex: 'language',
-        key: 'language',
-        align: 'center',
-        width: 100,
-        slots: { customRender: 'language' }
-    },
-    {
-        title: '情感',
-        dataIndex: 'emotion',
-        key: 'emotion',
-        align: 'center',
-        width: 100,
-        slots: { customRender: 'emotion' }
-    },
-    {
-        title: '语速',
-        dataIndex: 'speed',
-        key: 'speed',
-        align: 'center',
-        width: 100,
-        slots: { customRender: 'speed' }
-    },
-    {
-        title: '标签',
-        key: 'tags',
-        width: 300,
-        align: 'center',
-        slots: { customRender: 'tags' }
-    },
-    {
-        title: '操作',
-        key: 'action',
-        width: 200,
-        align: 'center',
-        slots: { customRender: 'action' }
-    }
-];
-
-// 防抖函数
-const debounce = (fn, delay) => {
-    let timer = null;
-    return function (...args) {
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(() => {
-            fn.apply(this, args);
-        }, delay);
-    };
+const showPreviewModal = (record) => {
+    currentPreviewRecord.value = record;
+    previewModalVisible.value = true;
 };
 
-// 处理试听文本修改
-const handlePreviewTextChange = debounce(async (id, text) => {
+const previewVoice = async (record, isDefault = true) => {
+    if (!record) return;
+    
+    previewLoading.value = true;
     try {
-        const formData = new FormData();
-        formData.append('speaker_id', id);
-        formData.append('sample', text);
-        const response = await updateSpeaker(formData);
-        if (response.code === 0) {
-            const index = voiceData.value.findIndex(v => v.id === id);
-            if (index !== -1) {
-                voiceData.value[index].preview_text = text;
-            }
-            message.success('试听文本更新成功');
-        } else {
-            message.error(response.message || '更新失败');
-        }
-    } catch (error) {
-        console.error('更新试听文本失败:', error);
-        message.error('更新试听文本失败');
-    }
-}, 2000); // 500ms 延迟
+        const params = {
+            speaker_id: record.id,
+            text: previewText.value, // 无论isDefault为何值都传递text
+            is_default: isDefault
+        };
 
-// 添加音色标签
-const addVoiceTag = async (id, tagId) => {
-    try {
-        const formData = new FormData();
-        formData.append('speaker_id', id);
-        formData.append('tag_ids', tagId);
-        const response = await updateSpeaker(formData);
-        if (response.code === 0) {
-            const index = voiceData.value.findIndex(v => v.id === id);
-            if (index !== -1) {
-                voiceData.value[index].tags.push(tagId);
-            }
-            message.success('标签添加成功');
-        } else {
-            message.error(response.message || '标签添加失败');
-        }
-    } catch (error) {
-        console.error('标签添加失败:', error);
-        message.error('标签添加失败');
-    }
-};
-
-// 移除音色标签
-const removeVoiceTag = async (id, tagId) => {
-    try {
-        const formData = new FormData();
-        formData.append('speaker_id', id);
-        formData.append('tag_ids', tagId);
-        const response = await updateSpeaker(formData);
-        if (response.code === 0) {
-            const index = voiceData.value.findIndex(v => v.id === id);
-            if (index !== -1) {
-                const tagIndex = voiceData.value[index].tags.indexOf(tagId);
-                if (tagIndex > -1) {
-                    voiceData.value[index].tags.splice(tagIndex, 1);
-                }
-            }
-            message.success('标签移除成功');
-        } else {
-            message.error(response.message || '标签移除失败');
-        }
-    } catch (error) {
-        console.error('标签移除失败:', error);
-        message.error('标签移除失败');
-    }
-};
-
-// 添加试听方法
-const previewLoading = ref(false); // 新增loading状态
-
-const previewVoice = async (record) => {
-    previewLoading.value = true; // 开始loading
-    try {
-        const response = await getSpeakerSample(record.id);
-
-        // 创建Blob对象
-        console.log('获取到的音频数据:', response);
+        const response = await getSpeakerSample(params);
+        
+        // 音频播放逻辑...
         const blob = new Blob([response], { type: 'audio/wav' });
         const audioUrl = URL.createObjectURL(blob);
-
-        // 创建音频元素并播放
         const audio = new Audio(audioUrl);
-        audio.play().catch(e => {
-            console.error('播放失败:', e);
-            message.error('播放失败，请检查音频文件');
-        });
-
-        // 清理内存
+        audio.play();
+        
         audio.onended = () => {
             URL.revokeObjectURL(audioUrl);
         };
@@ -477,7 +428,7 @@ const previewVoice = async (record) => {
         console.error('试听出错:', error);
         message.error('试听出错: ' + (error.response?.data?.message || error.message));
     } finally {
-        previewLoading.value = false; // 结束loading
+        previewLoading.value = false;
     }
 };
 
@@ -498,20 +449,6 @@ const syncAudio = async () => {
     }
 };
 
-
-// 编辑模态框相关状态
-const editModalVisible = ref(false);
-const currentVoice = ref(null);
-const voiceForm = reactive({
-    id: null,
-    reader: '',
-    gender: '',
-    seed: '',
-    tags: []
-});
-const voiceFormRef = ref(null);
-
-// 根据标签ID获取标签名称
 // 修改获取标签名称的方法
 const getTagNames = (tags) => {
     if (!tags || !Array.isArray(tags)) return [];
@@ -582,6 +519,174 @@ const resetBasicSearch = () => {
 onMounted(() => {
     pagination.total = voiceData.value.length;
 });
+// 修改表格列定义
+const columns = [
+    {
+        title: '序号',
+        key: 'index',
+        width: 60,
+        align: 'center',
+        slots: { customRender: 'index' }
+    },
+    {
+        title: '朗读者',
+        dataIndex: 'reader',
+        key: 'reader',
+        align: 'center',
+        width: 150,
+        slots: { customRender: 'reader' }
+    },
+    {
+        title: '语言',
+        dataIndex: 'language',
+        key: 'language',
+        align: 'center',
+        width: 100,
+        slots: { customRender: 'language' }
+    },
+    {
+        title: '情感',
+        dataIndex: 'emotion',
+        key: 'emotion',
+        align: 'center',
+        width: 100,
+        slots: { customRender: 'emotion' }
+    },
+    {
+        title: '语速',
+        dataIndex: 'speed',
+        key: 'speed',
+        align: 'center',
+        width: 100,
+        slots: { customRender: 'speed' }
+    },
+    {
+        title: '音频模型',  
+        dataIndex: 'model',
+        key: 'model',
+        align: 'center',
+        width: 120,
+        slots: { customRender: 'model' }
+    },
+    {
+        title: '标签',
+        key: 'tags',
+        width: 300,
+        align: 'center',
+        slots: { customRender: 'tags' }
+    },
+    {
+        title: '操作',
+        key: 'action',
+        width: 200,
+        align: 'center',
+        slots: { customRender: 'action' }
+    }
+];
+// 添加语言切换方法
+const handleLanguageChange = async (record, newLanguage) => {
+    try {
+        const formData = new FormData();
+        formData.append('speaker_id', record.id);
+        formData.append('language', newLanguage);
+        
+        const response = await updateSpeaker(formData);
+        if (response.code === 0) {
+            message.success('语言更新成功');
+            // 更新本地数据
+            const index = voiceData.value.findIndex(v => v.id === record.id);
+            if (index !== -1) {
+                voiceData.value[index].language = newLanguage;
+            }
+        } else {
+            message.error(response.message || '语言更新失败');
+        }
+    } catch (error) {
+        console.error('语言更新失败:', error);
+        message.error('语言更新失败');
+    }
+};
+
+const handleEmotionChange = async (record, newEmotion) => {
+    try {
+        const formData = new FormData();
+        formData.append('speaker_id', record.id);
+        formData.append('emotion', newEmotion);
+        
+        const response = await updateSpeaker(formData);
+        if (response.code === 0) {
+            message.success('情感更新成功');
+            // 更新本地数据
+            const index = voiceData.value.findIndex(v => v.id === record.id);
+            if (index !== -1) {
+                voiceData.value[index].emotion = newEmotion;
+            }
+        } else {
+            message.error(response.message || '情感更新失败');
+        }
+    } catch (error) {
+        console.error('情感更新失败:', error);
+        message.error('情感更新失败');
+    }
+};
+
+// 加载朗读者的语言选项
+const loadSpeakerLanguages = async (record) => {
+    if (record.languageOptions) return;
+    
+    try {
+        const response = await getLanguagesBySpeaker(record.id);
+        record.languageOptions = response.data.map(lang => ({
+            value: lang,
+            label: lang
+        }));
+    } catch (error) {
+        console.error('获取语言选项失败:', error);
+        record.languageOptions = [];
+    }
+};
+
+// 加载朗读者的情感选项
+const loadSpeakerEmotions = async (record) => {
+    if (record.emotionOptions) return;
+    
+    try {
+        const response = await getEmotionsBySpeaker(record.id);
+        record.emotionOptions = response.data.map(emo => ({
+            value: emo,
+            label: emo
+        }));
+    } catch (error) {
+        console.error('获取情感选项失败:', error);
+        record.emotionOptions = [];
+    }
+};
+
+const handleSpeedChange = async (record, newSpeed) => {
+    try {
+        // 确保值在范围内
+        newSpeed = Math.max(0.01, Math.min(2, newSpeed));
+        
+        const formData = new FormData();
+        formData.append('speaker_id', record.id);
+        formData.append('speed', newSpeed);
+        
+        const response = await updateSpeaker(formData);
+        if (response.code === 0) {
+            message.success('语速更新成功');
+            // 更新本地数据
+            const index = voiceData.value.findIndex(v => v.id === record.id);
+            if (index !== -1) {
+                voiceData.value[index].speed = newSpeed;
+            }
+        } else {
+            message.error(response.message || '语速更新失败');
+        }
+    } catch (error) {
+        console.error('语速更新失败:', error);
+        message.error('语速更新失败');
+    }
+};
 </script>
 
 <style scoped>
@@ -634,5 +739,28 @@ onMounted(() => {
 
 .voice-tags .ant-tag {
     margin: 0;
+}
+
+.preview-options {
+    display: flex;
+    gap: 24px;
+    margin-top: 20px;
+}
+
+.option-description {
+    flex: 1;
+    padding: 16px;
+    border-radius: 4px;
+    background: #f9f9f9;
+}
+
+.option-description h4 {
+    margin-bottom: 8px;
+    color: #1890ff;
+}
+
+.option-description p {
+    margin-bottom: 12px;
+    color: #666;
 }
 </style>
