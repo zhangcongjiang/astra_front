@@ -222,7 +222,7 @@ import {
 import { message } from 'ant-design-vue';
 import TagSearch from '@/components/TagSearch.vue';
 import Pagination from '@/components/Pagination.vue';
-import { addSpeaker, 
+import {  
     getSpeakerList, 
     updateSpeaker, 
     getSpeakerSample, 

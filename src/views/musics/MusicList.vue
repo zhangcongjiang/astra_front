@@ -54,8 +54,7 @@
     </div>
 
     <!-- 上传音乐模态框 -->
-    <a-modal v-model:visible="uploadModalVisible" title="上传音乐" width="800px" :maskClosable="false"
-      @ok="handleUploadSubmit" @cancel="closeUploadModal">
+    <a-modal v-model:visible="uploadModalVisible" title="上传音乐" width="800px" :maskClosable="false" @ok="handleUploadSubmit" @cancel="closeUploadModal">
       <a-form :model="uploadForm" :label-col="{ span: 4 }" :wrapper-col="{ span: 20 }" ref="uploadFormRef">
         <a-form-item label="音乐名称" name="name" :rules="[{ required: true, message: '请输入音乐名称' }]">
           <a-input v-model:value="uploadForm.name" placeholder="请输入音乐名称" />
@@ -63,6 +62,14 @@
         <a-form-item label="歌手" name="artist" :rules="[{ required: true, message: '请输入歌手名称' }]">
           <a-input v-model:value="uploadForm.artist" placeholder="请输入歌手名称" />
         </a-form-item>
+        <a-form-item label="分类" name="category" :rules="[{ required: true, message: '请选择分类' }]">
+  <a-select v-model:value="uploadForm.category" placeholder="请选择分类">
+    <a-select-option value="BGM">背景音乐</a-select-option>
+    <a-select-option value="EFFECT">音效</a-select-option>
+    <a-select-option value="MUSIC">音乐</a-select-option>
+  </a-select>
+</a-form-item>
+
         <a-form-item label="音乐文件" name="audioFile" :rules="[{ required: true, message: '请上传音乐文件' }]">
           <a-upload :beforeUpload="() => false" :showUploadList="false" @change="handleFileChange">
             <a-button>选择音乐文件</a-button>
@@ -173,6 +180,8 @@ import dayjs from 'dayjs'
 import TagSearch from '@/components/TagSearch.vue'
 import Pagination from '@/components/Pagination.vue'
 import { useRoute, useRouter } from 'vue-router'
+import {  
+    uploadSound } from '@/api/modules/voiceApi';
 
 // Initialize router and route
 const router = useRouter()
@@ -505,6 +514,7 @@ const uploadModalVisible = ref(false);
 const uploadForm = reactive({
   name: '',
   artist: '',
+  category: 'MUSIC', // 设置默认值
   audioFile: null,
   tags: []
 });
@@ -520,39 +530,35 @@ const closeUploadModal = () => {
   uploadForm.audioFile = null;
 };
 
+// 处理文件上传
 const handleUploadSubmit = async () => {
   try {
-    await uploadFormRef.value.validate();
+    const formData = new FormData();
+    formData.append('file', uploadForm.audioFile);
+    formData.append('name', uploadForm.name);
+    formData.append('category', uploadForm.category); // 使用动态值
+    formData.append('singer', uploadForm.artist)
+    formData.append('tags', JSON.stringify(uploadForm.tags)); // 数组需要序列化
 
-    musicData.value.unshift({
-      id: Date.now(),
-      name: uploadForm.name,
-      artist: uploadForm.artist,
-      duration: await getAudioDuration(uploadForm.audioFile),
-      uploadTime: dayjs().format('YYYY-MM-DD HH:mm'),
-      audioUrl: URL.createObjectURL(uploadForm.audioFile),
-      tags: [...uploadForm.tags]
-    });
-
-    message.success('上传成功');
-    closeUploadModal();
+    const { data } = await uploadSound(formData)
+    message.success('上传成功')
+    closeUploadModal()
+    fetchMusics() // 刷新列表
   } catch (error) {
-    console.error('表单验证失败:', error);
+    message.error(error.message || '上传失败')
   }
-};
+}
+
 // 处理文件选择
 const handleFileChange = (info) => {
-  if (info.file) {
-    musicForm.audioFile = info.file;
-    musicForm.audioUrl = URL.createObjectURL(info.file);
-
-    // 获取音频时长
-    getAudioDuration(info.file).then(duration => {
-      musicForm.duration = duration;
-    });
+  const file = info.file
+  const isAudio = file.type.includes('audio') || ['mp3', 'wav'].includes(file.name.split('.').pop().toLowerCase())
+  if (!isAudio) {
+    message.error('请上传音频文件 (MP3/WAV)')
+    return
   }
-};
-
+  uploadForm.audioFile = file
+}
 const handleSelect = (music) => {
   if (isSelectMode.value) {
     router.push({
@@ -700,6 +706,11 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.ant-select {
+  width: 200px;
+}
+
+
 .music-list-container {
   padding: 20px;
   height: 100%;
