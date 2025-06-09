@@ -102,3 +102,13 @@ export const uploadSound = async (data) => {
         throw error;
     }
 };
+
+export const getSoundList = async (params) => {
+    try {
+        const response = await request.get(`/voice/`, formatParams(params));
+        return response;
+    }catch{
+        console.error(`获取音频列表出错:`, error);
+        throw error;
+    }
+}

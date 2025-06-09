@@ -182,7 +182,8 @@ import TagSearch from '@/components/TagSearch.vue'
 import Pagination from '@/components/Pagination.vue'
 import { useRoute, useRouter } from 'vue-router'
 import {  
-    uploadSound } from '@/api/modules/voiceApi';
+    uploadSound,
+    getSoundList } from '@/api/modules/voiceApi';
 
 // Initialize router and route
 const router = useRouter()
@@ -235,32 +236,7 @@ const tagCategories = ref([
 const selectedTags = ref([]);
 
 // 音乐数据
-const musicData = ref([
-  {
-    id: 1,
-    name: '示例音乐1',
-    artist: '示例歌手',
-    duration: 213,
-    uploadTime: dayjs().format('YYYY-MM-DD HH:mm'),
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-    tags: ['genre_1', 'mood_1']
-  },
-  {
-    id: 2,
-    name: '示例音乐2',
-    artist: '示例歌手',
-    duration: 184,
-    uploadTime: dayjs().subtract(1, 'day').format('YYYY-MM-DD HH:mm'),
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-    tags: ['genre_2', 'mood_3']
-  },
-  // 更多示例音乐...
-  ...generateMockMusics(18)
-]);
-
-// 播放状态
-const currentPlaying = ref({ id: null });
-const isPlaying = ref(false);
+const musicData = ref([]);
 
 // 分页配置
 const pagination = reactive({
@@ -268,6 +244,54 @@ const pagination = reactive({
   pageSize: 10,
   total: 0
 });
+
+// 获取音乐列表
+const fetchMusicList = async () => {
+  try {
+    const params = {
+      page: pagination.current,
+      page_size: pagination.pageSize
+    };
+    
+    const res = await getSoundList(params);
+    
+    if (res.code === 0) {
+      musicData.value = res.data.results.map(item => ({
+        id: item.id,
+        name: item.name,
+        artist: item.spec?.singer || '',
+        duration: item.spec?.duration || 0,
+        uploadTime: item.create_time,
+        audioUrl: item.sound_path,
+        tags: item.tags || []
+      }));
+      
+      pagination.total = res.data.count;
+    } else {
+      message.error(res.message || '获取音乐列表失败');
+    }
+  } catch (error) {
+    message.error('获取音乐列表失败');
+    console.error(error);
+  }
+};
+
+// 分页变化处理
+const handlePaginationChange = (page, pageSize) => {
+  pagination.current = page;
+  pagination.pageSize = pageSize;
+  fetchMusicList();
+};
+
+// 初始化获取数据
+onMounted(() => {
+  fetchMusicList();
+});
+
+// 格式化日期
+const formatDate = (dateStr) => {
+  return dayjs(dateStr).format('YYYY-MM-DD HH:mm');
+};
 
 // 表格列定义
 const columns = [
@@ -282,13 +306,14 @@ const columns = [
     title: '音乐名称',
     dataIndex: 'name',
     key: 'name',
+    width: 400,
     slots: { customRender: 'name' }
   },
   {
     title: '时长',
     dataIndex: 'duration',
     key: 'duration',
-    width: 100,
+    width: 150,
     align: 'center',
     slots: { customRender: 'duration' }
   },
@@ -296,7 +321,8 @@ const columns = [
     title: '歌手',
     dataIndex: 'artist',
     key: 'artist',
-    width: 150
+    width: 150,
+    align: 'center',
   },
   {
     title: '上传时间',
@@ -309,6 +335,7 @@ const columns = [
   {
     title: '标签',
     key: 'tags',
+    align: 'center',
     slots: { customRender: 'tags' }
   },
   {
@@ -335,41 +362,6 @@ const musicForm = reactive({
 });
 const musicFormRef = ref(null);
 
-// 生成模拟音乐数据
-function generateMockMusics(count) {
-  const mockMusics = [];
-  const genres = ['genre_1', 'genre_2', 'genre_3', 'genre_4', 'genre_5', 'genre_6'];
-  const moods = ['mood_1', 'mood_2', 'mood_3', 'mood_4'];
-  const artists = ['周杰伦', '林俊杰', '邓紫棋', '王菲', '张学友', '陈奕迅', 'Taylor Swift', 'Ed Sheeran'];
-  const audioUrls = [
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
-    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3'
-  ];
-
-  for (let i = 1; i <= count; i++) {
-    const randomGenre = genres[Math.floor(Math.random() * genres.length)];
-    const randomMood = moods[Math.floor(Math.random() * moods.length)];
-    const randomArtist = artists[Math.floor(Math.random() * artists.length)];
-    const randomAudioUrl = audioUrls[Math.floor(Math.random() * audioUrls.length)];
-
-    mockMusics.push({
-      id: i + 2, // 从3开始，避免与示例音乐ID冲突
-      name: `音乐${i}`,
-      artist: randomArtist,
-      duration: Math.floor(Math.random() * 300) + 60, // 60-360秒
-      uploadTime: dayjs().subtract(Math.floor(Math.random() * 30), 'day').format('YYYY-MM-DD HH:mm'),
-      audioUrl: randomAudioUrl,
-      tags: [randomGenre, randomMood]
-    });
-  }
-
-  return mockMusics;
-}
-
 // 根据标签ID获取标签名称
 const getTagNames = (tagIds) => {
   const names = [];
@@ -389,16 +381,11 @@ const findTagById = (tagId) => {
   return null;
 };
 
-// 格式化时长
+// 格式化时长（精确到秒）
 const formatDuration = (seconds) => {
   const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
+  const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
-};
-
-// 格式化日期
-const formatDate = (date) => {
-  return dayjs(date).format('YYYY-MM-DD HH:mm');
 };
 
 // 当前页显示的音乐
@@ -505,11 +492,6 @@ const resetBasicSearch = () => {
   handleSearch();
 };
 
-// 分页变化处理
-const handlePaginationChange = ({ current, pageSize }) => {
-  pagination.current = current;
-  pagination.pageSize = pageSize;
-};
 // 在script setup中添加
 const uploadModalVisible = ref(false);
 const uploadForm = reactive({
@@ -574,22 +556,6 @@ const handleSelect = (music) => {
       }
     });
   }
-};
-
-// 获取音频时长
-const getAudioDuration = (file) => {
-  return new Promise((resolve) => {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const reader = new FileReader();
-
-    reader.onload = function (e) {
-      audioContext.decodeAudioData(e.target.result, function (buffer) {
-        resolve(Math.round(buffer.duration));
-      });
-    };
-
-    reader.readAsArrayBuffer(file);
-  });
 };
 
 // 显示编辑模态框

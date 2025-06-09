@@ -6,7 +6,6 @@ import VideoTemplateList from '@/views/videos/VideoTemplateList.vue'
 import VideoTemplateApply from '@/views/videos/VideoTemplateApply.vue'
 import BackgroundList from '@/views/images/BackgroundList.vue'
 import MyVideo from '@/views/videos/MyVideo.vue'
-import EffectList from '@/views/musics/EffectList.vue'
 import VoiceList from '@/views/musics/VoiceList.vue'
 import MySound from '@/views/musics/MySound.vue'
 import SystemSoundSettings from '@/views/settings/SystemSoundSettings.vue'
@@ -47,11 +46,7 @@ const router = createRouter({
                     path: 'musics',
                     name: 'musics',
                     component: MusicList // 音乐列表组件
-                }, {
-                    path: 'effects',
-                    name: 'effects',
-                    component: EffectList // 工作台组件
-                },
+                }, 
                 {
                     path: 'speakers',
                     name: 'speakers',

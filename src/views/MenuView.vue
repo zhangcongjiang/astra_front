@@ -60,9 +60,8 @@ const menuData = [
         id: 3,  // 修改前是2，现在改为4
         name: '音频素材',
         children: [
-            { id: 31, name: '背景音乐', content: '这里是背景音乐的内容...', path: '/musics' },
-            { id: 32, name: '声音特效', content: '这里是声音特效的内容...', path: '/effects' },
-            { id: 33, name: '音色管理', content: '这里是朗读者音色的内容...', path: '/speakers' },
+            { id: 31, name: '音频音乐', content: '这里是背景音乐的内容...', path: '/musics' },
+            { id: 32, name: '朗读者', content: '这里是朗读者音色的内容...', path: '/speakers' },
         ]
     }, {
         id: 4,
