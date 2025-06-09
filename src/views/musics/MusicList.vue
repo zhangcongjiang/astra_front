@@ -71,16 +71,17 @@
 </a-form-item>
 
         <a-form-item label="音乐文件" name="audioFile" :rules="[{ required: true, message: '请上传音乐文件' }]">
-          <a-upload :beforeUpload="() => false" :showUploadList="false" @change="handleFileChange">
+          <a-upload
+            :before-upload="() => false"
+            :show-upload-list="false"
+            @change="handleFileChange"
+            accept=".mp3,.wav"
+          >
             <a-button>选择音乐文件</a-button>
           </a-upload>
           <div v-if="uploadForm.audioFile" class="file-info">
             已选择: {{ uploadForm.audioFile.name }}
           </div>
-        </a-form-item>
-        <a-form-item label="标签">
-          <TagSearch :tags="tagCategories" :show-actions="false" :allow-image-tagging="true"
-            :image-tags="uploadForm.tags" @add-image-tag="addMusicTag" @remove-image-tag="removeMusicTag" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -514,10 +515,26 @@ const uploadModalVisible = ref(false);
 const uploadForm = reactive({
   name: '',
   artist: '',
-  category: 'MUSIC', // 设置默认值
-  audioFile: null,
-  tags: []
+  category: 'SOUND',
+  audioFile: null
 });
+
+const handleUploadSubmit = async () => {
+  try {
+    const formData = new FormData();
+    formData.append('file', uploadForm.audioFile);
+    formData.append('name', uploadForm.name);
+    formData.append('category', uploadForm.category);
+    formData.append('singer', uploadForm.artist);
+
+    const { data } = await uploadSound(formData);
+    message.success('上传成功');
+    closeUploadModal();
+    fetchMusics();
+  } catch (error) {
+    message.error(error.message || '上传失败');
+  }
+};
 const uploadFormRef = ref(null);
 
 const showUploadModal = () => {
@@ -530,24 +547,6 @@ const closeUploadModal = () => {
   uploadForm.audioFile = null;
 };
 
-// 处理文件上传
-const handleUploadSubmit = async () => {
-  try {
-    const formData = new FormData();
-    formData.append('file', uploadForm.audioFile);
-    formData.append('name', uploadForm.name);
-    formData.append('category', uploadForm.category); // 使用动态值
-    formData.append('singer', uploadForm.artist)
-    formData.append('tags', JSON.stringify(uploadForm.tags)); // 数组需要序列化
-
-    const { data } = await uploadSound(formData)
-    message.success('上传成功')
-    closeUploadModal()
-    fetchMusics() // 刷新列表
-  } catch (error) {
-    message.error(error.message || '上传失败')
-  }
-}
 
 // 处理文件选择
 const handleFileChange = (info) => {
@@ -831,7 +830,6 @@ onUnmounted(() => {
   color: #666;
 }
 
-/* 编辑模态框中的标签搜索组件 */
 :deep(.tag-search-in-modal) {
   box-shadow: none;
   padding: 0;

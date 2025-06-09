@@ -95,7 +95,7 @@ export const getEmotionsBySpeaker = async (speakerId) => {
 
 export const uploadSound = async (data) => {
     try {
-        const response = await request.post(`/voice/upload/`,data);
+        const response = await request.upload(`/voice/upload/`,data);
         return response;
     } catch (error) {
         console.error(`上传音频文件出错:`, error);
