@@ -95,7 +95,7 @@
         </template>
 
         <template #name="{ record }">
-          <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="text-align: center;">
             <span>{{ record.name }}</span>
           </div>
         </template>
@@ -109,10 +109,22 @@
         </template>
 
         <template #tags="{ record }">
-          <div class="music-tags">
-            <a-tag v-for="tag in getTagNames(record.tags)" :key="tag" color="blue">{{ tag }}</a-tag>
-          </div>
-        </template>
+  <div style="text-align: center;">
+    <div class="music-tags" style="display: flex; justify-content: center; align-items: center;">
+      <a-tag v-for="tag in getTagNames(record.tags)" 
+             :key="tag.id" 
+             color="blue"
+             closable
+             @close="removeMusicTag(record, tag.id)">
+        {{ tag.name }}
+      </a-tag>
+      <a-tooltip title="编辑标签">
+        <tags-outlined @click.stop="showTagEditor(record)" 
+                      style="cursor: pointer; color: #1890ff; margin-left: 8px;" />
+      </a-tooltip>
+    </div>
+  </div>
+</template>
 
         <template #action="{ record }">
           <div style="display: flex; gap: 4px;">
@@ -174,8 +186,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { EditOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons-vue'
+import { ref, reactive, computed, onMounted  } from 'vue'
+import { EditOutlined, DeleteOutlined, UploadOutlined,TagsOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import TagSearch from '@/components/TagSearch.vue'
@@ -307,6 +319,7 @@ const columns = [
     dataIndex: 'name',
     key: 'name',
     width: 400,
+    align: 'center',
     slots: { customRender: 'name' }
   },
   {
@@ -336,7 +349,16 @@ const columns = [
     title: '标签',
     key: 'tags',
     align: 'center',
-    slots: { customRender: 'tags' }
+    slots: { 
+      customRender: 'tags',
+      header: () => h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
+        '标签',
+        h(TagsOutlined, { 
+          style: { color: '#1890ff', cursor: 'pointer' },
+          onClick: () => showTagEditor()
+        })
+      ])
+    }
   },
   {
     title: '操作',
@@ -370,6 +392,10 @@ const getTagNames = (tagIds) => {
     if (foundTag) names.push(foundTag.name);
   });
   return names;
+};
+const showTagEditor = (record) => {
+  currentMusic.value = record;
+  editModalVisible.value = true;
 };
 
 // 根据标签ID查找标签
@@ -658,16 +684,6 @@ onMounted(() => {
   pagination.total = musicData.value.length;
 });
 
-// 组件卸载时停止所有音频
-onUnmounted(() => {
-  if (currentPlaying.value.id) {
-    const audioElement = document.querySelector(`audio[ref="audioPlayer_${currentPlaying.value.id}"]`);
-    if (audioElement) {
-      audioElement.pause();
-      audioElement.currentTime = 0;
-    }
-  }
-});
 </script>
 
 <style scoped>
@@ -677,18 +693,16 @@ onUnmounted(() => {
 
 
 .music-list-container {
-  padding: 20px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  padding: 16px;
+  background: #fff;
+  border-radius: 8px;
 }
 
 .search-area {
-  margin-bottom: 20px;
   padding: 16px;
-  background: #fff;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: #fafafa;
+  border-radius: 8px;
+  margin-bottom: 16px;
 }
 
 .search-header {
@@ -704,12 +718,9 @@ onUnmounted(() => {
 }
 
 .music-table {
-  flex: 1;
-  margin-bottom: 20px;
-  background: #fff;
-  border-radius: 4px;
+  margin-top: 20px;
+  border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  padding: 16px;
 }
 
 .music-name-container {
@@ -788,6 +799,7 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  align-items: center;
 }
 
 .file-info {
