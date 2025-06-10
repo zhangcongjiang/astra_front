@@ -54,7 +54,8 @@
     </div>
 
     <!-- 上传音乐模态框 -->
-    <a-modal v-model:visible="uploadModalVisible" title="上传音乐" width="800px" :maskClosable="false" @ok="handleUploadSubmit" @cancel="closeUploadModal">
+    <a-modal v-model:visible="uploadModalVisible" title="上传音乐" width="800px" :maskClosable="false"
+      @ok="handleUploadSubmit" @cancel="closeUploadModal">
       <a-form :model="uploadForm" :label-col="{ span: 4 }" :wrapper-col="{ span: 20 }" ref="uploadFormRef">
         <a-form-item label="音乐名称" name="name" :rules="[{ required: true, message: '请输入音乐名称' }]">
           <a-input v-model:value="uploadForm.name" placeholder="请输入音乐名称" />
@@ -63,20 +64,16 @@
           <a-input v-model:value="uploadForm.artist" placeholder="请输入歌手名称" />
         </a-form-item>
         <a-form-item label="分类" name="category" :rules="[{ required: true, message: '请选择分类' }]">
-  <a-select v-model:value="uploadForm.category" placeholder="请选择分类">
-    <a-select-option value="BGM">背景音乐</a-select-option>
-    <a-select-option value="EFFECT">音效</a-select-option>
-    <a-select-option value="MUSIC">音乐</a-select-option>
-  </a-select>
-</a-form-item>
+          <a-select v-model:value="uploadForm.category" placeholder="请选择分类">
+            <a-select-option value="BGM">背景音乐</a-select-option>
+            <a-select-option value="EFFECT">音效</a-select-option>
+            <a-select-option value="MUSIC">音乐</a-select-option>
+          </a-select>
+        </a-form-item>
 
         <a-form-item label="音乐文件" name="audioFile" :rules="[{ required: true, message: '请上传音乐文件' }]">
-          <a-upload
-            :before-upload="() => false"
-            :show-upload-list="false"
-            @change="handleFileChange"
-            accept=".mp3,.wav"
-          >
+          <a-upload :before-upload="() => false" :show-upload-list="false" @change="handleFileChange"
+            accept=".mp3,.wav">
             <a-button>选择音乐文件</a-button>
           </a-upload>
           <div v-if="uploadForm.audioFile" class="file-info">
@@ -109,25 +106,23 @@
         </template>
 
         <template #tags="{ record }">
-  <div style="text-align: center;">
-    <div class="music-tags" style="display: flex; justify-content: center; align-items: center;">
-      <a-tag v-for="tag in getTagNames(record.tags)" 
-             :key="tag.id" 
-             color="blue"
-             closable
-             @close="removeMusicTag(record, tag.id)">
-        {{ tag.name }}
-      </a-tag>
-      <a-tooltip title="编辑标签">
-        <tags-outlined @click.stop="showTagEditor(record)" 
-                      style="cursor: pointer; color: #1890ff; margin-left: 8px;" />
-      </a-tooltip>
-    </div>
-  </div>
-</template>
+          <div style="text-align: center;">
+            <div class="music-tags" style="display: flex; justify-content: center; align-items: center;">
+              <a-tag v-for="tag in getTagNames(record.tags)" :key="tag.id" color="blue" closable
+                @close="removeMusicTag(record, tag.id)">
+                {{ tag.name }}
+              </a-tag>
+              <a-tooltip title="编辑标签">
+                <tags-outlined @click.stop="showTagEditor(record)"
+                  style="cursor: pointer; color: #1890ff; margin-left: 8px;" />
+              </a-tooltip>
+            </div>
+          </div>
+        </template>
 
         <template #action="{ record }">
-          <div style="display: flex; gap: 4px;">
+          <div style="text-align: center;gap: 4px;">
+
             <!-- 选择按钮（仅在选择模式显示） -->
             <a-button v-if="isSelectMode" type="primary" size="small" @click.stop="handleSelect(record)">
               选择
@@ -186,16 +181,17 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted  } from 'vue'
-import { EditOutlined, DeleteOutlined, UploadOutlined,TagsOutlined } from '@ant-design/icons-vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { EditOutlined, DeleteOutlined, UploadOutlined, TagsOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import TagSearch from '@/components/TagSearch.vue'
 import Pagination from '@/components/Pagination.vue'
 import { useRoute, useRouter } from 'vue-router'
-import {  
-    uploadSound,
-    getSoundList } from '@/api/modules/voiceApi';
+import {
+  uploadSound,
+  getSoundList
+} from '@/api/modules/voiceApi';
 
 // Initialize router and route
 const router = useRouter()
@@ -264,9 +260,9 @@ const fetchMusicList = async () => {
       page: pagination.current,
       page_size: pagination.pageSize
     };
-    
+
     const res = await getSoundList(params);
-    
+
     if (res.code === 0) {
       musicData.value = res.data.results.map(item => ({
         id: item.id,
@@ -277,7 +273,7 @@ const fetchMusicList = async () => {
         audioUrl: item.sound_path,
         tags: item.tags || []
       }));
-      
+
       pagination.total = res.data.count;
     } else {
       message.error(res.message || '获取音乐列表失败');
@@ -318,7 +314,7 @@ const columns = [
     title: '音乐名称',
     dataIndex: 'name',
     key: 'name',
-    width: 400,
+    width: 300,
     align: 'center',
     slots: { customRender: 'name' }
   },
@@ -349,11 +345,11 @@ const columns = [
     title: '标签',
     key: 'tags',
     align: 'center',
-    slots: { 
+    slots: {
       customRender: 'tags',
       header: () => h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
         '标签',
-        h(TagsOutlined, { 
+        h(TagsOutlined, {
           style: { color: '#1890ff', cursor: 'pointer' },
           onClick: () => showTagEditor()
         })
@@ -828,8 +824,7 @@ onMounted(() => {
   border-color: #1890ff;
 }
 
-.ant-btn-primary:hover {
-  background-color: #40a9ff;
+.ant-btn-primary:hover {  background-color: #40a9ff;
   border-color: #40a9ff;
 }
 </style>

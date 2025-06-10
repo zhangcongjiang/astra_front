@@ -16,10 +16,7 @@
                         <a-input v-model:value="basicForm.reader" placeholder="输入朗读者" @pressEnter="handleSearch" />
                     </a-form-item>
                     <a-form-item label="语言">
-                        <a-select 
-                            v-model:value="basicForm.language" 
-                            placeholder="选择语言" 
-                            style="width: 120px"
+                        <a-select v-model:value="basicForm.language" placeholder="选择语言" style="width: 120px"
                             @dropdownVisibleChange="(open) => open && !languages.length && fetchOptionsData()"
                             :loading="!languages.length">
                             <a-select-option value="">全部</a-select-option>
@@ -30,10 +27,7 @@
                     </a-form-item>
 
                     <a-form-item label="情感">
-                        <a-select 
-                            v-model:value="basicForm.emotion" 
-                            placeholder="选择情感" 
-                            style="width: 120px"
+                        <a-select v-model:value="basicForm.emotion" placeholder="选择情感" style="width: 120px"
                             @dropdownVisibleChange="(open) => open && !emotions.length && fetchOptionsData()"
                             :loading="!emotions.length">
                             <a-select-option value="">全部</a-select-option>
@@ -81,45 +75,31 @@
 
                 <template #language="{ record }">
                     <div style="text-align: center;">
-                        <a-select 
-                            v-model:value="record.language"
-                            :options="record.languageOptions || []"
+                        <a-select v-model:value="record.language" :options="record.languageOptions || []"
                             @dropdownVisibleChange="(open) => open && loadSpeakerLanguages(record)"
-                            @change="(value) => handleLanguageChange(record, value)"
-                            style="width: 120px"
-                        />
+                            @change="(value) => handleLanguageChange(record, value)" style="width: 120px" />
                     </div>
                 </template>
 
                 <template #emotion="{ record }">
                     <div style="text-align: center;">
-                        <a-select 
-                            v-model:value="record.emotion"
-                            :options="record.emotionOptions || []"
+                        <a-select v-model:value="record.emotion" :options="record.emotionOptions || []"
                             @dropdownVisibleChange="(open) => open && loadSpeakerEmotions(record)"
-                            @change="(value) => handleEmotionChange(record, value)"
-                            style="width: 120px"
-                        />
+                            @change="(value) => handleEmotionChange(record, value)" style="width: 120px" />
                     </div>
                 </template>
 
                 <template #speed="{ record }">
                     <div style="text-align: center;">
-                        <a-input-number 
-                            v-model:value="record.speed"
-                            :min="0.01"
-                            :max="2"
-                            :step="0.1"
-                            @change="(value) => handleSpeedChange(record, value)"
-                            style="width: 100px"
-                        />
+                        <a-input-number v-model:value="record.speed" :min="0.01" :max="2" :step="0.1"
+                            @change="(value) => handleSpeedChange(record, value)" style="width: 100px" />
                     </div>
                 </template>
                 <template #model="{ record }">
-    <div style="text-align: center;">
-        {{ record.model }}
-    </div>
-</template>
+                    <div style="text-align: center;">
+                        {{ record.model }}
+                    </div>
+                </template>
 
                 <template #tags="{ record }">
                     <div style="text-align: center;">
@@ -142,52 +122,44 @@
                 <template #action="{ record }">
                     <div style="text-align: center;">
                         <div style="display: flex; gap: 4px; justify-content: center;">
-                            <a-button type="link" size="small" 
-                                     @click="showPreviewModal(record)"
-                                     :loading="previewLoading">
+                            <a-button type="link" size="small" @click="showPreviewModal(record)"
+                                :loading="previewLoading">
                                 试听
                             </a-button>
                         </div>
                     </div>
                 </template>
             </a-table>
-            
+
             <!-- 将试听模态框移到表格外部 -->
-            <a-modal v-model:visible="previewModalVisible" 
-                     title="试听选项" 
-                     width="600px"
-                     :footer="null"
-                     :maskClosable="false">
+            <a-modal v-model:visible="previewModalVisible" title="试听选项" width="600px" :footer="null"
+                :maskClosable="false">
                 <a-card :bordered="false">
                     <a-form layout="vertical">
                         <a-form-item label="试听文本">
-                            <a-textarea v-model:value="previewText" 
-                                       :rows="4" 
-                                       placeholder="请输入试听文本"/>
+                            <a-textarea v-model:value="previewText" :rows="4" placeholder="请输入试听文本" />
                         </a-form-item>
-                        
+
                         <div class="preview-options">
                             <div class="option-description">
-                                
-                                <a-button type="primary" 
-                                          @click="previewVoice(currentPreviewRecord, true)"
-                                          :loading="previewLoading">
+
+                                <a-button type="primary" @click="previewVoice(currentPreviewRecord, true)"
+                                    :loading="previewLoading">
                                     <play-circle-outlined /> 试听音色
                                 </a-button>
                                 <a-tooltip title="播放当前朗读者的默认音色样本">
-                                        <question-circle-outlined style="margin-left: 8px; color: #999; cursor: help"/>
-                                    </a-tooltip>
+                                    <question-circle-outlined style="margin-left: 8px; color: #999; cursor: help" />
+                                </a-tooltip>
                             </div>
-                            
+
                             <div class="option-description">
-                                
-                                <a-button @click="previewVoice(currentPreviewRecord, false)"
-                                          :loading="previewLoading">
+
+                                <a-button @click="previewVoice(currentPreviewRecord, false)" :loading="previewLoading">
                                     <play-circle-outlined /> 试听文本
                                 </a-button>
                                 <a-tooltip title="播放您输入的文本使用当前朗读者的音色">
-                                        <question-circle-outlined style="margin-left: 8px; color: #999; cursor: help"/>
-                                    </a-tooltip>
+                                    <question-circle-outlined style="margin-left: 8px; color: #999; cursor: help" />
+                                </a-tooltip>
                             </div>
                         </div>
                     </a-form>
@@ -211,26 +183,27 @@
 <script setup>
 import { ref, reactive, computed, onMounted, h } from 'vue';
 // 在现有import部分添加
-import { 
-    UploadOutlined, 
-    EditOutlined, 
-    DeleteOutlined, 
-    PlayCircleOutlined, 
+import {
+    UploadOutlined,
+    EditOutlined,
+    DeleteOutlined,
+    PlayCircleOutlined,
     TagsOutlined,
     QuestionCircleOutlined  // 新增
 } from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
 import TagSearch from '@/components/TagSearch.vue';
 import Pagination from '@/components/Pagination.vue';
-import {  
-    getSpeakerList, 
-    updateSpeaker, 
-    getSpeakerSample, 
-    syncSpeakerAudio, 
-    getAllEmotions, 
+import {
+    getSpeakerList,
+    updateSpeaker,
+    getSpeakerSample,
+    syncSpeakerAudio,
+    getAllEmotions,
     getAllLanguages,
     getLanguagesBySpeaker,
-    getEmotionsBySpeaker } from '@/api/modules/voiceApi';
+    getEmotionsBySpeaker
+} from '@/api/modules/voiceApi';
 import { request } from '@/api/config/request';
 import { getTagsByCategory } from '@/api/modules/tagApi';
 import { SyncOutlined } from '@ant-design/icons-vue';
@@ -293,7 +266,7 @@ const emotions = ref([]);
 // 获取语言和情感数据
 const fetchOptionsData = async () => {
     if (languages.value.length && emotions.value.length) return;
-    
+
     try {
         const [langRes, emoRes] = await Promise.all([
             getAllLanguages(),
@@ -361,17 +334,17 @@ const fetchSpeakerList = async () => {
             language: basicForm.language || undefined,
             emotion: basicForm.emotion || undefined
         };
-        
+
         if (selectedTags.value.length > 0) {
             params.tag_ids = selectedTags.value.join(',');
         }
 
         const response = await getSpeakerList(params);
-        
+
         // 确保数据结构正确
         voiceData.value = response.data?.list || response.data || response || [];
         pagination.total = response.data?.total || response.total || voiceData.value.length;
-        
+
     } catch (error) {
         console.error('获取音色列表失败:', error);
         message.error('获取音色列表失败');
@@ -405,7 +378,7 @@ const showPreviewModal = (record) => {
 
 const previewVoice = async (record, isDefault = true) => {
     if (!record) return;
-    
+
     previewLoading.value = true;
     try {
         const params = {
@@ -415,7 +388,7 @@ const previewVoice = async (record, isDefault = true) => {
         };
 
         const response = await getSpeakerSample(params);
-        
+
         // 检查响应结构并获取 file_path
         if (response && response.data && response.data.file_path) {
             const filePath = response.data.file_path;
@@ -577,7 +550,7 @@ const columns = [
         slots: { customRender: 'speed' }
     },
     {
-        title: '音频模型',  
+        title: '音频模型',
         dataIndex: 'model',
         key: 'model',
         align: 'center',
@@ -605,7 +578,7 @@ const handleLanguageChange = async (record, newLanguage) => {
         const formData = new FormData();
         formData.append('speaker_id', record.id);
         formData.append('language', newLanguage);
-        
+
         const response = await updateSpeaker(formData);
         if (response.code === 0) {
             message.success('语言更新成功');
@@ -628,7 +601,7 @@ const handleEmotionChange = async (record, newEmotion) => {
         const formData = new FormData();
         formData.append('speaker_id', record.id);
         formData.append('emotion', newEmotion);
-        
+
         const response = await updateSpeaker(formData);
         if (response.code === 0) {
             message.success('情感更新成功');
@@ -649,7 +622,7 @@ const handleEmotionChange = async (record, newEmotion) => {
 // 加载朗读者的语言选项
 const loadSpeakerLanguages = async (record) => {
     if (record.languageOptions) return;
-    
+
     try {
         const response = await getLanguagesBySpeaker(record.id);
         record.languageOptions = response.data.map(lang => ({
@@ -665,7 +638,7 @@ const loadSpeakerLanguages = async (record) => {
 // 加载朗读者的情感选项
 const loadSpeakerEmotions = async (record) => {
     if (record.emotionOptions) return;
-    
+
     try {
         const response = await getEmotionsBySpeaker(record.id);
         record.emotionOptions = response.data.map(emo => ({
@@ -682,11 +655,11 @@ const handleSpeedChange = async (record, newSpeed) => {
     try {
         // 确保值在范围内
         newSpeed = Math.max(0.01, Math.min(2, newSpeed));
-        
+
         const formData = new FormData();
         formData.append('speaker_id', record.id);
         formData.append('speed', newSpeed);
-        
+
         const response = await updateSpeaker(formData);
         if (response.code === 0) {
             message.success('语速更新成功');
