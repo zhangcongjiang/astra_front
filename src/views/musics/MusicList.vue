@@ -23,6 +23,17 @@
           <a-form-item label="歌手">
             <a-input v-model:value="basicForm.artist" placeholder="输入歌手名称" @pressEnter="handleSearch" />
           </a-form-item>
+          <a-form-item label="音频类型">
+            <a-select 
+              v-model:value="basicForm.category" 
+              placeholder="选择音频类型"
+              style="width: 120px">
+              <a-select-option value="">全部</a-select-option>
+              <a-select-option value="BGM">BGM</a-select-option>
+              <a-select-option value="SOUND">音乐</a-select-option>
+              <a-select-option value="EFFECT">特效音</a-select-option>
+            </a-select>
+          </a-form-item>
           <a-form-item label="上传时间">
             <a-range-picker v-model:value="basicForm.dateRange" :show-time="{ format: 'HH:mm' }"
               format="YYYY-MM-DD HH:mm" :placeholder="['开始时间', '结束时间']" @change="handleDateChange" />
@@ -67,7 +78,7 @@
           <a-select v-model:value="uploadForm.category" placeholder="请选择分类">
             <a-select-option value="BGM">背景音乐</a-select-option>
             <a-select-option value="EFFECT">音效</a-select-option>
-            <a-select-option value="MUSIC">音乐</a-select-option>
+            <a-select-option value="SOUND">音乐</a-select-option>
           </a-select>
         </a-form-item>
 
@@ -100,7 +111,7 @@
         <template #duration="{ record }">
           {{ formatDuration(record.duration) }}
         </template>
-
+       
         <template #uploadTime="{ record }">
           {{ formatDate(record.uploadTime) }}
         </template>
@@ -209,6 +220,7 @@ const templateId = computed(() => route.query?.templateId || '')
 const basicForm = reactive({
   name: '',
   artist: '',
+  category: '', // 新增音频类型筛选
   dateRange: [],
   startTime: null,
   endTime: null
@@ -254,20 +266,36 @@ const pagination = reactive({
 });
 
 // 获取音乐列表
-const fetchMusicList = async () => {
+const fetchMusicList = async (params = {}) => {
   try {
-    const params = {
+    // 基础参数
+    const baseParams = {
       page: pagination.current,
       page_size: pagination.pageSize
     };
 
-    const res = await getSoundList(params);
+    // 根据搜索类型添加不同参数
+    if (searchType.value === 'basic') {
+      if (basicForm.name) baseParams.name = basicForm.name;
+      if (basicForm.artist) baseParams.singer = basicForm.artist;
+      if (basicForm.category) baseParams.category = basicForm.category;
+      if (basicForm.startTime) baseParams.start_time = dayjs(basicForm.startTime).format('YYYY-MM-DD HH:mm:ss');
+      if (basicForm.endTime) baseParams.end_time = dayjs(basicForm.endTime).format('YYYY-MM-DD HH:mm:ss');
+    } else if (searchType.value === 'tag' && selectedTags.value.length > 0) {
+      baseParams.tags = selectedTags.value.join(',');
+    }
+
+    // 合并传入的参数
+    const finalParams = { ...baseParams, ...params };
+
+    const res = await getSoundList(finalParams);
 
     if (res.code === 0) {
       musicData.value = res.data.results.map(item => ({
         id: item.id,
         name: item.name,
-        artist: item.spec?.singer || '',
+        category: item.category,
+        artist: item.singer || '',
         duration: item.spec?.duration || 0,
         uploadTime: item.create_time,
         audioUrl: item.sound_path,
@@ -319,6 +347,13 @@ const columns = [
     slots: { customRender: 'name' }
   },
   {
+    title: '歌手',
+    dataIndex: 'artist',
+    key: 'artist',
+    width: 150,
+    align: 'center',
+  },
+  {
     title: '时长',
     dataIndex: 'duration',
     key: 'duration',
@@ -327,11 +362,18 @@ const columns = [
     slots: { customRender: 'duration' }
   },
   {
-    title: '歌手',
-    dataIndex: 'artist',
-    key: 'artist',
-    width: 150,
+    title: '音频类型',
+    dataIndex: 'category',
+    key: 'category',
+    width: 120,
     align: 'center',
+    customRender: ({ record }) => categoryMap[record.category],
+    filters: [
+      { text: 'BGM', value: 'BGM' },
+      { text: '音乐', value: 'SOUND' },
+      { text: '特效音', value: 'EFFECT' }
+    ],
+    onFilter: (value, record) => record.category === value
   },
   {
     title: '上传时间',
@@ -364,6 +406,13 @@ const columns = [
     slots: { customRender: 'action' }
   }
 ];
+
+
+const categoryMap = {
+  'BGM': 'BGM',
+  'SOUND': '音乐',
+  'EFFECT': '特效音'
+};
 
 // 编辑模态框相关状态
 const editModalVisible = ref(false);
@@ -490,7 +539,11 @@ const handleAudioEnded = () => {
 
 // 搜索
 const handleSearch = () => {
+  // 重置页码为1
   pagination.current = 1;
+  
+  // 调用获取音乐列表
+  fetchMusicList();
 };
 
 // 日期范围变化处理
@@ -508,10 +561,16 @@ const handleDateChange = (dates) => {
 const resetBasicSearch = () => {
   basicForm.name = '';
   basicForm.artist = '';
+  basicForm.category = '';
   basicForm.dateRange = [];
   basicForm.startTime = null;
   basicForm.endTime = null;
-  handleSearch();
+  
+  // 重置页码为1
+  pagination.current = 1;
+  
+  // 调用获取音乐列表
+  fetchMusicList();
 };
 
 // 在script setup中添加
