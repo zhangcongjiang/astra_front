@@ -24,10 +24,7 @@
             <a-input v-model:value="basicForm.artist" placeholder="输入歌手名称" @pressEnter="handleSearch" />
           </a-form-item>
           <a-form-item label="音频类型">
-            <a-select 
-              v-model:value="basicForm.category" 
-              placeholder="选择音频类型"
-              style="width: 120px">
+            <a-select v-model:value="basicForm.category" placeholder="选择音频类型" style="width: 120px">
               <a-select-option value="">全部</a-select-option>
               <a-select-option value="BGM">BGM</a-select-option>
               <a-select-option value="SOUND">音乐</a-select-option>
@@ -111,7 +108,7 @@
         <template #duration="{ record }">
           {{ formatDuration(record.duration) }}
         </template>
-       
+
         <template #uploadTime="{ record }">
           {{ formatDate(record.uploadTime) }}
         </template>
@@ -192,6 +189,7 @@
 </template>
 
 <script setup>
+import { request } from '@/api/config/request';
 import { ref, reactive, computed, onMounted } from 'vue'
 import { EditOutlined, DeleteOutlined, UploadOutlined, TagsOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
@@ -201,7 +199,8 @@ import Pagination from '@/components/Pagination.vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   uploadSound,
-  getSoundList
+  getSoundList,
+  soundPlay
 } from '@/api/modules/voiceApi';
 
 // Initialize router and route
@@ -328,7 +327,40 @@ onMounted(() => {
 const formatDate = (dateStr) => {
   return dayjs(dateStr).format('YYYY-MM-DD HH:mm');
 };
+const audioPlayer = ref(null);
 
+const previewMusic = async (music) => {
+  try {
+    const response = await soundPlay(music.id);
+    if (response && response.data && response.data.file_path) {
+      const filePath = response.data.file_path;
+      // 根据 file_path 去后端获取音频文件
+      console.log('准备播放的文件路径:', filePath);
+      const audioResponse = await request({
+        method: 'get',
+        url: `/${filePath}`,
+        responseType: 'arraybuffer' // 获取二进制数据
+      });
+
+      // 音频播放逻辑
+      const blob = new Blob([audioResponse], { type: `audio/${response.data.format}` });
+      const audioUrl = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrl);
+      audio.play();
+
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+      };
+    } else {
+      console.error('获取试听文件路径失败:', response);
+      message.error('获取试听文件路径失败');
+    }
+  } catch (error) {
+    console.error('试听出错:', error);
+    message.error('试听出错: ' + (error.response?.data?.message || error.message));
+  } 
+
+};
 // 表格列定义
 const columns = [
   {
@@ -541,7 +573,7 @@ const handleAudioEnded = () => {
 const handleSearch = () => {
   // 重置页码为1
   pagination.current = 1;
-  
+
   // 调用获取音乐列表
   fetchMusicList();
 };
@@ -565,10 +597,10 @@ const resetBasicSearch = () => {
   basicForm.dateRange = [];
   basicForm.startTime = null;
   basicForm.endTime = null;
-  
+
   // 重置页码为1
   pagination.current = 1;
-  
+
   // 调用获取音乐列表
   fetchMusicList();
 };
@@ -883,7 +915,8 @@ onMounted(() => {
   border-color: #1890ff;
 }
 
-.ant-btn-primary:hover {  background-color: #40a9ff;
+.ant-btn-primary:hover {
+  background-color: #40a9ff;
   border-color: #40a9ff;
 }
 </style>

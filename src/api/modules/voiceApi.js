@@ -95,7 +95,7 @@ export const getEmotionsBySpeaker = async (speakerId) => {
 
 export const uploadSound = async (data) => {
     try {
-        const response = await request.upload(`/voice/upload/`,data);
+        const response = await request.upload(`/voice/upload/`, data);
         return response;
     } catch (error) {
         console.error(`上传音频文件出错:`, error);
@@ -107,8 +107,18 @@ export const getSoundList = async (params) => {
     try {
         const response = await request.get(`/voice/`, formatParams(params));
         return response;
-    }catch{
+    } catch (error) {
         console.error(`获取音频列表出错:`, error);
+        throw error;
+    }
+}
+
+export const soundPlay = async (soundId) => {
+    try {
+        const response = await request.get(`/voice/sound/play/?sound_id=${soundId}`,)
+        return response;
+    } catch (error){
+        console.error(`音频播放失败:`, error);
         throw error;
     }
 }
