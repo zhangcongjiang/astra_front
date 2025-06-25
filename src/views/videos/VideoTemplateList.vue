@@ -15,6 +15,13 @@
                     <a-form-item label="模板名称">
                         <a-input v-model:value="basicForm.name" placeholder="输入模板名称" @pressEnter="handleSearch" />
                     </a-form-item>
+                    <a-form-item label="方向">
+                        <a-select v-model:value="basicForm.orientation" placeholder="全部方向" style="width: 120px">
+                            <a-select-option value="">全部</a-select-option>
+                            <a-select-option value="horizontal">横向</a-select-option>
+                            <a-select-option value="vertical">竖向</a-select-option>
+                        </a-select>
+                    </a-form-item>
                     <a-form-item label="创建时间">
                         <a-range-picker v-model:value="basicForm.dateRange" :show-time="{ format: 'HH:mm' }"
                             format="YYYY-MM-DD HH:mm" :placeholder="['开始时间', '结束时间']" @change="handleDateChange" />
@@ -36,21 +43,41 @@
         <!-- 视频模板列表 -->
         <div class="template-grid">
             <a-row :gutter="[16, 16]">
-                <a-col v-for="(template, index) in currentPageTemplates" :key="template.id" :xs="24" :sm="12" :md="8"
-                    :lg="6">
+                <a-col v-for="(template, index) in currentPageTemplates" :key="template.id" 
+                       :xs="24" :sm="12" :md="8" :lg="6">
                     <a-card hoverable class="template-card">
-                        <template #cover>
-                            <video class="template-video" :src="template.videoUrl" controls></video>
-                        </template>
-                        <a-card-meta :title="template.name">
-                            <template #description>
-                                <div class="template-description">{{ template.description }}</div>
-                                <div class="template-tags">
-                                    <a-tag v-for="tag in getTagNames(template.tags)" :key="tag" color="blue">{{ tag
-                                    }}</a-tag>
+                        <div class="card-content">
+                            <!-- 视频类型标签 - 移到卡片右上角 -->
+                            <div class="video-type">
+                                <a-tag :color="template.orientation === 'horizontal' ? 'blue' : 'green'">
+                                    {{ template.orientation === 'horizontal' ? '16 : 9' : '9 : 16' }}
+                                </a-tag>
+                            </div>
+                            
+                            <!-- 左侧封面 -->
+                            <div class="cover-wrapper">
+                                <img :src="getCoverUrl(template)" class="cover-image" :class="template.orientation" alt="视频封面">
+                            </div>
+                            
+                            <!-- 右侧内容 -->
+                            <div class="right-content">
+                                <!-- 上部信息 -->
+                                <div class="info-wrapper">
+                                    <h3>{{ template.name }}</h3>
+                                    <p class="description" :title="template.description">
+                                        {{ template.description }}
+                                    </p>
                                 </div>
-                            </template>
-                        </a-card-meta>
+                                
+                                <!-- 下部标签 -->
+                                <div class="tag-section">
+                                    <a-tag v-for="tag in getTagNames(template.tags)" :key="tag" color="orange">
+                                        {{ tag }}
+                                    </a-tag>
+                                </div>
+                            </div>
+                        </div>
+
                         <template #actions>
                             <a-button type="primary" @click="applyTemplate(template)">应用模板</a-button>
                         </template>
@@ -82,6 +109,7 @@ const searchType = ref('basic');
 // 基础查询表单
 const basicForm = reactive({
     name: '',
+    orientation: '',
     dateRange: [],
     startTime: null,
     endTime: null
@@ -129,7 +157,9 @@ const templates = ref([
             duration: 30,
             style: "modern"
         },
-        tags: ['type_1', 'style_2']
+        tags: ['type_1', 'style_2'],
+        orientation: 'horizontal',
+        cover: 'https://via.placeholder.com/300x169?text=横向封面'
     },
     {
         id: 2,
@@ -142,10 +172,11 @@ const templates = ref([
             narrator: true,
             backgroundMusic: "tutorial_music.mp3"
         },
-        tags: ['type_2', 'style_1']
+        tags: ['type_2', 'style_1'],
+        orientation: 'vertical',
+        cover: 'https://via.placeholder.com/169x300?text=竖向封面'
     },
-    // 更多模板...
-    ...generateMockTemplates(10)
+    // ...其他模板数据...
 ]);
 
 // 分页配置
@@ -154,60 +185,6 @@ const pagination = reactive({
     pageSize: 10,
     total: 0
 });
-
-// 生成模拟模板数据
-function generateMockTemplates(count) {
-    const mockTemplates = [];
-    const types = ['type_1', 'type_2', 'type_3', 'type_4'];
-    const styles = ['style_1', 'style_2', 'style_3', 'style_4'];
-    const descriptions = [
-        '专业级视频模板，适用于各种场景',
-        '简洁大方的设计风格',
-        '动态效果丰富的视频模板',
-        '适合社交媒体分享的短视频模板'
-    ];
-
-    for (let i = 1; i <= count; i++) {
-        const randomType = types[Math.floor(Math.random() * types.length)];
-        const randomStyle = styles[Math.floor(Math.random() * styles.length)];
-        const randomDesc = descriptions[Math.floor(Math.random() * descriptions.length)];
-
-        mockTemplates.push({
-            id: i + 2,
-            name: `视频模板${i}`,
-            description: randomDesc,
-            videoUrl: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
-            createTime: dayjs().subtract(Math.floor(Math.random() * 30), 'day').format('YYYY-MM-DD HH:mm'),
-            params: {
-                title: `模板${i}参数`,
-                duration: Math.floor(Math.random() * 60) + 15,
-                style: randomStyle.replace('style_', '')
-            },
-            tags: [randomType, randomStyle]
-        });
-    }
-
-    return mockTemplates;
-}
-
-// 根据标签ID获取标签名称
-const getTagNames = (tagIds) => {
-    const names = [];
-    tagIds.forEach(tagId => {
-        const foundTag = findTagById(tagId);
-        if (foundTag) names.push(foundTag.name);
-    });
-    return names;
-};
-
-// 根据标签ID查找标签
-const findTagById = (tagId) => {
-    for (const category of tagCategories.value) {
-        const foundTag = category.tags.find(t => t.id === tagId);
-        if (foundTag) return foundTag;
-    }
-    return null;
-};
 
 // 当前页显示的模板
 const currentPageTemplates = computed(() => {
@@ -218,53 +195,45 @@ const currentPageTemplates = computed(() => {
 
 // 过滤后的模板
 const filteredTemplates = computed(() => {
-    const filtered = templates.value.filter(template => {
-        // 基础查询过滤
-        if (searchType.value === 'basic') {
-            const nameMatch = template.name.toLowerCase().includes(basicForm.name.toLowerCase());
-            let dateMatch = true;
-
-            if (basicForm.startTime && basicForm.endTime) {
-                const templateDate = dayjs(template.createTime);
-                dateMatch = templateDate.isAfter(basicForm.startTime) &&
-                    templateDate.isBefore(basicForm.endTime);
-            }
-
-            return nameMatch && dateMatch;
-        }
-
-        // 标签查询过滤
-        if (searchType.value === 'tag' && selectedTags.value.length > 0) {
-            return selectedTags.value.some(tagId => template.tags.includes(tagId));
-        }
-
-        return true;
-    });
-
+    let filtered = templates.value;
+    
+    // 基础查询过滤
+    if (searchType.value === 'basic') {
+        const nameMatch = template => 
+            template.name.toLowerCase().includes(basicForm.name.toLowerCase());
+        
+        const orientationMatch = template => 
+            !basicForm.orientation || template.orientation === basicForm.orientation;
+        
+        const dateMatch = template => {
+            if (!basicForm.startTime || !basicForm.endTime) return true;
+            const templateDate = dayjs(template.createTime);
+            return templateDate.isAfter(basicForm.startTime) && 
+                   templateDate.isBefore(basicForm.endTime);
+        };
+        
+        filtered = filtered.filter(t => nameMatch(t) && orientationMatch(t) && dateMatch(t));
+    }
+    
+    // 标签查询过滤
+    if (searchType.value === 'tag' && selectedTags.value.length > 0) {
+        filtered = filtered.filter(t => 
+            selectedTags.value.some(tagId => t.tags.includes(tagId))
+        );
+    }
+    
     pagination.total = filtered.length;
     return filtered;
 });
 
 // 应用模板
 const applyTemplate = (template) => {
-  router.push({
-    path: `/templates/apply/${template.id}`,
-    state: { 
-      template: JSON.parse(JSON.stringify(template)) // 深拷贝避免引用问题
-    }
-  });
-};
-
-// 选择模板
-const selectTemplate = (template) => {
-  const sourceRecord = route.state?.sourceRecord;
-  router.push({
-    path: '/templates/apply',
-    state: {
-      template: JSON.parse(JSON.stringify(template)),
-      sourceRecord: sourceRecord ? JSON.parse(JSON.stringify(sourceRecord)) : null
-    }
-  });
+    router.push({
+        path: `/templates/apply/${template.id}`,
+        state: { 
+            template: JSON.parse(JSON.stringify(template))
+        }
+    });
 };
 
 // 搜索
@@ -286,6 +255,7 @@ const handleDateChange = (dates) => {
 // 重置基础查询
 const resetBasicSearch = () => {
     basicForm.name = '';
+    basicForm.orientation = '';
     basicForm.dateRange = [];
     basicForm.startTime = null;
     basicForm.endTime = null;
@@ -297,9 +267,60 @@ const handlePaginationChange = ({ current, pageSize }) => {
     pagination.current = current;
     pagination.pageSize = pageSize;
 };
+
+// 根据标签ID获取标签名称
+const getTagNames = (tagIds) => {
+    const names = [];
+    tagIds.forEach(tagId => {
+        const foundTag = findTagById(tagId);
+        if (foundTag) names.push(foundTag.name);
+    });
+    return names;
+};
+
+// 根据标签ID查找标签
+const findTagById = (tagId) => {
+    for (const category of tagCategories.value) {
+        const foundTag = category.tags.find(t => t.id === tagId);
+        if (foundTag) return foundTag;
+    }
+    return null;
+};
+
+// 添加描述截断方法
+const truncateDescription = (desc) => {
+    if (!desc) return '';
+    return desc.length > 50 ? desc.substring(0, 50) + '...' : desc;
+};
+// 直接使用静态路径
+const coverUrl = computed(() => {
+  return template.value.coverImage 
+    ? template.value.coverImage 
+    : template.value.orientation === 'horizontal'
+      ? '/src/assets/images/default-horizontal.jpg'
+      : '/src/assets/images/default-vertical.jpg';
+});
+const getCoverUrl = (template) => {
+  return template.coverImage || getDefaultCover(template.orientation);
+};
+const getDefaultCover = (orientation) => {
+  return orientation === 'horizontal'
+    ? '/src/assets/images/default-horizontal.jpg'
+    : '/src/assets/images/default-vertical.jpg';
+};
 </script>
 
 <style scoped>
+/* 在现有样式中添加 */
+.video-type {
+    margin: 4px 0 8px 0;
+}
+
+.video-type .ant-tag {
+    font-size: 12px;
+    font-weight: 500;
+}
+
 .video-template-container {
     padding: 20px;
     height: 100%;
@@ -317,6 +338,9 @@ const handlePaginationChange = ({ current, pageSize }) => {
 
 .search-header {
     margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
 .basic-search .ant-form-item {
@@ -334,33 +358,211 @@ const handlePaginationChange = ({ current, pageSize }) => {
 
 .template-card {
     height: 100%;
-    display: flex;
-    flex-direction: column;
+    position: relative; /* 为绝对定位提供参考 */
 }
 
-.template-video {
+.template-card .ant-card-body {
+    position: relative; /* 确保卡片内容区域作为定位参考 */
+}
+
+.video-type {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 100; /* 提高层级确保在最上层 */
+    margin: 8px; /* 使用margin而不是top/right偏移 */
+}
+
+.video-type .ant-tag {
+    font-size: 12px;
+    font-weight: 500;
+    margin: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* 添加阴影增强视觉效果 */
+}
+
+.template-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.template-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.cover-container {
+    position: relative;
+    margin-bottom: 12px;
+}
+
+.video-preview {
+    position: relative;
     width: 100%;
-    max-height: 200px;
+    background: #000;
+    overflow: hidden;
+}
+
+.video-preview.horizontal {
+    padding-top: 56.25%; /* 16:9 */
+}
+
+.video-preview.vertical {
+    padding-top: 177.78%; /* 9:16 */
+}
+
+.video-preview video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    .image-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+    }
     object-fit: cover;
 }
 
-.template-description {
-    margin: 8px 0;
-    color: #666;
-    font-size: 14px;
+.orientation-tag {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
 }
 
-.template-tags {
-    margin-top: 8px;
+.template-tags-cover {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
 }
 
-/* 响应式调整 */
-@media (max-width: 768px) {
-    .template-card {
-        margin-bottom: 16px;
-    }
+.template-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
+
+.template-name {
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.template-description {
+    color: #666;
+    font-size: 14px;
+    flex: 1;
+}
+
+
+.cover-image {
+  border-radius: 8px;
+  display: block;
+  margin: 0 auto;
+}
+
+.cover-image.horizontal {
+  aspect-ratio: 16/9;
+  width: 100%;
+  object-fit: cover;
+  object-position: center;
+  margin: auto;
+  display: block;
+}
+
+.cover-image.vertical {
+  aspect-ratio: 9/16;
+  height: 100%;
+}
+
+.template-card {
+  height: 100%;
+}
+
+.card-content {
+    display: flex;
+    gap: 12px;
+}
+
+.cover-wrapper {
+    position: relative;
+    width: 40%;;
+    height: 200px; 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.cover-image {
+    border-radius: 8px;
+    object-fit: cover;
+    object-position: center;
+}
+
+.cover-image.horizontal {
+    aspect-ratio: 16/9;
+    width: 100%;
+    height: auto;
+}
+
+.cover-image.vertical {
+    aspect-ratio: 9/16;
+    height: 100%;
+    width: auto;
+}
+
+.template-card {
+  height: 100%;
+}
+
+.card-content {
+    display: flex;
+    gap: 12px;
+}
+
+.right-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.info-wrapper {
+    flex: 1;
+}
+
+.info-wrapper h3 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.description {
+    margin: 0;
+    color: #666;
+    font-size: 14px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tag-section {
+    padding-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: flex-start;
+}
+
+/* 保留原有的封面图片样式 */
 </style>
