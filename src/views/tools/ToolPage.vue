@@ -273,23 +273,23 @@ const openTool = (tool) => {
 
 .tool-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); /* 从200px增加到280px */
+  gap: 20px; /* 从16px增加到20px */
   padding: 8px;
 }
 
 .tool-item {
-  height: 60px;
+  height: 100px; /* 从60px增加到100px */
   border: 1px solid #f0f0f0;
   border-radius: 8px;
-  padding: 8px;
+  padding: 16px; /* 从8px增加到16px */
   transition: all 0.2s;
-  cursor: pointer; /* 添加鼠标指针样式 */
+  cursor: pointer;
 }
 
 .tool-item:hover {
   border-color: #1890ff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); /* 增强阴影效果 */
   transform: translateY(-2px);
 }
 
@@ -297,20 +297,20 @@ const openTool = (tool) => {
   display: flex;
   align-items: center;
   height: 100%;
-  gap: 12px; /* 添加间距 */
+  gap: 16px; /* 从12px增加到16px */
 }
 
 .tool-logo-wrapper {
-  width: 40%; /* 占据40%宽度 */
-  height: 44px; /* 增加高度 */
-  flex-shrink: 0; /* 防止收缩 */
+  width: 40%;
+  height: 68px; /* 从44px增加到68px */
+  flex-shrink: 0;
 }
 
 .tool-logo {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: 4px; /* 添加圆角 */
+  border-radius: 6px; /* 从4px增加到6px */
 }
 
 .default-logo {
@@ -320,23 +320,36 @@ const openTool = (tool) => {
   align-items: center;
   justify-content: center;
   background: #f5f5f5;
-  border-radius: 4px;
+  border-radius: 6px; /* 从4px增加到6px */
 }
 
 .tool-name {
-  font-size: 14px;
+  font-size: 16px; /* 从14px增加到16px */
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 1; /* 占据剩余的60%宽度 */
-  width: 60%; /* 明确指定60%宽度 */
+  flex: 1;
+  width: 60%;
 }
 
-/* 响应式布局 */
+/* 响应式布局调整 */
 @media (max-width: 768px) {
   .tool-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); /* 移动端也适当增加 */
+  }
+  
+  .tool-item {
+    height: 80px; /* 移动端稍小一些 */
+    padding: 12px;
+  }
+  
+  .tool-logo-wrapper {
+    height: 56px;
+  }
+  
+  .tool-name {
+    font-size: 15px;
   }
 }
 </style>
