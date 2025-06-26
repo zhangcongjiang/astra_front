@@ -9,10 +9,16 @@
     </div>
 
     <div class="tool-grid">
-      <div v-for="item in filteredTools" :key="item.id" class="tool-item" :title="item.description">
+      <div 
+        v-for="item in filteredTools" 
+        :key="item.id" 
+        class="tool-item" 
+        :title="item.description"
+        @click="openTool(item)"
+      >
         <div class="tool-content">
           <div class="tool-logo-wrapper">
-            <img v-if="item.logo" :src="item.logo" class="tool-logo" />
+            <img v-if="item.logo_path" :src="item.logo_path" class="tool-logo" />
             <div v-else class="default-logo">
               <picture-outlined style="font-size: 18px; color: #ccc" />
             </div>
@@ -48,10 +54,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'; // Add watch to the imports
+import { ref, computed, onMounted, watch } from 'vue';
 import { PlusOutlined } from '@ant-design/icons-vue';
 import { PictureOutlined } from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
+// 导入API
+import { uploadTool, getTools } from '@/api/modules/toolsApi';
 
 const props = defineProps({
   category: {
@@ -100,54 +108,14 @@ const loadTools = async () => {
   try {
     loading.value = true;
     
-    // 使用import语法加载图片
-    const logoPath = new URL('@/assets/logo/logo.png', import.meta.url).href;
-
-    // 模拟从数据库获取数据
-    const mockTools = [
-      // 文本工具 (10条)
-      ...Array.from({ length: 10 }, (_, i) => ({
-        id: i + 1,
-        name: `文本工具 ${i + 1}`,
-        logo: logoPath,
-        url: `https://text-tool-${i + 1}.com`,
-        description: `这是一个强大的文本处理工具 ${i + 1}`,
-        category: 'text'
-      })),
-      // 图像工具 (10条)
-      ...Array.from({ length: 10 }, (_, i) => ({
-        id: i + 11,
-        name: `图像工具 ${i + 1}`,
-        logo: logoPath,
-        url: `https://image-tool-${i + 1}.com`,
-        description: `这是一个专业的图像处理工具 ${i + 1}`,
-        category: 'image'
-      })),
-      // 音频工具 (10条)
-      ...Array.from({ length: 10 }, (_, i) => ({
-        id: i + 21,
-        name: `音频工具 ${i + 1}`,
-        logo: logoPath,
-        url: `https://audio-tool-${i + 1}.com`,
-        description: `这是一个高效的音频处理工具 ${i + 1}`,
-        category: 'audio'
-      })),
-      // 视频工具 (10条)
-      ...Array.from({ length: 10 }, (_, i) => ({
-        id: i + 31,
-        name: `视频工具 ${i + 1}`,
-        logo: logoPath,
-        url: `https://video-tool-${i + 1}.com`,
-        description: `这是一个全面的视频处理工具 ${i + 1}`,
-        category: 'video'
-      }))
-    ];
-
-    // 根据当前category过滤工具
-    tools.value = mockTools.filter(tool => tool.category === props.category);
+    // 调用真实API获取工具列表
+    const response = await getTools({ category: props.category });
+    tools.value = response.data || [];
   } catch (error) {
     console.error('加载工具失败:', error);
     message.error('加载工具失败');
+    // 如果API调用失败，可以保留模拟数据作为fallback
+    tools.value = [];
   } finally {
     loading.value = false;
   }
@@ -162,6 +130,7 @@ const showAddModal = () => {
     description: '',
     category: props.category
   };
+  fileList.value = []; // 重置文件列表
   modalTitle.value = '添加工具';
   modalVisible.value = true;
 };
@@ -175,17 +144,41 @@ const editTool = (tool) => {
 const handleSubmit = async () => {
   try {
     submitting.value = true;
-    // 这里替换为实际API调用
-    // if (toolForm.value.id) {
-    //   await api.updateTool(toolForm.value);
-    // } else {
-    //   await api.addTool(toolForm.value);
-    // }
-    message.success('操作成功');
+    
+    // 创建FormData对象
+    const formData = new FormData();
+    formData.append('name', toolForm.value.name);
+    formData.append('url', toolForm.value.url);
+    formData.append('description', toolForm.value.description);
+    formData.append('category', toolForm.value.category);
+    
+    // 如果有logo文件，添加到FormData
+    if (fileList.value.length > 0 && fileList.value[0].originFileObj) {
+      formData.append('logo', fileList.value[0].originFileObj);
+    }
+    
+    // 调用上传API
+    await uploadTool(formData);
+    
+    message.success('添加工具成功');
     modalVisible.value = false;
+    
+    // 重置表单
+    toolForm.value = {
+      id: null,
+      name: '',
+      logo: '',
+      url: '',
+      description: '',
+      category: props.category
+    };
+    fileList.value = [];
+    
+    // 重新加载工具列表
     loadTools();
   } catch (error) {
-    message.error('操作失败');
+    console.error('添加工具失败:', error);
+    message.error('添加工具失败');
   } finally {
     submitting.value = false;
   }
@@ -216,6 +209,52 @@ watch(() => props.category, (newCategory) => {
   console.log('工具类别变化:', newCategory);
   loadTools();
 });
+// 在现有的ref变量后添加
+const fileList = ref([]);
+const uploadLoading = ref(false);
+
+// 文件上传前的处理
+const beforeUpload = (file) => {
+  const isImage = file.type.startsWith('image/');
+  if (!isImage) {
+    message.error('只能上传图片文件!');
+    return false;
+  }
+  const isLt20M = file.size / 1024 / 1024 < 20;
+  if (!isLt20M) {
+    message.error('图片大小不能超过 20MB!');
+    return false;
+  }
+  return false; // 阻止自动上传
+};
+
+// 文件上传变化处理
+const handleUploadChange = (info) => {
+  fileList.value = info.fileList.slice(-1); // 只保留最后一个文件
+  
+  if (info.fileList.length > 0) {
+    const file = info.fileList[0];
+    if (file.status === 'done' || file.originFileObj) {
+      // 创建预览URL
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        toolForm.value.logo = e.target.result;
+      };
+      reader.readAsDataURL(file.originFileObj || file);
+    }
+  } else {
+    toolForm.value.logo = '';
+  }
+};
+
+// 添加点击工具的处理函数
+const openTool = (tool) => {
+  if (tool.url) {
+    window.open(tool.url, '_blank');
+  } else {
+    message.warning('该工具暂未配置链接');
+  }
+};
 </script>
 
 <style scoped>
@@ -245,6 +284,7 @@ watch(() => props.category, (newCategory) => {
   border-radius: 8px;
   padding: 8px;
   transition: all 0.2s;
+  cursor: pointer; /* 添加鼠标指针样式 */
 }
 
 .tool-item:hover {
@@ -257,18 +297,20 @@ watch(() => props.category, (newCategory) => {
   display: flex;
   align-items: center;
   height: 100%;
+  gap: 12px; /* 添加间距 */
 }
 
 .tool-logo-wrapper {
-  width: 32px;
-  height: 32px;
-  margin-right: 8px;
+  width: 40%; /* 占据40%宽度 */
+  height: 44px; /* 增加高度 */
+  flex-shrink: 0; /* 防止收缩 */
 }
 
 .tool-logo {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  border-radius: 4px; /* 添加圆角 */
 }
 
 .default-logo {
@@ -287,7 +329,8 @@ watch(() => props.category, (newCategory) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 1;
+  flex: 1; /* 占据剩余的60%宽度 */
+  width: 60%; /* 明确指定60%宽度 */
 }
 
 /* 响应式布局 */
