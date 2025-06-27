@@ -133,6 +133,13 @@ const router = createRouter({
                     props: { category: 'video' }
                 },
                 {
+                    path: 'other-tools',
+                    name: 'other-tools',
+                    component: () => import('@/views/tools/ToolPage.vue'),
+                    meta: { title: '其他工具' },
+                    props: { category: 'other' }
+                },
+                {
                     path: '/transitions',
                     name: 'transitions',
                     component: TransitionList,

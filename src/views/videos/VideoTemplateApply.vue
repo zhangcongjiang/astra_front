@@ -167,7 +167,7 @@ const getTagNames = (tagIds) => {
 
 // 初始化加载数据
 onMounted(() => {
-  if (!route.params.id) {
+  if (!route.params.templateId) {
     message.error('无效的模板ID')
     router.push('/templates')
     return
@@ -182,7 +182,7 @@ const loadTemplateData = async () => {
     
     // 尝试从多个来源获取模板数据
     let templateData = route.state?.template 
-                    || JSON.parse(sessionStorage.getItem(`template-${route.params.id}`))
+                    || JSON.parse(sessionStorage.getItem(`template-${route.params.templateId}`))
     
     // 获取来源文案数据
     const sourceRecord = route.state?.sourceRecord;
@@ -228,13 +228,13 @@ const loadTemplateData = async () => {
           tags: ['type_2', 'style_1']
         }
       ]
-      templateData = mockTemplates.find(t => t.id === parseInt(route.params.id))
+      templateData = mockTemplates.find(t => t.id === parseInt(route.params.templateId))
       
       if (!templateData) throw new Error('模板不存在')
     }
 
     // 保存到sessionStorage防止刷新丢失
-    sessionStorage.setItem(`template-${route.params.id}`, JSON.stringify(templateData))
+    sessionStorage.setItem(`template-${route.params.templateId}`, JSON.stringify(templateData))
     
     // 填充数据
     Object.assign(template, {

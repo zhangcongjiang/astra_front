@@ -75,7 +75,8 @@ const categoryName = computed(() => {
     text: '文本',
     image: '图像',
     audio: '音频',
-    video: '视频'
+    video: '视频',
+    other: '其他'
   };
   return names[props.category] || '';
 });

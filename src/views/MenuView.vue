@@ -99,7 +99,8 @@ const menuData = [
             { id: 71, name: '文本工具', content: '提供各种文本处理工具...', path: '/text-tools' },
             { id: 72, name: '图像工具', content: '提供图像处理和转换工具...', path: '/image-tools' },
             { id: 73, name: '音频工具', content: '提供音频编辑和处理工具...', path: '/audio-tools' },
-            { id: 74, name: '视频工具', content: '提供视频编辑和处理工具...', path: '/video-tools' }
+            { id: 74, name: '视频工具', content: '提供视频编辑和处理工具...', path: '/video-tools' },
+            { id: 75, name: '其他工具', content: '提供其他收录的工具...', path: '/other-tools' }
         ]
     }, {
         id: 8,  // 修改前是6，现在改为7
