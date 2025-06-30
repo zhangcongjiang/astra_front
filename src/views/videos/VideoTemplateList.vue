@@ -228,6 +228,7 @@ const filteredTemplates = computed(() => {
 
 // 应用模板
 const applyTemplate = (template) => {
+    console.log('apply template', template);
     router.push({
         path: `/templates/apply/${template.id}`,
         state: { 

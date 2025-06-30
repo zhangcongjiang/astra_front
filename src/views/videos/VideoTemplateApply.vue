@@ -14,58 +14,144 @@
         </div>
       </div>
 
+      <!-- 改造开始: 使用a-form动态生成表单 -->
       <div class="params-section">
-        <div class="params-display">
-          <div class="params-header">
-            <h3>模板默认参数</h3>
-            <div class="header-placeholder"></div>
-          </div>
-          <div class="json-display">
-            <pre>{{ formattedDefaultParams }}</pre>
-          </div>
-        </div>
-
         <div class="params-editor">
           <div class="params-header">
             <h3>自定义参数配置</h3>
-            <div class="editor-toolbar">
-              <a-button @click="formatJson" size="small">
-                <template #icon><HighlightOutlined /></template>
-                格式化
-              </a-button>
-              <a-button @click="resetParams" size="small">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </a-button>
-              <a-button 
-                type="primary" 
-                @click="handleApply"
-                :loading="applying"
-                size="small"
-                class="apply-btn"
+          </div>
+          <a-form 
+            :model="formData" 
+            layout="vertical"
+            ref="formRef"
+            @finish="handleApply"
+          >
+            <template v-for="field in formDefinition" :key="field.name">
+              <a-form-item
+                :label="field.label"
+                :name="field.name"
+                :rules="generateRules(field)"
               >
-                <template #icon><RocketOutlined /></template>
-                生成视频
-              </a-button>
-            </div>
-          </div>
+                <!-- Input type: text, url, number -->
+                <a-input
+                  v-if="field.type === 'input' && (field.inputType === 'text' || field.inputType === 'url')"
+                  v-model:value="formData[field.name]"
+                  :placeholder="field.placeholder"
+                />
+                <a-input-number
+                  v-if="field.type === 'input' && field.inputType === 'number'"
+                  v-model:value="formData[field.name]"
+                  :placeholder="field.placeholder"
+                  style="width: 100%"
+                />
 
-          <div class="json-editor">
-            <textarea
-              ref="editor"
-              v-model="jsonString"
-              @input="validateJson"
-              placeholder="在此编辑您的自定义参数..."
-            ></textarea>
-            <div v-if="jsonError" class="error-tip">
-              <ExclamationCircleOutlined />
-              {{ jsonError }}
-            </div>
-          </div>
+                <!-- Textarea -->
+                <a-textarea
+                  v-if="field.type === 'textarea'"
+                  v-model:value="formData[field.name]"
+                  :rows="field.rows"
+                  :placeholder="field.placeholder"
+                />
+
+                <!-- Select -->
+                <a-select
+                  v-if="field.type === 'select'"
+                  v-model:value="formData[field.name]"
+                  :mode="field.multiple ? 'multiple' : 'default'"
+                  :placeholder="field.placeholder"
+                  :loading="field.options && field.options.loading"
+                  allow-clear
+                >
+                  <a-select-option
+                    v-for="option in (field.options && field.options.data) || []"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </a-select-option>
+                </a-select>
+
+                <!-- Radio Group -->
+                <a-radio-group
+                  v-if="field.type === 'radio'"
+                  v-model:value="formData[field.name]"
+                >
+                  <a-radio
+                    v-for="option in (field.options && field.options.data) || []"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </a-radio>
+                </a-radio-group>
+                
+                <!-- Checkbox Group -->
+                <a-checkbox-group
+                   v-if="field.type === 'checkbox'"
+                   v-model:value="formData[field.name]"
+                   :options="(field.options && field.options.data) || []"
+                />
+
+                <!-- Input type: range (Slider) -->
+                <a-slider
+                  v-if="field.type === 'input' && field.inputType === 'range'"
+                  v-model:value="formData[field.name]"
+                  :min="Number(field.min)"
+                  :max="Number(field.max)"
+                  :step="Number(field.step)"
+                />
+
+                <!-- Input type: color -->
+                <input
+                  v-if="field.type === 'input' && field.inputType === 'color'"
+                  type="color"
+                  v-model="formData[field.name]"
+                  class="color-picker"
+                />
+
+                <!-- Input type: file -->
+                <a-upload
+                  v-if="field.type === 'input' && field.inputType === 'file'"
+                  v-model:file-list="formData[field.name]"
+                  :before-upload="() => false"
+                  :multiple="field.multiple"
+                  :accept="field.accept"
+                  list-type="picture"
+                >
+                  <a-button>
+                    <upload-outlined></upload-outlined>
+                    点击上传
+                  </a-button>
+                </a-upload>
+
+                <!-- Field Description -->
+                <template #extra v-if="field.description">
+                  <p class="field-description">{{ field.description }}</p>
+                </template>
+              </a-form-item>
+            </template>
+
+            <a-form-item>
+                <a-button 
+                  type="primary" 
+                  html-type="submit"
+                  :loading="applying"
+                  class="apply-btn"
+                >
+                  <template #icon><RocketOutlined /></template>
+                  生成视频
+                </a-button>
+                <a-button @click="resetParams" style="margin-left: 12px;">
+                  <template #icon><ReloadOutlined /></template>
+                  重置参数
+                </a-button>
+            </a-form-item>
+          </a-form>
         </div>
       </div>
+      <!-- 改造结束 -->
     </a-spin>
-
+    
     <a-modal
       v-model:visible="showSuccessModal"
       title="视频生成任务已提交"
@@ -90,71 +176,49 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
-  HighlightOutlined,
   ReloadOutlined,
   RocketOutlined,
-  ExclamationCircleOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
+  UploadOutlined
 } from '@ant-design/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
 
-// 模板数据
+// Template data
 const template = reactive({
   id: null,
   name: '加载中...',
   description: '',
   tags: [],
-  params: {},
+  params: { form: [] }, // Default to an empty form structure
   videoUrl: ''
 })
 
-// 加载状态
+// Form state
 const loading = ref(true)
-
-// JSON编辑状态
-const jsonString = ref('')
-const jsonError = ref('')
 const applying = ref(false)
 const showSuccessModal = ref(false)
-const editor = ref(null)
+const formRef = ref(null); // Reference to the form component
+const formData = reactive({}) // Holds the data for the v-models
+const formDefinition = computed(() => template.params?.form || [])
 
-// 标签分类数据（与列表页保持一致）
+// Tag classification data
 const tagCategories = ref([
   {
-    id: 1,
-    name: '类型',
-    tags: [
-      { id: 'type_1', name: '宣传片' },
-      { id: 'type_2', name: '教程' },
-      { id: 'type_3', name: '产品展示' },
-      { id: 'type_4', name: '活动记录' }
-    ]
+    id: 1, name: '类型',
+    tags: [ { id: 'type_1', name: '宣传片' }, { id: 'type_2', name: '教程' }, { id: 'type_3', name: '产品展示' } ]
   },
   {
-    id: 2,
-    name: '风格',
-    tags: [
-      { id: 'style_1', name: '简约' },
-      { id: 'style_2', name: '科技感' },
-      { id: 'style_3', name: '复古' },
-      { id: 'style_4', name: '卡通' }
-    ]
+    id: 2, name: '风格',
+    tags: [ { id: 'style_1', name: '简约' }, { id: 'style_2', name: '科技感' }, { id: 'style_3', name: '复古' } ]
   }
 ])
 
-// 计算格式化后的默认参数
-const formattedDefaultParams = computed(() => {
-  return JSON.stringify(template.params, null, 2)
-})
-
-// 根据标签ID获取标签名称
+// Get tag names from IDs
 const getTagNames = (tagIds) => {
   const names = []
   if (!tagIds) return names
-  
-  // 在标签分类中查找标签名称
   for (const category of tagCategories.value) {
     for (const tag of category.tags) {
       if (tagIds.includes(tag.id)) {
@@ -165,14 +229,12 @@ const getTagNames = (tagIds) => {
   return names
 }
 
-// 初始化加载数据
 onMounted(() => {
-  if (!route.params.templateId) {
+  if (!route.params.id) {
     message.error('无效的模板ID')
     router.push('/templates')
     return
   }
-
   loadTemplateData()
 })
 
@@ -180,71 +242,67 @@ const loadTemplateData = async () => {
   try {
     loading.value = true
     
-    // 尝试从多个来源获取模板数据
-    let templateData = route.state?.template 
-                    || JSON.parse(sessionStorage.getItem(`template-${route.params.templateId}`))
+    // Simulate fetching template data
+    let templateData = route.state?.template || JSON.parse(sessionStorage.getItem(`template-${route.params.id}`))
     
-    // 获取来源文案数据
     const sourceRecord = route.state?.sourceRecord;
-    if (sourceRecord) {
-      // 这里可以根据需要将文案数据填充到模板参数中
-      templateData.params.text = sourceRecord.text;
-      templateData.params.title = sourceRecord.name;
-    }
-
-    // 如果都没有，可以尝试从API获取（示例）
+    
     if (!templateData) {
-      // 这里可以替换为实际的API请求
-      // const response = await api.getTemplate(route.params.id)
-      // templateData = response.data
-      
-      // 模拟API请求
       await new Promise(resolve => setTimeout(resolve, 500))
+      // Use the comprehensive mock data
       const mockTemplates = [
         {
-          id: 1,
-          name: '产品宣传模板',
-          description: '适用于产品推广的高质量宣传视频模板',
-          videoUrl: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
-          params: {
-            title: "产品名称",
-            subtitle: "产品标语",
-            images: ["image1.jpg", "image2.jpg"],
-            duration: 30,
-            style: "modern"
-          },
-          tags: ['type_1', 'style_2']
+            id: 1,
+            name: '产品宣传模板',
+            description: '适用于产品推广的高质量宣传视频模板',
+            videoUrl: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
+            params: JSON.parse(
+              `{
+                "form": [
+                  { "name": "video_title", "label": "视频标题", "type": "input", "inputType": "text", "required": true, "placeholder": "请输入吸引人的标题", "description": "标题将作为视频的封面和文件名。", "validation": { "minLength": 5, "maxLength": 40, "errorMessage": "标题长度必须在5到40个字符之间。" }, "defaultValue": "" },
+                  { "name": "video_script", "label": "视频文案", "type": "textarea", "required": true, "rows": 10, "placeholder": "请在这里输入视频的讲述文案或脚本...", "description": "文案内容将用于生成字幕和AI语音。", "defaultValue": "" },
+                  { "name": "narrator_voice", "label": "讲述人声音", "type": "select", "required": true, "defaultValue": "female_1", "description": "选择一个AI声音来朗读您的文案。", "options": { "source": "static", "data": [{ "value": "female_1", "label": "温柔女声" }, { "value": "male_1", "label": "磁性男声" }, { "value": "child_1", "label": "天真童声" }] } },
+                  { "name": "bg_music", "label": "背景音乐(多选)", "type": "select", "required": false, "multiple": true, "description": "按住 Ctrl/Command 并单击可选择多首音乐。", "options": { "source": "remote", "url": "https://mock.api.com/music/list", "valueKey": "musicId", "labelKey": "musicName" }, "defaultValue": [] },
+                  { "name": "aspect_ratio", "label": "视频比例", "type": "radio", "required": true, "defaultValue": "9:16", "options": { "source": "static", "data": [{ "value": "16:9", "label": "16:9 (横屏)" }, { "value": "9:16", "label": "9:16 (竖屏)" }, { "value": "1:1", "label": "1:1 (方形)" }] } },
+                  { "name": "subtitle_style", "label": "字幕风格", "type": "checkbox", "defaultValue": ["highlight"], "options": { "source": "static", "data": [{ "value": "highlight", "label": "重点词高亮" }, { "value": "karaoke", "label": "卡拉OK效果" }, { "value": "glow", "label": "描边发光" }] } },
+                  { "name": "image_files", "label": "图片素材", "type": "input", "inputType": "file", "multiple": true, "accept": "image/jpeg, image/png, image/webp", "description": "上传图片作为视频的插图或背景。", "defaultValue": [] },
+                  { "name": "image_duration", "label": "图片播放速度(秒/张)", "type": "input", "inputType": "range", "min": "2", "max": "10", "step": "0.5", "defaultValue": 4, "description": "控制每张图片在视频中停留的时间。" },
+                  { "name": "watermark_position", "label": "水印位置", "type": "select", "defaultValue": "bottom_right", "options": { "source": "static", "data": [{ "value": "top_left", "label": "左上角" }, { "value": "top_right", "label": "右上角" }, { "value": "bottom_left", "label": "左下角" }, { "value": "bottom_right", "label": "右下角" }] } },
+                  { "name": "theme_color", "label": "主题颜色", "type": "input", "inputType": "color", "defaultValue": "#ffffff", "description": "选择一个颜色用于标题或元素高亮。" }
+                ]
+              }`
+            ),
+            tags: ['type_1', 'style_2']
         },
         {
-          id: 2,
-          name: '教程视频模板',
-          description: '适合制作步骤教学视频的模板',
-          videoUrl: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
-          params: {
-            steps: ["第一步", "第二步", "第三步"],
-            narrator: true,
-            backgroundMusic: "tutorial_music.mp3"
-          },
-          tags: ['type_2', 'style_1']
+            id: 2,
+            name: '故事相册模板',
+            description: '一个简单的模板，用于将图片制作成带转场和音效的故事短片。',
+            videoUrl: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
+            params: {
+              "form": [
+                { "name": "video_title", "label": "相册标题", "type": "input", "inputType": "text", "required": true, "defaultValue": "我的美好回忆" },
+                { "name": "image_files", "label": "上传图片", "type": "input", "inputType": "file", "multiple": true, "required": true, "accept": "image/*", "description": "请至少上传3张图片。", "defaultValue": [] },
+                { "name": "image_animation", "label": "图片入场动画", "type": "select", "defaultValue": "fade_in", "options": { "source": "static", "data": [ { "value": "fade_in", "label": "淡入" }, { "value": "fly_in_left", "label": "从左飞入" }, { "value": "zoom_in", "label": "放大进入" } ] } },
+                { "name": "scene_description", "label": "场景描述（分段）", "type": "textarea", "rows": 5, "defaultValue": "", "placeholder": "每一行代表一个场景的描述，将对应一张图片。", "description": "请确保行数和图片数量一致。" },
+                { "name": "transition_effect", "label": "转场特效", "type": "select", "defaultValue": "dissolve", "options": { "source": "static", "data": [ { "value": "cut", "label": "硬切" }, { "value": "dissolve", "label": "叠化" }, { "value": "wipe_right", "label": "向右擦除" } ] } },
+                { "name": "sound_effects", "label": "特效音（可多选）", "type": "select", "multiple": true, "defaultValue": [], "options": { "source": "static", "data": [ { "value": "shutter", "label": "相机快门声" }, { "value": "whoosh", "label": "风声/嗖" }, { "value": "ding", "label": "叮" } ] } }
+              ]
+            },
+            tags: ['type_4', 'style_3']
         }
       ]
-      templateData = mockTemplates.find(t => t.id === parseInt(route.params.templateId))
-      
+      templateData = mockTemplates.find(t => t.id === parseInt(route.params.id))
       if (!templateData) throw new Error('模板不存在')
     }
+    
+    sessionStorage.setItem(`template-${route.params.id}`, JSON.stringify(templateData))
+    
+    Object.assign(template, { id: route.params.id, ...templateData })
+    
+    // Initialize form data and handle external data injection
+    await initializeForm(sourceRecord)
 
-    // 保存到sessionStorage防止刷新丢失
-    sessionStorage.setItem(`template-${route.params.templateId}`, JSON.stringify(templateData))
-    
-    // 填充数据
-    Object.assign(template, {
-      id: route.params.id,
-      ...templateData
-    })
-    
-    jsonString.value = JSON.stringify(template.params, null, 2)
-    adjustEditorHeight()
-    
   } catch (error) {
     message.error('模板加载失败: ' + error.message)
     router.push('/templates')
@@ -253,76 +311,185 @@ const loadTemplateData = async () => {
   }
 }
 
-// JSON操作
-const validateJson = () => {
-  try {
-    JSON.parse(jsonString.value)
-    jsonError.value = ''
-    return true
-  } catch (e) {
-    jsonError.value = e.message
-    return false
+// Initialize form values from definition and handle remote options
+const initializeForm = async (sourceRecord = null) => {
+  for (const field of formDefinition.value) {
+    // Set default value
+    formData[field.name] = field.defaultValue ?? null
+
+    // Override with source record data if available
+    if (sourceRecord) {
+        if (field.name === 'video_title' && sourceRecord.name) {
+            formData.video_title = sourceRecord.name;
+        }
+        if (field.name === 'video_script' && sourceRecord.text) {
+            formData.video_script = sourceRecord.text;
+        }
+    }
+
+    // Handle remote options for select
+    if (field.type === 'select' && field.options?.source === 'remote') {
+      field.options.loading = true
+      try {
+        // Mock API call for remote options
+        console.log(`Fetching options from: ${field.options.url}`)
+        await new Promise(resolve => setTimeout(resolve, 500))
+        const remoteData = [
+            { musicId: 'm1', musicName: '轻松的旋律' },
+            { musicId: 'm2', musicName: '激昂的节奏' },
+            { musicId: 'm3', musicName: '宁静的午后' }
+        ];
+        field.options.data = remoteData.map(item => ({
+          value: item[field.options.valueKey],
+          label: item[field.options.labelKey]
+        }))
+
+      } catch (e) {
+        message.error(`加载 ${field.label} 选项失败`)
+        field.options.data = []
+      } finally {
+        field.options.loading = false
+      }
+    }
   }
 }
 
-const formatJson = () => {
-  if (!validateJson()) {
-    message.error('请先修正JSON错误')
-    return
+// Generate validation rules for a-form-item
+const generateRules = (field) => {
+  const rules = []
+  if (field.required) {
+    rules.push({ required: true, message: `请输入${field.label}` })
   }
-  
-  try {
-    const obj = JSON.parse(jsonString.value)
-    jsonString.value = JSON.stringify(obj, null, 2)
-    adjustEditorHeight()
-  } catch (e) {
-    jsonError.value = e.message
+  if (field.validation) {
+    const v = field.validation
+    rules.push({
+      validator: (_, value) => {
+        if (!value) return Promise.resolve() // Pass if not required and empty
+        if (v.minLength && value.length < v.minLength) {
+          return Promise.reject(v.errorMessage || `${field.label}长度不能小于${v.minLength}`)
+        }
+        if (v.maxLength && value.length > v.maxLength) {
+          return Promise.reject(v.errorMessage || `${field.label}长度不能超过${v.maxLength}`)
+        }
+        if (v.pattern && !new RegExp(v.pattern).test(value)) {
+            return Promise.reject(v.errorMessage || `${field.label}格式不正确`)
+        }
+        return Promise.resolve()
+      }
+    })
   }
+  return rules
 }
 
+// Reset form to default values
 const resetParams = () => {
-  jsonString.value = JSON.stringify(template.params, null, 2)
-  jsonError.value = ''
-  adjustEditorHeight()
+  formRef.value.clearValidate();
+  initializeForm();
+  message.success('参数已重置');
 }
 
-// 应用模板
-const handleApply = () => {
-  if (!validateJson()) {
-    message.error('请修正JSON格式错误')
-    return
-  }
-
+// Handle form submission
+const handleApply = (values) => {
+  console.log('Form Submitted. Values:', values)
+  // The 'values' object already contains all form data.
+  // For file uploads, the value will be an array of file objects.
+  
   Modal.confirm({
     title: '确认生成视频',
     content: '确定使用当前参数生成视频吗？',
-    onOk: submitVideoTask
+    onOk: () => submitVideoTask(values),
   })
 }
 
-const submitVideoTask = () => {
+const submitVideoTask = (finalParams) => {
   applying.value = true
-  
-  // 模拟API请求
+  console.log('Submitting task with params:', finalParams)
+
+  // Here you would typically construct a FormData object if you have files
+  // and send it to your API.
+
+  // Simulate API request
   setTimeout(() => {
     applying.value = false
     showSuccessModal.value = true
   }, 1500)
 }
 
-// 辅助功能
-const adjustEditorHeight = () => {
-  if (editor.value) {
-    editor.value.style.height = 'auto'
-    editor.value.style.height = `${editor.value.scrollHeight}px`
-  }
-}
-
 const goToMyVideos = () => {
   router.push('/my-videos')
   showSuccessModal.value = false
 }
+
 </script>
+
+<style>
+/* Add some basic styling to make it look good */
+.template-apply-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.template-info {
+  margin-bottom: 24px;
+}
+.template-info .description {
+  color: #888;
+}
+.template-info .tags {
+  margin-top: 8px;
+}
+.params-section {
+  background-color: #fdfdfd;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+}
+.params-editor {
+  padding: 24px;
+}
+.params-header {
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.params-header h3 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0;
+}
+.field-description {
+  color: #aaa;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.apply-btn {
+  margin-right: 12px;
+}
+.color-picker {
+  width: 100%;
+  height: 32px;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.success-modal {
+  text-align: center;
+}
+.success-icon {
+  font-size: 48px;
+  color: #52c41a;
+  margin-bottom: 16px;
+}
+.success-modal h3 {
+  font-size: 20px;
+}
+.success-modal p {
+  color: #888;
+}
+.success-modal .actions {
+  margin-top: 24px;
+}
+</style>
+
 
 <style scoped>
 .template-apply-container {
