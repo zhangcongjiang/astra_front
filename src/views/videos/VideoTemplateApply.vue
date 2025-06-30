@@ -24,7 +24,7 @@
             :model="formData" 
             layout="vertical"
             ref="formRef"
-            @finish="handleApply"
+            @finish="onFormFinish"
           >
             <!-- Loop through top-level form fields and groups -->
             <template v-for="field in formDefinition" :key="field.name">
@@ -44,7 +44,8 @@
                     <a-checkbox-group v-if="field.type === 'checkbox'" v-model:value="formData[field.name]" :options="(field.options && field.options.data) || []" />
                     <a-slider v-if="field.type === 'input' && field.inputType === 'range'" v-model:value="formData[field.name]" :min="Number(field.min)" :max="Number(field.max)" :step="Number(field.step)" />
                     <input v-if="field.type === 'input' && field.inputType === 'color'" type="color" v-model="formData[field.name]" class="color-picker" />
-                    <a-upload v-if="field.type === 'input' && field.inputType === 'file'" v-model:file-list="formData[field.name]" :before-upload="() => false" :multiple="field.multiple" :accept="field.accept" list-type="picture">
+                    <!-- Modified Upload Component -->
+                    <a-upload v-if="field.type === 'input' && field.inputType === 'file'" v-model:file-list="formData[field.name]" :customRequest="customUpload" :multiple="field.multiple" :accept="field.accept" list-type="picture">
                       <a-button><upload-outlined /> 点击上传</a-button>
                     </a-upload>
                     <template #extra v-if="field.description"><p class="field-description">{{ field.description }}</p></template>
@@ -62,15 +63,8 @@
                     <div v-for="(groupInstance, index) in formData[field.name]" :key="index" class="replicable-group-item">
                        <div class="group-item-header">
                           <h5>{{ field.label }} #{{ index + 1 }}</h5>
-                          <a-button 
-                            type="dashed" 
-                            danger 
-                            size="small"
-                            @click="removeGroupInstance(field.name, index)"
-                            v-if="formData[field.name].length > 1"
-                          >
-                             <template #icon><delete-outlined /></template>
-                             删除
+                          <a-button type="dashed" danger size="small" @click="removeGroupInstance(field.name, index)" v-if="formData[field.name].length > 1">
+                             <template #icon><delete-outlined /></template> 删除
                           </a-button>
                        </div>
                        <!-- Inlined logic for inner fields -->
@@ -88,7 +82,8 @@
                             <a-checkbox-group v-if="innerField.type === 'checkbox'" v-model:value="groupInstance[innerField.name]" :options="(innerField.options && innerField.options.data) || []" />
                             <a-slider v-if="innerField.type === 'input' && innerField.inputType === 'range'" v-model:value="groupInstance[innerField.name]" :min="Number(innerField.min)" :max="Number(innerField.max)" :step="Number(innerField.step)" />
                             <input v-if="innerField.type === 'input' && innerField.inputType === 'color'" type="color" v-model="groupInstance[innerField.name]" class="color-picker" />
-                            <a-upload v-if="innerField.type === 'input' && innerField.inputType === 'file'" v-model:file-list="groupInstance[innerField.name]" :before-upload="() => false" :multiple="innerField.multiple" :accept="innerField.accept" list-type="picture">
+                            <!-- Modified Upload Component -->
+                            <a-upload v-if="innerField.type === 'input' && innerField.inputType === 'file'" v-model:file-list="groupInstance[innerField.name]" :customRequest="customUpload" :multiple="innerField.multiple" :accept="innerField.accept" list-type="picture">
                               <a-button><upload-outlined /> 点击上传</a-button>
                             </a-upload>
                             <template #extra v-if="innerField.description"><p class="field-description">{{ innerField.description }}</p></template>
@@ -96,55 +91,19 @@
                        </template>
                     </div>
                     <a-button type="dashed" @click="addGroupInstance(field)" style="width: 100%; margin-top: 10px;">
-                        <template #icon><plus-outlined /></template>
-                        添加{{ field.label }}
+                        <template #icon><plus-outlined /></template> 添加{{ field.label }}
                     </a-button>
                   </template>
-                  
-                  <!-- Non-replicable Group -->
-                  <template v-if="!field.replicable">
-                     <div class="static-group-item">
-                        <!-- Inlined logic for inner fields -->
-                        <template v-for="innerField in field.fields" :key="innerField.name">
-                           <a-form-item :label="innerField.label" :name="[field.name, innerField.name]" :rules="generateRules(innerField)">
-                             <a-input v-if="innerField.type === 'input' && (innerField.inputType === 'text' || innerField.inputType === 'url')" v-model:value="formData[field.name][innerField.name]" :placeholder="innerField.placeholder" />
-                             <a-input-number v-if="innerField.type === 'input' && innerField.inputType === 'number'" v-model:value="formData[field.name][innerField.name]" :placeholder="innerField.placeholder" style="width: 100%" />
-                             <a-textarea v-if="innerField.type === 'textarea'" v-model:value="formData[field.name][innerField.name]" :rows="innerField.rows" :placeholder="innerField.placeholder" />
-                             <a-select v-if="innerField.type === 'select'" v-model:value="formData[field.name][innerField.name]" :mode="innerField.multiple ? 'multiple' : 'default'" :placeholder="innerField.placeholder" :loading="innerField.options && innerField.options.loading" allow-clear>
-                               <a-select-option v-for="option in (innerField.options && innerField.options.data) || []" :key="option.value" :value="option.value">{{ option.label }}</a-select-option>
-                             </a-select>
-                             <a-radio-group v-if="innerField.type === 'radio'" v-model:value="formData[field.name][innerField.name]">
-                               <a-radio v-for="option in (innerField.options && innerField.options.data) || []" :key="option.value" :value="option.value">{{ option.label }}</a-radio>
-                             </a-radio-group>
-                             <a-checkbox-group v-if="innerField.type === 'checkbox'" v-model:value="formData[field.name][innerField.name]" :options="(innerField.options && innerField.options.data) || []" />
-                             <a-slider v-if="innerField.type === 'input' && innerField.inputType === 'range'" v-model:value="formData[field.name][innerField.name]" :min="Number(innerField.min)" :max="Number(innerField.max)" :step="Number(innerField.step)" />
-                             <input v-if="innerField.type === 'input' && innerField.inputType === 'color'" type="color" v-model="formData[field.name][innerField.name]" class="color-picker" />
-                             <a-upload v-if="innerField.type === 'input' && innerField.inputType === 'file'" v-model:file-list="formData[field.name][innerField.name]" :before-upload="() => false" :multiple="innerField.multiple" :accept="innerField.accept" list-type="picture">
-                               <a-button><upload-outlined /> 点击上传</a-button>
-                             </a-upload>
-                             <template #extra v-if="innerField.description"><p class="field-description">{{ innerField.description }}</p></template>
-                           </a-form-item>
-                        </template>
-                     </div>
-                  </template>
-
                 </div>
               </template>
             </template>
 
             <a-form-item>
-                <a-button 
-                  type="primary" 
-                  html-type="submit"
-                  :loading="applying"
-                  class="apply-btn"
-                >
-                  <template #icon><RocketOutlined /></template>
-                  生成视频
+                <a-button type="primary" html-type="submit" :loading="applying" class="apply-btn">
+                  <template #icon><RocketOutlined /></template> 生成视频
                 </a-button>
                 <a-button @click="resetParams" style="margin-left: 12px;">
-                  <template #icon><ReloadOutlined /></template>
-                  重置参数
+                  <template #icon><ReloadOutlined /></template> 重置参数
                 </a-button>
             </a-form-item>
           </a-form>
@@ -178,7 +137,8 @@ import {
   DeleteOutlined,
   PlusOutlined
 } from '@ant-design/icons-vue'
-
+// Import your API functions from the new file
+import { uploadFile, createVideoTask } from '@/api/modules/videoApi.js' 
 
 const route = useRoute()
 const router = useRouter()
@@ -197,11 +157,9 @@ const tagCategories = ref([
   { id: 2, name: '风格', tags: [ { id: 'style_1', name: '简约' }, { id: 'style_2', name: '科技感' }, { id: 'style_3', name: '复古' } ]}
 ])
 
-// Moved generateRules to the main setup scope
 const generateRules = (field) => {
   const rules = [];
   if (field.required) {
-    // For file uploads, the value is an array.
     if (field.type === 'input' && field.inputType === 'file') {
         rules.push({ required: true, type: 'array', min: 1, message: `请上传${field.label}` });
     } else {
@@ -247,44 +205,11 @@ onMounted(() => {
 const loadTemplateData = async () => {
   try {
     loading.value = true;
-    let templateData = null; // fetch logic...
+    let templateData = null; 
     
     // --- MOCK DATA ---
     await new Promise(resolve => setTimeout(resolve, 500));
     const mockTemplates = [
-      {
-          id: 1,
-          name: '产品宣传模板（完整版）',
-          description: '功能齐全的模板，包含各类输入组件。',
-          tags: ['type_1', 'style_2'],
-          params: {
-    "form": [
-        {
-            "name": "video_title",
-            "label": "视频标题",
-            "type": "input",
-            "inputType": "text",
-            "required": true,
-            "placeholder": "请输入吸引人的标题",
-            "description": "标题将作为视频的封面和文件名。",
-            "validation": {
-                "minLength": 5,
-                "maxLength": 40,
-                "errorMessage": "标题长度必须在5到40个字符之间。"
-            }
-        },
-        {
-            "name": "video_script",
-            "label": "视频文案",
-            "type": "textarea",
-            "required": true,
-            "rows": 10,
-            "placeholder": "请在这里输入视频的讲述文案或脚本...",
-            "description": "文案内容将用于生成字幕和AI语音。"
-        }
-    ]
-}
-      },
       {
           id: 2,
           name: '动态故事相册模板',
@@ -335,10 +260,8 @@ const initializeForm = async () => {
   for (const field of formDefinition.value) {
     if (field.type === 'group') {
       if (field.replicable) {
-        // For replicable groups, initialize with one default instance in an array
         formData[field.name] = [getGroupDefault(field)];
       } else {
-        // For static groups, initialize as a single object
         formData[field.name] = getGroupDefault(field);
       }
     } else {
@@ -365,22 +288,100 @@ const resetParams = () => {
   message.success('参数已重置');
 };
 
-const handleApply = (values) => {
-  console.log('Form Submitted. Values:', JSON.parse(JSON.stringify(values)));
-  Modal.confirm({
-    title: '确认生成视频',
-    content: '确定使用当前参数生成视频吗？',
-    onOk: () => submitVideoTask(values),
-  });
+/**
+ * Custom upload handler for a-upload.
+ * It calls the backend API and attaches the returned URL to the file object.
+ */
+const customUpload = async ({ file, onSuccess, onError }) => {
+    const data = new FormData();
+    data.append('file', file);
+    try {
+        // Use the imported API function
+        const response = await uploadFile(data); 
+        file.url = response.url; 
+        onSuccess(response, file);
+        message.success(`${file.name} 上传成功`);
+    } catch (error) {
+        message.error(`${file.name} 上传失败`);
+        onError(error);
+    }
 };
 
-const submitVideoTask = (finalParams) => {
-  applying.value = true;
-  console.log('Submitting task with params:', JSON.parse(JSON.stringify(finalParams)));
-  setTimeout(() => {
-    applying.value = false;
-    showSuccessModal.value = true;
-  }, 1500);
+/**
+ * Processes the raw form data to build the final JSON payload.
+ * Replaces file objects with their URLs.
+ */
+const buildFinalParams = (rawFormData) => {
+    const finalParams = {};
+    const formDef = formDefinition.value;
+
+    for (const key in rawFormData) {
+        const fieldDef = formDef.find(f => f.name === key);
+        if (!fieldDef) continue;
+
+        const value = rawFormData[key];
+
+        if (fieldDef.type === 'group' && fieldDef.replicable) {
+            // Process array of group instances
+            finalParams[key] = value.map(groupInstance => {
+                const processedInstance = {};
+                for (const innerKey in groupInstance) {
+                    const innerFieldDef = fieldDef.fields.find(f => f.name === innerKey);
+                    if (innerFieldDef && innerFieldDef.type === 'input' && innerFieldDef.inputType === 'file') {
+                        const fileList = groupInstance[innerKey] || [];
+                        const urls = fileList
+                            .filter(file => file.status === 'done' && file.url)
+                            .map(file => file.url);
+                        processedInstance[innerKey] = innerFieldDef.multiple ? urls : (urls[0] || null);
+                    } else {
+                        processedInstance[innerKey] = groupInstance[innerKey];
+                    }
+                }
+                return processedInstance;
+            });
+        } else if (fieldDef.type === 'input' && fieldDef.inputType === 'file') {
+            // Process top-level file input
+            const fileList = value || [];
+            const urls = fileList
+                .filter(file => file.status === 'done' && file.url)
+                .map(file => file.url);
+            finalParams[key] = fieldDef.multiple ? urls : (urls[0] || null);
+        } else {
+            // Copy other data types directly
+            finalParams[key] = value;
+        }
+    }
+    return finalParams;
+}
+
+/**
+ * This function is called when the form is successfully validated.
+ */
+const onFormFinish = (values) => {
+  console.log('Form validation successful. Raw values:', values);
+  
+  const finalParams = buildFinalParams(formData);
+
+  Modal.confirm({
+    title: '确认生成视频',
+    content: '您确定要使用当前配置生成视频吗？',
+    async onOk() {
+      try {
+        console.log('Final parameters for video task:', finalParams);
+        applying.value = true;
+        // Use the imported API function
+        await createVideoTask(finalParams); 
+        showSuccessModal.value = true;
+        message.success('任务已提交，您可以在“我的视频”中查看进度。');
+        goToMyVideos();
+      } catch (error) {
+        message.error('任务提交失败，请稍后重试。');
+        console.error('Failed to create video task:', error);
+      } finally {
+        applying.value = false;
+      }
+    },
+  });
 };
 
 const goToMyVideos = () => {
