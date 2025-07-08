@@ -220,7 +220,18 @@ const generateRules = (field) => {
         rules.push({ required: true, message: `请输入${field.label}` });
     }
   }
-  // ... other validation logic ...
+  if (field.validation) {
+    const v = field.validation;
+    rules.push({
+      validator: (_, value) => {
+        if (!value && !field.required) return Promise.resolve();
+        if (v.minLength && value.length < v.minLength) return Promise.reject(v.errorMessage || `${field.label}长度不能小于${v.minLength}`);
+        if (v.maxLength && value.length > v.maxLength) return Promise.reject(v.errorMessage || `${field.label}长度不能超过${v.maxLength}`);
+        if (v.pattern && !new RegExp(v.pattern).test(value)) return Promise.reject(v.errorMessage || `${field.label}格式不正确`);
+        return Promise.resolve();
+      },
+    });
+  }
   return rules;
 };
 
