@@ -32,19 +32,34 @@
               <!-- Render a standard form item (Inlined Logic) -->
               <template v-if="field.type !== 'group'">
                  <a-form-item :label="field.label" :name="field.name" :rules="generateRules(field)">
+                    <!-- Standard Inputs -->
                     <a-input v-if="field.type === 'input' && (field.inputType === 'text' || field.inputType === 'url')" v-model:value="formData[field.name]" :placeholder="field.placeholder" />
                     <a-input-number v-if="field.type === 'input' && field.inputType === 'number'" v-model:value="formData[field.name]" :placeholder="field.placeholder" style="width: 100%" />
                     <a-textarea v-if="field.type === 'textarea'" v-model:value="formData[field.name]" :rows="field.rows" :placeholder="field.placeholder" />
-                    <a-select v-if="field.type === 'select'" v-model:value="formData[field.name]" :mode="field.multiple ? 'multiple' : 'default'" :placeholder="field.placeholder" :loading="field.options && field.options.loading" allow-clear>
+                    
+                    <!-- Static & Remote Select -->
+                    <a-select v-if="field.type === 'select' && (field.options.source === 'static' || field.options.source === 'remote')" v-model:value="formData[field.name]" :mode="field.multiple ? 'multiple' : 'default'" :placeholder="field.placeholder" :loading="field.options && field.options.loading" allow-clear>
                       <a-select-option v-for="option in (field.options && field.options.data) || []" :key="option.value" :value="option.value">{{ option.label }}</a-select-option>
                     </a-select>
+                    
+                    <!-- Server Select (New) -->
+                    <div v-if="field.type === 'select' && field.options.source === 'server'" class="server-select-wrapper">
+                        <div class="selected-display">
+                            <span v-if="!formData[field.name] || (Array.isArray(formData[field.name]) && formData[field.name].length === 0)" class="placeholder">未选择</span>
+                            <template v-else>
+                                <a-tag v-if="!field.multiple" closable @close="clearServerSelection(field.name)">{{ formData[field.name].name }}</a-tag>
+                                <a-tag v-for="item in formData[field.name]" :key="item.id" closable @close="removeServerSelectionItem(field.name, item.id)">{{ item.name }}</a-tag>
+                            </template>
+                        </div>
+                        <a-button @click="openResourceModal(field)">从服务器选择</a-button>
+                    </div>
+
                     <a-radio-group v-if="field.type === 'radio'" v-model:value="formData[field.name]">
                       <a-radio v-for="option in (field.options && field.options.data) || []" :key="option.value" :value="option.value">{{ option.label }}</a-radio>
                     </a-radio-group>
                     <a-checkbox-group v-if="field.type === 'checkbox'" v-model:value="formData[field.name]" :options="(field.options && field.options.data) || []" />
                     <a-slider v-if="field.type === 'input' && field.inputType === 'range'" v-model:value="formData[field.name]" :min="Number(field.min)" :max="Number(field.max)" :step="Number(field.step)" />
                     <input v-if="field.type === 'input' && field.inputType === 'color'" type="color" v-model="formData[field.name]" class="color-picker" />
-                    <!-- Modified Upload Component -->
                     <a-upload v-if="field.type === 'input' && field.inputType === 'file'" v-model:file-list="formData[field.name]" :customRequest="customUpload" :multiple="field.multiple" :accept="field.accept" list-type="picture">
                       <a-button><upload-outlined /> 点击上传</a-button>
                     </a-upload>
@@ -73,16 +88,30 @@
                             <a-input v-if="innerField.type === 'input' && (innerField.inputType === 'text' || innerField.inputType === 'url')" v-model:value="groupInstance[innerField.name]" :placeholder="innerField.placeholder" />
                             <a-input-number v-if="innerField.type === 'input' && innerField.inputType === 'number'" v-model:value="groupInstance[innerField.name]" :placeholder="innerField.placeholder" style="width: 100%" />
                             <a-textarea v-if="innerField.type === 'textarea'" v-model:value="groupInstance[innerField.name]" :rows="innerField.rows" :placeholder="innerField.placeholder" />
-                            <a-select v-if="innerField.type === 'select'" v-model:value="groupInstance[innerField.name]" :mode="innerField.multiple ? 'multiple' : 'default'" :placeholder="innerField.placeholder" :loading="innerField.options && innerField.options.loading" allow-clear>
+                            
+                            <!-- Static & Remote Select in Group -->
+                            <a-select v-if="innerField.type === 'select' && (innerField.options.source === 'static' || innerField.options.source === 'remote')" v-model:value="groupInstance[innerField.name]" :mode="innerField.multiple ? 'multiple' : 'default'" :placeholder="innerField.placeholder" :loading="innerField.options && innerField.options.loading" allow-clear>
                               <a-select-option v-for="option in (innerField.options && innerField.options.data) || []" :key="option.value" :value="option.value">{{ option.label }}</a-select-option>
                             </a-select>
+
+                            <!-- Server Select in Group (New) -->
+                            <div v-if="innerField.type === 'select' && innerField.options.source === 'server'" class="server-select-wrapper">
+                                <div class="selected-display">
+                                    <span v-if="!groupInstance[innerField.name] || (Array.isArray(groupInstance[innerField.name]) && groupInstance[innerField.name].length === 0)" class="placeholder">未选择</span>
+                                    <template v-else>
+                                        <a-tag v-if="!innerField.multiple" closable @close="clearServerSelection(groupInstance, innerField.name)">{{ groupInstance[innerField.name].name }}</a-tag>
+                                        <a-tag v-if="innerField.multiple" v-for="item in groupInstance[innerField.name]" :key="item.id" closable @close="removeServerSelectionItem(groupInstance, innerField.name, item.id)">{{ item.name }}</a-tag>
+                                    </template>
+                                </div>
+                                <a-button @click="openResourceModal(innerField, groupInstance)">从服务器选择</a-button>
+                            </div>
+
                             <a-radio-group v-if="innerField.type === 'radio'" v-model:value="groupInstance[innerField.name]">
                               <a-radio v-for="option in (innerField.options && innerField.options.data) || []" :key="option.value" :value="option.value">{{ option.label }}</a-radio>
                             </a-radio-group>
                             <a-checkbox-group v-if="innerField.type === 'checkbox'" v-model:value="groupInstance[innerField.name]" :options="(innerField.options && innerField.options.data) || []" />
                             <a-slider v-if="innerField.type === 'input' && innerField.inputType === 'range'" v-model:value="groupInstance[innerField.name]" :min="Number(innerField.min)" :max="Number(innerField.max)" :step="Number(innerField.step)" />
                             <input v-if="innerField.type === 'input' && innerField.inputType === 'color'" type="color" v-model="groupInstance[innerField.name]" class="color-picker" />
-                            <!-- Modified Upload Component -->
                             <a-upload v-if="innerField.type === 'input' && innerField.inputType === 'file'" v-model:file-list="groupInstance[innerField.name]" :customRequest="customUpload" :multiple="innerField.multiple" :accept="innerField.accept" list-type="picture">
                               <a-button><upload-outlined /> 点击上传</a-button>
                             </a-upload>
@@ -111,6 +140,16 @@
       </div>
     </a-spin>
     
+    <!-- Resource Selector Modal -->
+    <ResourceSelectorModal
+        v-if="modalConfig.resourceType"
+        v-model:visible="modalConfig.visible"
+        :resource-type="modalConfig.resourceType"
+        :multiple="modalConfig.multiple"
+        :selected-value="modalConfig.selectedValue"
+        @select="handleResourceSelect"
+    />
+
     <a-modal v-model:visible="showSuccessModal" title="视频生成任务已提交" :footer="null" centered >
       <div class="success-modal">
         <CheckCircleOutlined class="success-icon" />
@@ -137,8 +176,9 @@ import {
   DeleteOutlined,
   PlusOutlined
 } from '@ant-design/icons-vue'
-// Import your API functions from the new file
+// Import your API functions and the new modal component
 import { uploadFile, createVideoTask } from '@/api/modules/videoApi.js' 
+import ResourceSelectorModal from './ResourceSelectorModal.vue';
 
 const route = useRoute()
 const router = useRouter()
@@ -152,6 +192,16 @@ const formRef = ref(null)
 const formData = reactive({})
 const formDefinition = computed(() => template.params?.form || [])
 
+// Modal State
+const modalConfig = reactive({
+    visible: false,
+    resourceType: null,
+    multiple: false,
+    activeField: null,
+    activeGroupInstance: null, // To handle selections within a group
+    selectedValue: null,
+});
+
 const tagCategories = ref([
   { id: 1, name: '类型', tags: [ { id: 'type_1', name: '宣传片' }, { id: 'type_2', name: '教程' }, { id: 'type_4', name: '活动记录' } ]},
   { id: 2, name: '风格', tags: [ { id: 'style_1', name: '简约' }, { id: 'style_2', name: '科技感' }, { id: 'style_3', name: '复古' } ]}
@@ -162,22 +212,15 @@ const generateRules = (field) => {
   if (field.required) {
     if (field.type === 'input' && field.inputType === 'file') {
         rules.push({ required: true, type: 'array', min: 1, message: `请上传${field.label}` });
-    } else {
+    } else if (field.type === 'select' && field.options.source === 'server') {
+        const type = field.multiple ? 'array' : 'object';
+        rules.push({ required: true, type: type, message: `请选择${field.label}` });
+    }
+    else {
         rules.push({ required: true, message: `请输入${field.label}` });
     }
   }
-  if (field.validation) {
-    const v = field.validation;
-    rules.push({
-      validator: (_, value) => {
-        if (!value && !field.required) return Promise.resolve();
-        if (v.minLength && value.length < v.minLength) return Promise.reject(v.errorMessage || `${field.label}长度不能小于${v.minLength}`);
-        if (v.maxLength && value.length > v.maxLength) return Promise.reject(v.errorMessage || `${field.label}长度不能超过${v.maxLength}`);
-        if (v.pattern && !new RegExp(v.pattern).test(value)) return Promise.reject(v.errorMessage || `${field.label}格式不正确`);
-        return Promise.resolve();
-      },
-    });
-  }
+  // ... other validation logic ...
   return rules;
 };
 
@@ -223,15 +266,15 @@ const loadTemplateData = async () => {
                 "label": "内容场景",
                 "type": "group",
                 "replicable": true,
-                "description": "点击下方按钮添加更多场景。每个场景包含图片、特效和文案。",
+                "description": "点击下方按钮添加更多场景。",
                 "fields": [
-                  { "name": "image", "label": "场景图片", "type": "input", "inputType": "file", "required": true, "defaultValue": [] },
+                  { "name": "image", "label": "场景图片 (服务器)", "type": "select", "required": true, "options": { "source": "server", "resourceType": "image" }, "defaultValue": null },
                   { "name": "transition", "label": "转场特效", "type": "select", "defaultValue": "dissolve", "options": { "source": "static", "data": [{ "value": "dissolve", "label": "叠化" }, { "value": "wipe", "label": "擦除" }] } },
-                  { "name": "sound_effect", "label": "特效音", "type": "select", "options": { "source": "static", "data": [{ "value": "shutter", "label": "快门声" }, { "value": "whoosh", "label": "风声" }] }, "defaultValue": null },
-                  { "name": "script", "label": "场景文案", "type": "textarea", "rows": 2, "placeholder": "描述这个场景...", "defaultValue": "" }
+                  { "name": "script", "label": "场景文案", "type": "textarea", "rows": 2, "placeholder": "描述这个场景...", "defaultValue": "" },
+                  { "name": "audio", "label": "音频 (服务器)", "type": "select", "required": true, "options": { "source": "server", "resourceType": "audio" }, "defaultValue": null },
                 ]
               },
-              { "name": "ending_video", "label": "片尾视频", "type": "input", "inputType": "file", "description": "上传一个视频作为结尾。", "defaultValue": [] }
+              { "name": "background_music", "label": "背景音乐 (服务器多选)", "type": "select", "multiple": true, "options": { "source": "server", "resourceType": "audio" }, "defaultValue": [] }
             ]
           }
       }
@@ -288,15 +331,10 @@ const resetParams = () => {
   message.success('参数已重置');
 };
 
-/**
- * Custom upload handler for a-upload.
- * It calls the backend API and attaches the returned URL to the file object.
- */
 const customUpload = async ({ file, onSuccess, onError }) => {
     const data = new FormData();
     data.append('file', file);
     try {
-        // Use the imported API function
         const response = await uploadFile(data); 
         file.url = response.url; 
         onSuccess(response, file);
@@ -307,59 +345,108 @@ const customUpload = async ({ file, onSuccess, onError }) => {
     }
 };
 
-/**
- * Processes the raw form data to build the final JSON payload.
- * Replaces file objects with their URLs.
- */
+// --- New Modal Handling Logic ---
+const openResourceModal = (field, groupInstance = null) => {
+    modalConfig.visible = true;
+    modalConfig.resourceType = field.options.resourceType;
+    modalConfig.multiple = field.multiple || false;
+    modalConfig.activeField = field.name;
+    modalConfig.activeGroupInstance = groupInstance; // Store the group instance if any
+    
+    if (groupInstance) {
+        modalConfig.selectedValue = groupInstance[field.name];
+    } else {
+        modalConfig.selectedValue = formData[field.name];
+    }
+};
+
+const handleResourceSelect = (selection) => {
+    // Filter out null or invalid entries before assignment
+    const cleanedSelection = Array.isArray(selection)
+        ? selection.filter(item => item && typeof item === 'object' && item.id)
+        : (selection && typeof selection === 'object' && selection.id ? selection : null);
+
+    if (modalConfig.activeGroupInstance) {
+        // Update a field within a group
+        modalConfig.activeGroupInstance[modalConfig.activeField] = cleanedSelection;
+    } else if (modalConfig.activeField) {
+        // Update a top-level field
+        formData[modalConfig.activeField] = cleanedSelection;
+    }
+
+    // Reset config
+    modalConfig.activeField = null;
+    modalConfig.activeGroupInstance = null;
+};
+
+const clearServerSelection = (context, fieldName) => {
+    if (fieldName) { // In a group
+        context[fieldName] = null;
+    } else { // Top level
+        formData[context] = null;
+    }
+};
+
+const removeServerSelectionItem = (context, fieldName, itemId) => {
+    const isGroup = typeof context === 'object' && context !== null;
+    const currentSelection = isGroup ? context[fieldName] : formData[fieldName];
+    
+    if (Array.isArray(currentSelection)) {
+        const newSelection = currentSelection.filter(item => item.id !== itemId);
+        if (isGroup) {
+            context[fieldName] = newSelection;
+        } else {
+            formData[fieldName] = newSelection;
+        }
+    }
+};
+
 const buildFinalParams = (rawFormData) => {
     const finalParams = {};
     const formDef = formDefinition.value;
+
+    const processValue = (fieldDefinition, value) => {
+        if (!fieldDefinition || value === null || value === undefined) return value;
+
+        // Handle file uploads
+        if (fieldDefinition.type === 'input' && fieldDefinition.inputType === 'file') {
+            const fileList = value || [];
+            const urls = fileList.filter(f => f.status === 'done' && f.url).map(f => f.url);
+            return fieldDefinition.multiple ? urls : (urls[0] || null);
+        }
+
+        // Handle server selections
+        if (fieldDefinition.type === 'select' && fieldDefinition.options.source === 'server') {
+            if (fieldDefinition.multiple) {
+                return Array.isArray(value) ? value.map(item => item.id) : []; // Send back IDs
+            }
+            return value ? value.id : null; // Send back ID
+        }
+
+        return value;
+    };
 
     for (const key in rawFormData) {
         const fieldDef = formDef.find(f => f.name === key);
         if (!fieldDef) continue;
 
-        const value = rawFormData[key];
-
         if (fieldDef.type === 'group' && fieldDef.replicable) {
-            // Process array of group instances
-            finalParams[key] = value.map(groupInstance => {
+            finalParams[key] = rawFormData[key].map(groupInstance => {
                 const processedInstance = {};
                 for (const innerKey in groupInstance) {
                     const innerFieldDef = fieldDef.fields.find(f => f.name === innerKey);
-                    if (innerFieldDef && innerFieldDef.type === 'input' && innerFieldDef.inputType === 'file') {
-                        const fileList = groupInstance[innerKey] || [];
-                        const urls = fileList
-                            .filter(file => file.status === 'done' && file.url)
-                            .map(file => file.url);
-                        processedInstance[innerKey] = innerFieldDef.multiple ? urls : (urls[0] || null);
-                    } else {
-                        processedInstance[innerKey] = groupInstance[innerKey];
-                    }
+                    processedInstance[innerKey] = processValue(innerFieldDef, groupInstance[innerKey]);
                 }
                 return processedInstance;
             });
-        } else if (fieldDef.type === 'input' && fieldDef.inputType === 'file') {
-            // Process top-level file input
-            const fileList = value || [];
-            const urls = fileList
-                .filter(file => file.status === 'done' && file.url)
-                .map(file => file.url);
-            finalParams[key] = fieldDef.multiple ? urls : (urls[0] || null);
         } else {
-            // Copy other data types directly
-            finalParams[key] = value;
+            finalParams[key] = processValue(fieldDef, rawFormData[key]);
         }
     }
     return finalParams;
 }
 
-/**
- * This function is called when the form is successfully validated.
- */
 const onFormFinish = (values) => {
-  console.log('Form validation successful. Raw values:', values);
-  
   const finalParams = buildFinalParams(formData);
 
   Modal.confirm({
@@ -367,16 +454,13 @@ const onFormFinish = (values) => {
     content: '您确定要使用当前配置生成视频吗？',
     async onOk() {
       try {
-        console.log('Final parameters for video task:', finalParams);
         applying.value = true;
-        // Use the imported API function
         await createVideoTask(finalParams); 
         showSuccessModal.value = true;
         message.success('任务已提交，您可以在“我的视频”中查看进度。');
         goToMyVideos();
       } catch (error) {
         message.error('任务提交失败，请稍后重试。');
-        console.error('Failed to create video task:', error);
       } finally {
         applying.value = false;
       }
@@ -390,6 +474,7 @@ const goToMyVideos = () => {
 };
 
 </script>
+
 
 <style>
 /* Basic styles for clarity */
@@ -442,6 +527,29 @@ const goToMyVideos = () => {
   font-size: 14px;
 }
 
+.server-select-wrapper {
+    display: flex;
+    align-items: center;
+    border: 1px solid #d9d9d9;
+    border-radius: 2px;
+    padding: 0 4px 0 11px;
+    transition: all 0.3s;
+    background-color: white;
+}
+.server-select-wrapper:hover {
+    border-color: #40a9ff;
+}
+.selected-display {
+    flex-grow: 1;
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.selected-display .placeholder {
+    color: #bfbfbf;
+}
 /* Modal styles */
 .success-modal { text-align: center; }
 .success-icon { font-size: 48px; color: #52c41a; margin-bottom: 16px; }

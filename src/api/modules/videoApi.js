@@ -41,3 +41,44 @@ export const createVideoTask = async (params) => {
     }
 };
 
+
+/**
+ * 从服务器获取资源列表。
+ * @param {object} params - 查询参数，例如 { type: 'image' }。
+ * @returns {Promise<Array>} - 返回资源对象数组。
+ */
+export const getServerResources = async (url, params) => {
+    if (!url) {
+        const error = new Error(`无效的资源url: ${url}`);
+        console.error(error);
+        throw error;
+    }
+
+    try {
+        const response = await request.get(`/${url}/`, formatParams(params));
+        
+        // 在返回前，统一处理数据，确保每个项目都有一个'name'字段
+        if (response.code === 0 && response.data && Array.isArray(response.data.results)) {
+            response.data.results = response.data.results.map(item => {
+                // 根据不同资源类型的字段，创建一个统一的'name'属性
+                if (params.type === 'image' && item.img_name) {
+                    item.name = item.img_name;
+                } else if (params.type === 'video' && item.video_name) {
+                    item.name = item.video_name;
+                } else if (params.type === 'audio' && item.audio_name) {
+                    item.name = item.audio_name;
+                } else if (!item.name) {
+                    // 如果没有特定名称字段，可以提供一个默认值或使用ID
+                    item.name = item.id;
+                }
+                return item;
+            });
+        }
+
+        return response;
+    } catch (error) {
+        console.error(`获取 ${params.type} 列表出错:`, error);
+        throw error;
+    }
+};
+
