@@ -48,7 +48,7 @@
                             <span v-if="!formData[field.name] || (Array.isArray(formData[field.name]) && formData[field.name].length === 0)" class="placeholder">未选择</span>
                             <template v-else>
                                 <a-tag v-if="!field.multiple" closable @close="clearServerSelection(field.name)">{{ formData[field.name].name }}</a-tag>
-                                <a-tag v-for="item in formData[field.name]" :key="item.id" closable @close="removeServerSelectionItem(field.name, item.id)">{{ item.name }}</a-tag>
+                                <a-tag v-if="field.multiple" v-for="item in formData[field.name]" :key="item.id" closable @close="removeServerSelectionItem(field.name, item.id)">{{ item.name }}</a-tag>
                             </template>
                         </div>
                         <a-button @click="openResourceModal(field)">从服务器选择</a-button>
@@ -288,7 +288,8 @@ const loadTemplateData = async () => {
               { "name": "background_music", "label": "背景音乐 (服务器多选)", "type": "select", "multiple": true, "options": { "source": "server", "resourceType": "audio" }, "defaultValue": [] }
             ]
           }
-      }
+      },
+      {"id":1,"name":"宣传片模板","tags":["type_1","style_1"],"params":{"form":[{"name":"template_id","label":"模板ID","type":"input","inputType":"text","description":"通常为隐藏字段，此处为展示目的。"},{"name":"background","label":"背景图片","type":"select","required":true,"options":{"source":"server","resourceType":"image"},"description":"从您的媒体库中选择一张背景图片。"},{"name":"bgm","label":"背景音乐","type":"select","required":true,"options":{"source":"server","resourceType":"audio"},"description":"从您的媒体库中选择一首背景音乐。"},{"name":"title","label":"视频标题","type":"input","inputType":"text","required":true,"placeholder":"请输入视频的标题"},{"name":"reader","label":"选择配音员","type":"select","required":true,"options":{"source":"remote","url":"https://api.example.com/readers","valueKey":"id","labelKey":"name"},"description":"选择一个AI配音员来朗读文案。"},{"name":"start_images","label":"开场图片","type":"select","required":true,"options":{"source":"server","resourceType":"image"}},{"name":"start_text","label":"开场文案","type":"textarea","rows":3,"required":true,"placeholder":"请输入视频的开场白。"},{"name":"content","label":"核心内容场景","type":"group","replicable":true,"description":"点击“添加场景”以创建多个视频片段。","fields":[{"name":"images","label":"场景关联图片","type":"select","multiple":true,"required":true,"options":{"source":"server","resourceType":"image"},"description":"按住Ctrl/Command可选择多张图片。"},{"name":"name","label":"场景核心人物/事件","type":"input","inputType":"text","placeholder":"例如：布朗尼·詹姆斯"},{"name":"text","label":"场景解说文案","type":"textarea","rows":3,"required":true,"placeholder":"请输入该场景的解说词。"}]}]}}
     ];
     templateData = mockTemplates.find(t => t.id === parseInt(route.params.id));
     if (!templateData) throw new Error('模板不存在');
