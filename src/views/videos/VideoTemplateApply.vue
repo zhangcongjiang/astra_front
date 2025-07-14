@@ -287,6 +287,12 @@ const getGroupDefault = (groupField) => {
 };
 
 const initializeForm = async () => {
+  // Clear previous form data to ensure a clean state
+  Object.keys(formData).forEach(key => delete formData[key]);
+
+  // Set template_id for submission
+  formData.template_id = template.id;
+
   for (const field of formDefinition.value) {
     if (field.type === 'group') {
       if (field.replicable) {
@@ -413,9 +419,21 @@ const buildFinalParams = (rawFormData) => {
         return value;
     };
 
+    // Directly assign template_id first
+    if (rawFormData.template_id) {
+        finalParams.template_id = rawFormData.template_id;
+    }
+
     for (const key in rawFormData) {
+        // Skip template_id as it's already handled
+        if (key === 'template_id') continue;
+
         const fieldDef = formDef.find(f => f.name === key);
-        if (!fieldDef) continue;
+        
+        // If there's no field definition, it's not a form field we need to process.
+        if (!fieldDef) {
+            continue;
+        }
 
         if (fieldDef.type === 'group' && fieldDef.replicable) {
             finalParams[key] = rawFormData[key].map(groupInstance => {
