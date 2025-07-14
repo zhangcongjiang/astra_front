@@ -309,7 +309,7 @@ const initializeForm = async () => {
       field.options.loading = true;
       try {
         const response = await fetchRemoteData(field.options.url);
-        field.options.data = response.data.data.map(item => ({ value: item.id, label: item.name }));
+        field.options.data = response.data.map(item => ({ value: item.id, label: item.name }));
       } catch (error) {
         message.error(`Failed to load options for ${field.label}`);
       } finally {
