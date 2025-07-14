@@ -33,7 +33,7 @@ export const uploadFile = async (data) => {
 export const createVideoTask = async (params) => {
     try {
         // 使用POST方法提交JSON数据
-        const response = await request.post("/video/create-task/", params);
+        const response = await request.post("/video/templates/", params);
         return response;
     } catch (error) {
         console.error(`创建视频任务失败:`, error);
