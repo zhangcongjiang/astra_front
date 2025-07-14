@@ -42,9 +42,10 @@
 
         <!-- 视频模板列表 -->
         <div class="template-grid">
-            <a-row :gutter="[16, 16]">
-                <a-col v-for="(template, index) in currentPageTemplates" :key="template.id" 
-                       :xs="24" :sm="12" :md="8" :lg="6">
+            <a-spin :spinning="loading" tip="加载中...">
+                <a-row :gutter="[16, 16]">
+                    <a-col v-for="(template, index) in currentPageTemplates" :key="template.id" 
+                           :xs="24" :sm="12" :md="8" :lg="6">
                     <a-card hoverable class="template-card">
                         <div class="card-content">
                             <!-- 视频类型标签 - 移到卡片右上角 -->
@@ -81,9 +82,10 @@
                         <template #actions>
                             <a-button type="primary" @click="applyTemplate(template)">应用模板</a-button>
                         </template>
-                    </a-card>
-                </a-col>
-            </a-row>
+                        </a-card>
+                    </a-col>
+                </a-row>
+            </a-spin>
         </div>
 
         <!-- 分页控制 -->
@@ -94,14 +96,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
 import dayjs from 'dayjs';
 import TagSearch from '@/components/TagSearch.vue';
 import Pagination from '@/components/Pagination.vue';
+import { getVideoTemplates } from '@/api/modules/videoApi.js';
 
 const router = useRouter();
+
+// 加载状态
+const loading = ref(false);
 
 // 搜索类型
 const searchType = ref('basic');
@@ -143,41 +149,7 @@ const tagCategories = ref([
 const selectedTags = ref([]);
 
 // 视频模板数据
-const templates = ref([
-    {
-        id: 1,
-        name: '产品宣传模板',
-        description: '适用于产品推广的高质量宣传视频模板',
-        videoUrl: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
-        createTime: dayjs().subtract(2, 'day').format('YYYY-MM-DD HH:mm'),
-        params: {
-            title: "产品名称",
-            subtitle: "产品标语",
-            images: ["image1.jpg", "image2.jpg"],
-            duration: 30,
-            style: "modern"
-        },
-        tags: ['type_1', 'style_2'],
-        orientation: 'horizontal',
-        cover: 'https://via.placeholder.com/300x169?text=横向封面'
-    },
-    {
-        id: 2,
-        name: '教程视频模板',
-        description: '适合制作步骤教学视频的模板',
-        videoUrl: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
-        createTime: dayjs().subtract(5, 'day').format('YYYY-MM-DD HH:mm'),
-        params: {
-            steps: ["第一步", "第二步", "第三步"],
-            narrator: true,
-            backgroundMusic: "tutorial_music.mp3"
-        },
-        tags: ['type_2', 'style_1'],
-        orientation: 'vertical',
-        cover: 'https://via.placeholder.com/169x300?text=竖向封面'
-    },
-    // ...其他模板数据...
-]);
+const templates = ref([]);
 
 // 分页配置
 const pagination = reactive({
@@ -186,60 +158,81 @@ const pagination = reactive({
     total: 0
 });
 
-// 当前页显示的模板
+// 当前页显示的模板（服务器端分页，直接返回templates）
 const currentPageTemplates = computed(() => {
-    const start = (pagination.current - 1) * pagination.pageSize;
-    const end = start + pagination.pageSize;
-    return filteredTemplates.value.slice(start, end);
-});
-
-// 过滤后的模板
-const filteredTemplates = computed(() => {
-    let filtered = templates.value;
-    
-    // 基础查询过滤
-    if (searchType.value === 'basic') {
-        const nameMatch = template => 
-            template.name.toLowerCase().includes(basicForm.name.toLowerCase());
-        
-        const orientationMatch = template => 
-            !basicForm.orientation || template.orientation === basicForm.orientation;
-        
-        const dateMatch = template => {
-            if (!basicForm.startTime || !basicForm.endTime) return true;
-            const templateDate = dayjs(template.createTime);
-            return templateDate.isAfter(basicForm.startTime) && 
-                   templateDate.isBefore(basicForm.endTime);
-        };
-        
-        filtered = filtered.filter(t => nameMatch(t) && orientationMatch(t) && dateMatch(t));
-    }
-    
-    // 标签查询过滤
-    if (searchType.value === 'tag' && selectedTags.value.length > 0) {
-        filtered = filtered.filter(t => 
-            selectedTags.value.some(tagId => t.tags.includes(tagId))
-        );
-    }
-    
-    pagination.total = filtered.length;
-    return filtered;
+    return templates.value;
 });
 
 // 应用模板
 const applyTemplate = (template) => {
     console.log('apply template', template);
+    // 使用 history state 传递模板数据，避免URL过长，同时也能传递复杂对象
     router.push({
-        path: `/templates/apply/${template.id}`,
-        state: { 
-            template: JSON.parse(JSON.stringify(template))
-        }
+        name: 'VideoTemplateApply',
+        params: { id: template.id },
+        state: { template: JSON.stringify(template) } // 序列化template对象
     });
+};
+
+// 获取模板列表数据
+const fetchTemplates = async () => {
+    try {
+        loading.value = true;
+        
+        // 构建查询参数
+        const params = {
+            page: pagination.current,
+            page_size: pagination.pageSize
+        };
+        
+        // 基础查询参数
+        if (searchType.value === 'basic') {
+            if (basicForm.name) {
+                params.name = basicForm.name;
+            }
+            if (basicForm.orientation) {
+                params.orientation = basicForm.orientation;
+            }
+        }
+        
+        // 标签查询参数
+        if (searchType.value === 'tag' && selectedTags.value.length > 0) {
+            params.tag_id = selectedTags.value.join(',');
+        }
+        
+        const response = await getVideoTemplates(params);
+        
+        if (response.code === 0) {
+            // 字段映射转换
+            const mappedTemplates = (response.data.results || []).map(template => ({
+                id: template.template_id,
+                name: template.name,
+                description: template.desc,
+                orientation: template.orientation?.toLowerCase() || 'horizontal',
+                tags: template.tags || [],
+                cover: template.demo, // 使用demo字段作为封面
+                videoUrl: template.demo,
+                params: template.parameters || {},
+                createTime: template.created_at || new Date().toISOString()
+            }));
+            
+            templates.value = mappedTemplates;
+            pagination.total = response.data.count || 0;
+        } else {
+            message.error(response.message || '获取模板列表失败');
+        }
+    } catch (error) {
+        console.error('获取模板列表失败:', error);
+        message.error('获取模板列表失败，请稍后重试');
+    } finally {
+        loading.value = false;
+    }
 };
 
 // 搜索
 const handleSearch = () => {
     pagination.current = 1;
+    fetchTemplates();
 };
 
 // 日期范围变化处理
@@ -267,7 +260,27 @@ const resetBasicSearch = () => {
 const handlePaginationChange = ({ current, pageSize }) => {
     pagination.current = current;
     pagination.pageSize = pageSize;
+    fetchTemplates();
 };
+
+// 组件挂载时获取数据
+onMounted(() => {
+    fetchTemplates();
+});
+
+// 监听搜索类型变化
+watch(searchType, () => {
+    pagination.current = 1;
+    fetchTemplates();
+});
+
+// 监听选中标签变化
+watch(selectedTags, () => {
+    if (searchType.value === 'tag') {
+        pagination.current = 1;
+        fetchTemplates();
+    }
+}, { deep: true });
 
 // 根据标签ID获取标签名称
 const getTagNames = (tagIds) => {

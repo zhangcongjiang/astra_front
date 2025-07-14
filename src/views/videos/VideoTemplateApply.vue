@@ -248,60 +248,35 @@ const getTagNames = (tagIds) => {
 }
 
 onMounted(() => {
-  if (!route.params.id) {
-    message.error('无效的模板ID');
-    router.push('/templates');
-    return;
-  }
   loadTemplateData();
 });
 
+// 从 history.state 加载模板数据
 const loadTemplateData = async () => {
-  try {
     loading.value = true;
-    let templateData = null; 
-    
-    // --- MOCK DATA ---
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const mockTemplates = [
-      {
-          id: 2,
-          name: '动态故事相册模板',
-          description: '可动态添加多个内容场景，每个场景都可以独立配置。',
-          tags: ['type_4', 'style_3'],
-          params: {
-            "form": [
-              { "name": "opening_video", "label": "片头视频", "type": "input", "inputType": "file", "description": "上传一个视频作为开场。", "defaultValue": [] },
-              {
-                "name": "content_scenes",
-                "label": "内容场景",
-                "type": "group",
-                "replicable": true,
-                "description": "点击下方按钮添加更多场景。",
-                "fields": [
-                  { "name": "image", "label": "场景图片 (服务器)", "type": "select", "required": true, "options": { "source": "server", "resourceType": "image" }, "defaultValue": null },
-                  { "name": "transition", "label": "转场特效", "type": "select", "defaultValue": "dissolve", "options": { "source": "static", "data": [{ "value": "dissolve", "label": "叠化" }, { "value": "wipe", "label": "擦除" }] } },
-                  { "name": "script", "label": "场景文案", "type": "textarea", "rows": 2, "placeholder": "描述这个场景...", "defaultValue": "" },
-                  { "name": "audio", "label": "音频 (服务器)", "type": "select", "required": true, "options": { "source": "server", "resourceType": "audio" }, "defaultValue": null },
-                ]
-              },
-              { "name": "background_music", "label": "背景音乐 (服务器多选)", "type": "select", "multiple": true, "options": { "source": "server", "resourceType": "audio" }, "defaultValue": [] }
-            ]
-          }
-      },
-      {"id":1,"name":"宣传片模板","tags":["type_1","style_1"],"params":{"form":[{"name":"template_id","label":"模板ID","type":"input","inputType":"text","description":"通常为隐藏字段，此处为展示目的。"},{"name":"background","label":"背景图片","type":"select","required":true,"options":{"source":"server","resourceType":"image"},"description":"从您的媒体库中选择一张背景图片。"},{"name":"bgm","label":"背景音乐","type":"select","required":true,"options":{"source":"server","resourceType":"audio"},"description":"从您的媒体库中选择一首背景音乐。"},{"name":"title","label":"视频标题","type":"input","inputType":"text","required":true,"placeholder":"请输入视频的标题"},{"name":"reader","label":"选择配音员","type":"select","required":true,"options":{"source":"remote","url":"https://api.example.com/readers","valueKey":"id","labelKey":"name"},"description":"选择一个AI配音员来朗读文案。"},{"name":"start_images","label":"开场图片","type":"select","required":true,"options":{"source":"server","resourceType":"image"}},{"name":"start_text","label":"开场文案","type":"textarea","rows":3,"required":true,"placeholder":"请输入视频的开场白。"},{"name":"content","label":"核心内容场景","type":"group","replicable":true,"description":"点击“添加场景”以创建多个视频片段。","fields":[{"name":"images","label":"场景关联图片","type":"select","multiple":true,"required":true,"options":{"source":"server","resourceType":"image"},"description":"按住Ctrl/Command可选择多张图片。"},{"name":"name","label":"场景核心人物/事件","type":"input","inputType":"text","placeholder":"例如：布朗尼·詹姆斯"},{"name":"text","label":"场景解说文案","type":"textarea","rows":3,"required":true,"placeholder":"请输入该场景的解说词。"}]}]}}
-    ];
-    templateData = mockTemplates.find(t => t.id === parseInt(route.params.id));
-    if (!templateData) throw new Error('模板不存在');
-    
-    Object.assign(template, { id: route.params.id, ...templateData });
-    await initializeForm();
-  } catch (error) {
-    message.error('模板加载失败: ' + error.message);
-  } finally {
-    loading.value = false;
-  }
-}
+    try {
+        const passedTemplateStr = history.state.template;
+        if (!passedTemplateStr) {
+            throw new Error('未找到模板数据，请返回列表页重新选择。');
+        }
+        
+        const passedTemplate = JSON.parse(passedTemplateStr);
+        const routeId = route.params.id;
+
+        // 校验传递过来的模板ID和URL中的ID是否一致
+        if (!passedTemplate || String(passedTemplate.id) !== routeId) {
+            throw new Error('无效的模板数据，请从列表页重新选择模板。');
+        }
+        
+        Object.assign(template, passedTemplate);
+        await initializeForm();
+    } catch (error) {
+        message.error(error.message || '加载模板数据失败');
+        router.push('/templates');
+    } finally {
+        loading.value = false;
+    }
+};
 
 const getGroupDefault = (groupField) => {
     const defaultInstance = {};

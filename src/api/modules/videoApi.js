@@ -82,3 +82,18 @@ export const getServerResources = async (url, params) => {
     }
 };
 
+/**
+ * 获取视频模板列表。
+ * @param {object} params - 查询参数，例如 { page: 1, page_size: 10, name: '', orientation: '', tag_id: '' }。
+ * @returns {Promise<object>} - 返回模板列表数据。
+ */
+export const getVideoTemplates = async (params = {}) => {
+    try {
+        const response = await request.get("/video/templates/", formatParams(params));
+        return response;
+    } catch (error) {
+        console.error(`获取视频模板列表失败:`, error);
+        throw error;
+    }
+};
+
