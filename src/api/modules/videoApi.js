@@ -83,6 +83,28 @@ export const getServerResources = async (url, params) => {
 };
 
 /**
+ * 从远程URL获取数据，支持完整的http url和相对路径。
+ * @param {string} url - 要获取数据的URL。
+ * @returns {Promise<object>} - 返回从URL获取的数据。
+ */
+export const fetchRemoteData = async (url) => {
+    try {
+        let response;
+        // 检查URL是否是完整的HTTP/HTTPS链接
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            response = await request.get(url, {}, { baseURL: '' }); // 使用空的baseURL覆盖默认值
+        } else {
+            // 对于相对路径，使用封装的request实例
+            response = await request.get(`${url}`);
+        }
+        return response;
+    } catch (error) {
+        console.error(`从URL ${url} 获取数据失败:`, error);
+        throw error;
+    }
+};
+
+/**
  * 获取视频模板列表。
  * @param {object} params - 查询参数，例如 { page: 1, page_size: 10, name: '', orientation: '', tag_id: '' }。
  * @returns {Promise<object>} - 返回模板列表数据。

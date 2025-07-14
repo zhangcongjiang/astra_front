@@ -177,7 +177,7 @@ import {
   PlusOutlined
 } from '@ant-design/icons-vue'
 // Import your API functions and the new modal component
-import { uploadFile, createVideoTask } from '@/api/modules/videoApi.js' 
+import { uploadFile, createVideoTask, fetchRemoteData } from '@/api/modules/videoApi.js' 
 import ResourceSelectorModal from './ResourceSelectorModal.vue';
 
 const route = useRoute()
@@ -302,6 +302,19 @@ const initializeForm = async () => {
       }
     } else {
       formData[field.name] = field.defaultValue ?? (field.multiple ? [] : null);
+    }
+
+    // Handle remote select data loading
+    if (field.type === 'select' && field.options.source === 'remote') {
+      field.options.loading = true;
+      try {
+        const response = await fetchRemoteData(field.options.url);
+        field.options.data = response.data.data.map(item => ({ value: item.id, label: item.name }));
+      } catch (error) {
+        message.error(`Failed to load options for ${field.label}`);
+      } finally {
+        field.options.loading = false;
+      }
     }
   }
 };
