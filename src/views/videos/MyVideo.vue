@@ -37,8 +37,8 @@
           >
             <a-select-option :value="undefined">全部</a-select-option>
             <a-select-option value="Process">生成中</a-select-option>
-            <a-select-option value="Success">生成成功</a-select-option>
-            <a-select-option value="Fail">生成失败</a-select-option>
+            <a-select-option value="Success">成功</a-select-option>
+            <a-select-option value="Fail">失败</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item>
