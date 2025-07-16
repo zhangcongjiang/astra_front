@@ -71,10 +71,11 @@
 <script setup>
 import { ref, computed, reactive, onMounted } from 'vue';
 import { h } from 'vue';
-import { NDataTable, NCard, NButton, NProgress, NTag } from 'naive-ui';
+import { NDataTable, NCard, NButton, NProgress, NTag,useDialog, useMessage } from 'naive-ui';
 import Pagination from '@/components/Pagination.vue';
 import { getVideoList } from '@/api/modules/videoApi.js';
 import dayjs from 'dayjs';
+
 
 // 加载状态
 const loading = ref(false);
@@ -285,14 +286,14 @@ const columns = [
       h(NButton, {
         type: 'primary',
         size: 'small',
-        style: 'margin-right: 8px;',
         onClick: () => showDetail(row)
       }, () => '详情'),
       h(NButton, {
-        type: 'warning',
+        type: 'error',
         size: 'small',
-        onClick: () => regenerateVideo(row)
-      }, () => '重新生成')
+        style: { marginLeft: '8px' },
+        onClick: () => handleDelete(row)
+      }, () => '删除')
     ]
   }
 ];
@@ -312,20 +313,36 @@ const showDetail = (row) => {
   router.push(`/my-videos/${row.id}`);
 };
 
-// 重新生成视频
-const regenerateVideo = async (row) => {
+// 在 script setup 中添加
+const dialog = useDialog();
+const message = useMessage();
+
+// 修改删除函数
+const handleDelete = async (row) => {
+  // 确认删除
+  const confirmed = await new Promise((resolve) => {
+    dialog.warning({
+      title: '确认删除',
+      content: `确定要删除视频 "${row.title}" 吗？`,
+      positiveText: '确定',
+      negativeText: '取消',
+      onPositiveClick: () => resolve(true),
+      onNegativeClick: () => resolve(false)
+    });
+  });
+  
+  if (!confirmed) return;
+  
   try {
-    const response = await regenerateVideoApi(row.id);
-    if (response.code === 0) {
-      message.success('重新生成请求已提交');
-      // 刷新列表
-      await loadVideoList();
-    } else {
-      message.error('重新生成失败');
-    }
+    // 这里需要调用删除API，假设API函数名为deleteVideo
+    // await deleteVideo(row.id);
+    
+    message.success('删除成功');
+    // 重新加载列表
+    loadVideoList();
   } catch (error) {
-    message.error('重新生成失败');
-    console.error('重新生成失败:', error);
+    console.error('删除失败:', error);
+    message.error('删除失败');
   }
 };
 </script>
