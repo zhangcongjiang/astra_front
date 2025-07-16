@@ -15,17 +15,30 @@
             @change="handleDateChange"
           />
         </a-form-item>
-        <a-form-item label="所属账号">
+        <a-form-item label="创建者">
           <a-select
-            v-model:value="basicForm.account"
-            placeholder="选择账号"
+            v-model:value="basicForm.creator"
+            placeholder="选择创建者"
             style="width: 120px"
             allowClear
           >
             <a-select-option :value="undefined">全部</a-select-option>
-            <a-select-option v-for="account in uniqueAccounts" :key="account" :value="account">
-              {{ account }}
+            <a-select-option v-for="creator in uniqueCreators" :key="creator" :value="creator">
+              {{ creator }}
             </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="生成状态">
+          <a-select
+            v-model:value="basicForm.result"
+            placeholder="选择状态"
+            style="width: 120px"
+            allowClear
+          >
+            <a-select-option :value="undefined">全部</a-select-option>
+            <a-select-option value="Process">生成中</a-select-option>
+            <a-select-option value="Success">生成成功</a-select-option>
+            <a-select-option value="Fail">生成失败</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item>
@@ -37,86 +50,114 @@
 
     <!-- 数据表格 -->
     <n-card>
-      <n-data-table :columns="columns" :data="filteredData" :pagination="false" :loading="loading" />
+      <n-data-table 
+        :columns="columns" 
+        :data="videoList" 
+        :pagination="false" 
+        :loading="loading" 
+      />
     </n-card>
 
     <!-- 分页组件 -->
-    <Pagination v-model:current="currentPage" v-model:pageSize="pageSize" :total="filteredData.length"
-      @change="handlePageChange" />
+    <Pagination 
+      v-model:current="pagination.current" 
+      v-model:pageSize="pagination.pageSize" 
+      :total="pagination.total"
+      @change="handlePageChange" 
+    />
   </div>
 </template>
 
-
 <script setup>
-import { ref, computed, reactive } from 'vue'; // Add reactive to the imports
+import { ref, computed, reactive, onMounted } from 'vue';
 import { h } from 'vue';
-import { NDataTable, NCard, NButton, NProgress, NForm, NFormItem, NInput, NDatePicker } from 'naive-ui';
+import { NDataTable, NCard, NButton, NProgress, NTag } from 'naive-ui';
 import Pagination from '@/components/Pagination.vue';
+import { getVideoList } from '@/api/modules/videoApi.js';
+import dayjs from 'dayjs';
+
+// 加载状态
+const loading = ref(false);
+
+// 视频数据
+const videoList = ref([]);
+
+// 分页配置
+const pagination = reactive({
+  current: 1,
+  pageSize: 10,
+  total: 0
+});
 
 // 查询参数
-// 修改搜索表单
 const basicForm = reactive({
   title: '',
   dateRange: [],
   startTime: null,
   endTime: null,
-  account: undefined
+  creator: undefined,
+  result: undefined
 });
 
-// 在视频数据中添加account字段
-const videoList = ref([
-  {
-    id: 1,
-    title: '视频1',
-    createTime: '2023-10-01',
-    audioProgress: 80,
-    videoProgress: 60,
-    account: '账号1',
-    params: {
-      // 视频参数
-    }
-  },
-  // 更多视频数据...
-]);
-
-// 添加唯一账号列表计算属性
-const uniqueAccounts = computed(() => {
-  const accounts = new Set(videoList.value.map(item => item.account));
-  return Array.from(accounts);
+// 获取唯一创建者列表
+const uniqueCreators = computed(() => {
+  const creators = new Set(videoList.value.map(item => item.creator));
+  return Array.from(creators);
 });
 
-// 修改过滤逻辑
-const filteredData = computed(() => {
-  return videoList.value.filter(item => {
-    const matchesTitle = item.title.includes(basicForm.title);
-    let matchesDate = true;
-    let matchesAccount = true;
-
-    if (basicForm.startTime && basicForm.endTime) {
-      const itemDate = new Date(item.createTime);
-      matchesDate = itemDate >= new Date(basicForm.startTime) &&
-        itemDate <= new Date(basicForm.endTime);
+// 加载视频列表数据
+const loadVideoList = async () => {
+  try {
+    loading.value = true;
+    
+    const params = {
+      page: pagination.current,
+      page_size: pagination.pageSize,
+      title: basicForm.title || undefined,
+      start_time: basicForm.startTime ? dayjs(basicForm.startTime).format('YYYY-MM-DD HH:mm:ss') : undefined,
+      end_time: basicForm.endTime ? dayjs(basicForm.endTime).format('YYYY-MM-DD HH:mm:ss') : undefined,
+      creator: basicForm.creator || undefined,
+      result: basicForm.result || undefined
+    };
+    
+    const response = await getVideoList(params);
+    
+    if (response.code === 0) {
+      videoList.value = response.data.results || [];
+      pagination.total = response.data.count || 0;
+    } else {
+      console.error('获取视频列表失败:', response.message);
     }
+  } catch (error) {
+    console.error('加载视频列表出错:', error);
+  } finally {
+    loading.value = false;
+  }
+};
 
-    if (basicForm.account !== undefined) {
-      matchesAccount = item.account === basicForm.account;
-    }
+// 处理查询
+const handleSearch = () => {
+  pagination.current = 1;
+  loadVideoList();
+};
 
-    return matchesTitle && matchesDate && matchesAccount;
-  });
-});
+// 处理分页变化
+const handlePageChange = ({ current, pageSize: newPageSize }) => {
+  pagination.current = current;
+  pagination.pageSize = newPageSize;
+  loadVideoList();
+};
 
-// 修改重置方法
+// 重置搜索
 const resetBasicSearch = () => {
   basicForm.title = '';
   basicForm.dateRange = [];
   basicForm.startTime = null;
   basicForm.endTime = null;
-  basicForm.account = undefined;
+  basicForm.creator = undefined;
+  basicForm.result = undefined;
   handleSearch();
 };
-
-// 修改模板中的搜索区域
 
 // 处理日期范围变化
 const handleDateChange = (dates) => {
@@ -129,39 +170,39 @@ const handleDateChange = (dates) => {
   }
 };
 
-
-// 处理查询
-const handleSearch = () => {
-  currentPage.value = 1; // 查询后回到第一页
+// 查看详情
+const showDetail = (row) => {
+  console.log('查看详情:', row);
+  // 这里可以实现详情查看逻辑
 };
 
-// 处理重置
-const handleReset = () => {
-  queryParams.value = {
-    title: '',
-    dateRange: null
-  };
-  currentPage.value = 1;
+// 下载视频
+const downloadVideo = (row) => {
+  console.log('下载视频:', row);
+  // 这里可以实现下载逻辑
 };
 
-// 分页相关
-const currentPage = ref(1);
-const pageSize = ref(10);
-
-// 计算分页后的数据
-const pagedData = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value;
-  const end = start + pageSize.value;
-  return videoList.value.slice(start, end);
-});
-
-// 处理分页变化
-const handlePageChange = ({ current, pageSize }) => {
-  currentPage.value = current;
-  pageSize.value = pageSize;
+// 预览视频
+const previewVideo = (row) => {
+  console.log('预览视频:', row);
+  // 这里可以实现预览逻辑
 };
 
+// 获取状态显示信息
+const getStatusInfo = (result) => {
+  switch (result) {
+    case 'Process':
+      return { text: '生成中', type: 'warning' };
+    case 'Success':
+      return { text: '成功', type: 'success' };
+    case 'Fail':
+      return { text: '失败', type: 'error' };
+    default:
+      return { text: '未知', type: 'default' };
+  }
+};
 
+// 表格列定义
 const columns = [
   {
     title: '序号',
@@ -172,169 +213,124 @@ const columns = [
   },
   {
     title: '标题',
-    key: 'title'
+    key: 'title',
+    width: 200
   },
   {
-    title: '封面',
-    key: 'cover',
-    width: 120,
-    align: 'center',
-    render: (row) => h('img', {
-      src: row.cover,
-      style: 'width: 100px; height: 60px; object-fit: cover; border-radius: 4px;'
-    })
-  },
-  {
-    title: '生成进度',
-    key: 'progress',
-    render: (row) => h('div', [
-      h('div', { style: 'margin-bottom: 8px;' }, [
-        h('span', { style: 'margin-right: 8px;' }, '音频:'),
-        h(NProgress, {
-          percentage: row.audioProgress,
-          status: row.audioProgress === 100 ? 'success' : 'default',
-          style: 'width: 80%; display: inline-block;'
-        })
-      ]),
-      h('div', [
-        h('span', { style: 'margin-right: 8px;' }, '视频:'),
-        h(NProgress, {
-          percentage: row.videoProgress,
-          status: row.videoProgress === 100 ? 'success' : 'default',
-          style: 'width: 80%; display: inline-block;'
-        })
-      ])
-    ])
-  },
-  {
-    title: '创作时间',
-    key: 'createTime'
-  },
-  {
-    title: '所属账号',
-    key: 'account',
-    width: 120,
+    title: '创建者',
+    key: 'creator',
+    width: 100,
     align: 'center'
+  },
+  {
+    title: '状态',
+    key: 'status',
+    width: 200,
+    align: 'center',
+    render: (row) => {
+      const statusInfo = getStatusInfo(row.result);
+      
+      if (row.result === 'Process') {
+        // 生成中显示进度条和百分比
+        console.log("生成进度：",row.process);
+        const percentage = Math.round((row.process || 0) * 100);
+        return h('div', {
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }
+        }, [
+          h(NProgress, {
+            percentage: percentage,
+            status: 'active',
+            showIndicator: false,
+            color: '#18a058',
+            railColor: '#f0f0f0',
+            style: 'width: 120px; flex-shrink: 0;'
+          }),
+          h('span', {
+            style: {
+              fontSize: '12px',
+              color: '#666',
+              minWidth: '35px',
+              textAlign: 'left'
+            }
+          }, `${percentage}%`)
+        ]);
+      } else {
+        // 成功或失败显示状态标签
+        return h('div', {
+          style: {
+            display: 'flex',
+            justifyContent: 'center'
+          }
+        }, [
+          h(NTag, {
+            type: statusInfo.type
+          }, () => statusInfo.text)
+        ]);
+      }
+    }
+  },
+  {
+    title: '创建时间',
+    key: 'create_time',
+    width: 180,
+    render: (row) => {
+      return dayjs(row.create_time).format('YYYY-MM-DD HH:mm:ss');
+    }
   },
   {
     title: '操作',
     key: 'actions',
+    width: 200,
     render: (row) => [
       h(NButton, {
         type: 'primary',
         size: 'small',
+        style: 'margin-right: 8px;',
         onClick: () => showDetail(row)
-      }, '详情'),
+      }, () => '详情'),
       h(NButton, {
-        type: row.videoProgress === 100 ? 'primary' : 'default',
+        type: 'warning',
         size: 'small',
-        disabled: row.videoProgress !== 100,
-        onClick: () => downloadVideo(row)
-      }, '下载'),
-      h(NButton, {
-        type: row.videoProgress === 100 ? 'primary' : 'default',
-        size: 'small',
-        disabled: row.videoProgress !== 100,
-        onClick: () => playVideo(row)
-      }, '播放'),
-      h(NButton, {
-        type: row.videoProgress === 100 ? 'primary' : 'default',
-        size: 'small',
-        disabled: row.videoProgress === 100,
         onClick: () => regenerateVideo(row)
-      }, '重新生成'),
-      h(NButton, {
-        type: 'danger',
-        size: 'small',
-        disabled: row.videoProgress !== 100,
-        onClick: () => deleteVideo(row)
-      }, '删除')
+      }, () => '重新生成')
     ]
   }
 ];
-// 在示例数据中添加account字段
-const videoData = ref([
-  {
-    id: 1,
-    cover: 'https://example.com/cover1.jpg',
-    title: '视频1',
-    createTime: '2023-10-01',
-    audioProgress: 80,
-    videoProgress: 60,
-    account: '账号1',
-    params: {
-      // 视频参数
-    }
-  },
-  // 更多视频数据...
-]);
-// 分页配置
-// 分页相关
-const pagination = reactive({
-  current: 1,
-  pageSize: 10
+
+// 组件挂载时加载数据
+onMounted(() => {
+  loadVideoList();
 });
-
-
-// 显示详情
-const showDetail = (row) => {
-  console.log(JSON.stringify(row.params, null, 2));
-};
-
-// 下载视频
-const downloadVideo = (row) => {
-  // 下载逻辑
-};
 
 // 重新生成视频
 const regenerateVideo = (row) => {
-  // 重新生成逻辑
-};
-
-// 播放视频
-const playVideo = (row) => {
-  // 播放逻辑
-  console.log('播放视频:', row.id);
-};
-
-// 删除视频
-const deleteVideo = (row) => {
-  // 删除逻辑
-  const index = videoList.value.findIndex(video => video.id === row.id);
-  if (index !== -1) {
-    videoList.value.splice(index, 1);
-    console.log('删除视频成功:', row.id);
-  }
+  console.log('重新生成视频:', row);
+  // 这里可以调用重新生成的API
+  // 例如: regenerateVideoApi(row.id)
 };
 </script>
 
-// 修改搜索区域样式
 <style scoped>
-/* 添加容器样式 */
 .graphic-list-container {
-  padding: 20px;  /* 上下左右各20px间距 */
-  height: 100%;
+  padding: 20px;
+  min-height: 100vh;
+  background-color: #f5f5f5;
   display: flex;
   flex-direction: column;
 }
 
-/* 搜索区域样式保持不变 */
+/* 搜索区域样式 */
 .search-area {
   margin-bottom: 20px;
   padding: 20px;
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-}
-
-/* 表格容器样式 */
-.table-container {
-  margin-top: 16px;
-  flex: 1;
-  background: #fff;
-  padding: 16px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .search-area .ant-form-item {
@@ -377,22 +373,8 @@ const deleteVideo = (row) => {
   padding: 12px 16px;
 }
 
-.n-data-table :deep(img) {
-  border-radius: 4px;
-  transition: transform 0.2s;
-}
-
-.n-data-table :deep(img:hover) {
-  transform: scale(1.05);
-}
-
 /* 操作按钮样式 */
 .n-button {
   margin-right: 8px;
-}
-
-/* 进度条样式 */
-.n-progress {
-  margin-bottom: 8px;
 }
 </style>

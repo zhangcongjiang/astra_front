@@ -119,3 +119,13 @@ export const getVideoTemplates = async (params = {}) => {
     }
 };
 
+export const getVideoList = async(params ={}) =>{
+        try {
+        const response = await request.get("/video/videos/", formatParams(params));
+        return response;
+    } catch (error) {
+        console.error(`获取视频列表失败:`, error);
+        throw error;
+    }
+}
+
