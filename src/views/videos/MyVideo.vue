@@ -294,10 +294,18 @@ const columns = [
         onClick: () => showDetail(row)
       }, () => '详情'),
       h(NButton, {
-        type: 'warning',
+        type: row.result === 'Success' ? 'primary' : 'default',
         size: 'small',
-        onClick: () => regenerateVideo(row)
-      }, () => '重新生成')
+        disabled: row.result !== 'Success',
+        style: 'margin-right: 8px;',
+        onClick: () => downloadVideo(row)
+      }, () => '下载'),
+      h(NButton, {
+        type: row.result === 'Success' ? 'primary' : 'default',
+        size: 'small',
+        disabled: row.result !== 'Success',
+        onClick: () => previewVideo(row)
+      }, () => '预览')
     ]
   }
 ];
@@ -306,13 +314,6 @@ const columns = [
 onMounted(() => {
   loadVideoList();
 });
-
-// 重新生成视频
-const regenerateVideo = (row) => {
-  console.log('重新生成视频:', row);
-  // 这里可以调用重新生成的API
-  // 例如: regenerateVideoApi(row.id)
-};
 </script>
 
 <style scoped>
