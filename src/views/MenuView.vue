@@ -1,43 +1,46 @@
 <template>
-    <div class="app-container">
-        <!-- 顶部导航栏（包含Logo和一级菜单） -->
-        <div class="top-nav">
-            <!-- Logo区域 -->
-            <div class="logo-container" @click="goToDashboard">
-                <img src="@/assets/logo/logo.png" alt="Logo" class="logo">
-                <span class="logo-text">ASTRA</span>
-            </div>
-
-            <!-- 一级菜单 -->
-            <div class="top-menu">
-                <div v-for="(item, index) in topMenu" :key="item.id" class="top-menu-item"
-                    :class="{ 'active': activeTopMenu === index }" @click="selectTopMenu(index)">
-                    {{ item.name }}
+    <n-message-provider>
+        <div class="app-container">
+            <!-- 顶部导航栏（包含Logo和一级菜单） -->
+            <div class="top-nav">
+                <!-- Logo区域 -->
+                <div class="logo-container" @click="goToDashboard">
+                    <img src="@/assets/logo/logo.png" alt="Logo" class="logo">
+                    <span class="logo-text">ASTRA</span>
                 </div>
-            </div>
-        </div>
 
-        <!-- 主体内容区 -->
-        <div class="main-content">
-            <!-- 左侧二级菜单 -->
-            <div class="left-menu">
-                <div v-for="(item, index) in leftMenu" :key="item.id" class="left-menu-item"
-                    :class="{ 'active': activeLeftMenu === index }" @click="selectLeftMenu(index)">
-                    {{ item.name }}
+                <!-- 一级菜单 -->
+                <div class="top-menu">
+                    <div v-for="(item, index) in topMenu" :key="item.id" class="top-menu-item"
+                        :class="{ 'active': activeTopMenu === index }" @click="selectTopMenu(index)">
+                        {{ item.name }}
+                    </div>
                 </div>
             </div>
 
-            <!-- 右侧内容区 -->
-            <div class="content">
-                <router-view></router-view>
+            <!-- 主体内容区 -->
+            <div class="main-content">
+                <!-- 左侧二级菜单 -->
+                <div class="left-menu">
+                    <div v-for="(item, index) in leftMenu" :key="item.id" class="left-menu-item"
+                        :class="{ 'active': activeLeftMenu === index }" @click="selectLeftMenu(index)">
+                        {{ item.name }}
+                    </div>
+                </div>
+
+                <!-- 右侧内容区 -->
+                <div class="content">
+                    <router-view></router-view>
+                </div>
             </div>
         </div>
-    </div>
+    </n-message-provider>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { NMessageProvider } from 'naive-ui';
 const router = useRouter();
 // 菜单数据
 const menuData = [

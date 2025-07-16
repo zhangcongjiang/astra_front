@@ -82,6 +82,13 @@ const router = createRouter({
                     component: MyVideo // 工作台组件
                 },
                 {
+                    path: 'my-videos/:id',
+                    name: 'video-detail',
+                    component: () => import('@/views/videos/VideoDetail.vue'),
+                    meta: { title: '视频详情' },
+                    props: true
+                },
+                {
                     path: 'system-video',
                     name: 'system-video',
                     component: SystemVideoSettings // 修改为新的系统视频设置组件

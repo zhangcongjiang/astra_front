@@ -170,11 +170,6 @@ const handleDateChange = (dates) => {
   }
 };
 
-// 查看详情
-const showDetail = (row) => {
-  console.log('查看详情:', row);
-  // 这里可以实现详情查看逻辑
-};
 
 // 下载视频
 const downloadVideo = (row) => {
@@ -307,11 +302,31 @@ onMounted(() => {
   loadVideoList();
 });
 
+// 在script setup部分添加路由跳转函数
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
+
+// 查看详情
+const showDetail = (row) => {
+  router.push(`/my-videos/${row.id}`);
+};
+
 // 重新生成视频
-const regenerateVideo = (row) => {
-  console.log('重新生成视频:', row);
-  // 这里可以调用重新生成的API
-  // 例如: regenerateVideoApi(row.id)
+const regenerateVideo = async (row) => {
+  try {
+    const response = await regenerateVideoApi(row.id);
+    if (response.code === 0) {
+      message.success('重新生成请求已提交');
+      // 刷新列表
+      await loadVideoList();
+    } else {
+      message.error('重新生成失败');
+    }
+  } catch (error) {
+    message.error('重新生成失败');
+    console.error('重新生成失败:', error);
+  }
 };
 </script>
 
