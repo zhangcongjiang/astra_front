@@ -37,10 +37,11 @@
         <div class="tags-container" @mouseleave="resetHoverPreview">
           <template v-for="category in tags" :key="category.id">
             <a-checkable-tag 
-              :checked="selectedFirstLevelTags.includes(category.id)"
+              :checked="allowImageTagging ? isTagSelected(category.id) : selectedFirstLevelTags.includes(category.id)"
               :class="{ 
                 'has-child': category.tags && category.tags.length,
-                'management-tag': showManagement
+                'management-tag': showManagement,
+                'image-tag-selected': allowImageTagging && isTagSelected(category.id)
               }"
               @change="checked => handleFirstLevelChange(category, checked)"
               @mouseenter="hoverFirstLevelTag(category)"
@@ -332,6 +333,12 @@ const handleFirstLevelChange = (category, checked) => {
     if (!selectedTags.value.includes(category.id)) {
       selectedTags.value.push(category.id);
     }
+    
+    // 在图片标签模式下触发 add-image-tag 事件
+    if (props.allowImageTagging) {
+      console.log('一级标签选中，触发 add-image-tag 事件:', category.id);
+      emit('add-image-tag', category.id);
+    }
   } else {
     const index = selectedFirstLevelTags.value.indexOf(category.id);
     if (index > -1) {
@@ -347,6 +354,12 @@ const handleFirstLevelChange = (category, checked) => {
         tagId => !category.tags.some(tag => tag.id === tagId)
       );
     }
+    
+    // 在图片标签模式下触发 remove-image-tag 事件
+    if (props.allowImageTagging) {
+      console.log('一级标签取消选中，触发 remove-image-tag 事件:', category.id);
+      emit('remove-image-tag', category.id);
+    }
   }
   emit('update:selectedTags', selectedTags.value); // 更新选中的标签
   resetHoverPreview();
@@ -354,11 +367,14 @@ const handleFirstLevelChange = (category, checked) => {
 };
 
 const handleSecondLevelChange = (tagId, checked) => {
+  console.log('handleSecondLevelChange 被调用:', tagId, checked, 'allowImageTagging:', props.allowImageTagging);
   if (props.allowImageTagging) {
     // 图片标签模式
     if (checked) {
+      console.log('准备触发 add-image-tag 事件:', tagId);
       emit('add-image-tag', tagId);
     } else {
+      console.log('准备触发 remove-image-tag 事件:', tagId);
       emit('remove-image-tag', tagId);
     }
   } else {

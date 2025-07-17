@@ -135,12 +135,12 @@ export const deleteSounds = async (sound_ids) => {
     }
 };
 
-export const bindTags = async (data) => {
-  try {
-    const response = await request.post('/voice/bind-tags/', data);
-    return response;
-  } catch (error) {
-    console.error('绑定标签失败:', error);
-    throw error;
-  }
+export const updateSound = async (data) => {
+    try {
+        const response = await request.post('/voice/update/', data);
+        return response;
+    } catch (error) {
+        console.error('更新音频文件失败:', error);
+        throw error;
+    }
 };
