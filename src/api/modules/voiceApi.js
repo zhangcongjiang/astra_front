@@ -117,8 +117,20 @@ export const soundPlay = async (soundId) => {
     try {
         const response = await request.get(`/voice/sound/play/?sound_id=${soundId}`,)
         return response;
-    } catch (error){
+    } catch (error) {
         console.error(`音频播放失败:`, error);
         throw error;
     }
 }
+
+export const deleteSounds = async (sound_ids) => {
+    try {
+        const response = await request.post('/voice/delete/', {
+            sound_ids: sound_ids
+        });
+        return response;
+    } catch (error) {
+        console.error('删除音频失败:', error);
+        throw error;
+    }
+};

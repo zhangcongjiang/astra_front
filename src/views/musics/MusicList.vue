@@ -200,7 +200,8 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   uploadSound,
   getSoundList,
-  soundPlay
+  soundPlay,
+  deleteSounds  // 添加这行
 } from '@/api/modules/voiceApi';
 
 // Initialize router and route
@@ -445,7 +446,8 @@ const categoryMap = {
   'SOUND': '音乐',
   'EFFECT': '特效音'
 };
-
+const currentPlaying = ref({ id: null });
+const isPlaying = ref(false);
 // 编辑模态框相关状态
 const editModalVisible = ref(false);
 const currentMusic = ref(null);
@@ -745,24 +747,33 @@ const handleEditSubmit = async () => {
 };
 
 // 删除音乐
-const deleteMusic = (musicId) => {
-  const index = musicData.value.findIndex(m => m.id === musicId);
-  if (index !== -1) {
-    // 如果正在播放的是要删除的音乐，先停止播放
-    if (currentPlaying.value.id === musicId) {
-      const audioElement = document.querySelector(`audio[ref="audioPlayer_${musicId}"]`);
-      if (audioElement) {
-        audioElement.pause();
-        audioElement.currentTime = 0;
+const deleteMusic = async (musicId) => {
+  try {
+    // 调用删除 API，传入音乐 ID 数组
+    await deleteSounds([musicId]);
+    
+    // API 调用成功后，更新本地数据
+    const index = musicData.value.findIndex(m => m.id === musicId);
+    if (index !== -1) {
+      // 如果正在播放的是要删除的音乐，先停止播放
+      if (currentPlaying.value.id === musicId) {
+        const audioElement = document.querySelector(`audio[ref="audioPlayer_${musicId}"]`);
+        if (audioElement) {
+          audioElement.pause();
+          audioElement.currentTime = 0;
+        }
+        currentPlaying.value = { id: null };
+        isPlaying.value = false;
       }
-      currentPlaying.value = { id: null };
-      isPlaying.value = false;
+      
+      musicData.value.splice(index, 1);
+      // 重新获取音乐列表以保持数据同步
+      await fetchMusicList();
+      message.success('删除成功');
     }
-
-    musicData.value.splice(index, 1);
-    message.success('删除成功');
-  } else {
-    message.error('删除失败');
+  } catch (error) {
+    console.error('删除音乐失败:', error);
+    message.error('删除失败，请重试');
   }
 };
 

@@ -6,7 +6,7 @@ import VideoTemplateList from '@/views/videos/VideoTemplateList.vue'
 import VideoTemplateApply from '@/views/videos/VideoTemplateApply.vue'
 import BackgroundList from '@/views/images/BackgroundList.vue'
 import MyVideo from '@/views/videos/MyVideo.vue'
-import VoiceList from '@/views/musics/VoiceList.vue'
+import SpeakerList from '@/views/musics/SpeakerList.vue'
 import MySound from '@/views/musics/MySound.vue'
 import SystemSoundSettings from '@/views/settings/SystemSoundSettings.vue'
 import SystemVideoSettings from '@/views/settings/SystemVideoSettings.vue'
@@ -50,7 +50,7 @@ const router = createRouter({
                 {
                     path: 'speakers',
                     name: 'speakers',
-                    component: VoiceList // 工作台组件
+                    component: SpeakerList // 工作台组件
                 }, {
                     path: 'templates',
                     name: 'templates',
