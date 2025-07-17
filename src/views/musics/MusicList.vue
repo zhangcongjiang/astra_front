@@ -26,7 +26,7 @@
           <a-form-item label="音频类型">
             <a-select v-model:value="basicForm.category" placeholder="选择音频类型" style="width: 120px">
               <a-select-option value="">全部</a-select-option>
-              <a-select-option value="BGM">BGM</a-select-option>
+              <a-select-option value="BGM">背景音乐</a-select-option>
               <a-select-option value="SOUND">音乐</a-select-option>
               <a-select-option value="EFFECT">特效音</a-select-option>
             </a-select>
@@ -45,7 +45,7 @@
       <!-- 标签查询 -->
       <div class="tag-search" v-if="searchType === 'tag'">
         <TagSearch :tags="tagCategories" :showActions="true" v-model:selectedTags="selectedTags"
-          @search="handleSearch" />
+          :category="TAG_CATEGORY" @search="handleSearch" />
       </div>
     </div>
 
@@ -74,7 +74,7 @@
         <a-form-item label="分类" name="category" :rules="[{ required: true, message: '请选择分类' }]">
           <a-select v-model:value="uploadForm.category" placeholder="请选择分类">
             <a-select-option value="BGM">背景音乐</a-select-option>
-            <a-select-option value="EFFECT">音效</a-select-option>
+            <a-select-option value="EFFECT">特效音</a-select-option>
             <a-select-option value="SOUND">音乐</a-select-option>
           </a-select>
         </a-form-item>
@@ -135,8 +135,13 @@
             <a-button v-if="isSelectMode" type="primary" size="small" @click.stop="handleSelect(record)">
               选择
             </a-button>
-            <a-button type="link" size="small" @click="previewMusic(record)">
-              播放
+            <a-button type="link" size="small" @click="togglePlay(record)">
+              <template v-if="currentPlaying.id === record.id && isPlaying">
+                <pause-circle-outlined /> 暂停
+              </template>
+              <template v-else>
+                <play-circle-outlined /> 播放
+              </template>
             </a-button>
             <a-button type="link" size="small" @click="showEditModal(record)">
               编辑
@@ -181,7 +186,7 @@
         </a-form-item>
         <a-form-item label="音乐标签">
           <TagSearch :tags="tagCategories" :show-actions="false" :allow-image-tagging="true"
-            :image-tags="musicForm.tags" @add-image-tag="addMusicTag" @remove-image-tag="removeMusicTag" />
+            :category="TAG_CATEGORY" :image-tags="musicForm.tags" @add-image-tag="addMusicTag" @remove-image-tag="removeMusicTag" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -191,7 +196,7 @@
 <script setup>
 import { request } from '@/api/config/request';
 import { ref, reactive, computed, onMounted } from 'vue'
-import { EditOutlined, DeleteOutlined, UploadOutlined, TagsOutlined } from '@ant-design/icons-vue'
+import { EditOutlined, DeleteOutlined, UploadOutlined, TagsOutlined, PlayCircleOutlined, PauseCircleOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import TagSearch from '@/components/TagSearch.vue'
@@ -201,8 +206,10 @@ import {
   uploadSound,
   getSoundList,
   soundPlay,
-  deleteSounds  // 添加这行
+  deleteSounds,  // 已存在
+  bindTags  // 新增：绑定标签的API
 } from '@/api/modules/voiceApi';
+import { getTagsByCategory } from '@/api/modules/tagApi';  // 新增：获取标签分类的API
 
 // Initialize router and route
 const router = useRouter()
@@ -226,31 +233,34 @@ const basicForm = reactive({
   endTime: null
 });
 
-// 标签数据
-const tagCategories = ref([
-  {
-    id: 1,
-    name: '风格',
-    tags: [
-      { id: 'genre_1', name: '流行' },
-      { id: 'genre_2', name: '摇滚' },
-      { id: 'genre_3', name: '电子' },
-      { id: 'genre_4', name: '古典' },
-      { id: 'genre_5', name: '爵士' },
-      { id: 'genre_6', name: '民谣' }
-    ]
-  },
-  {
-    id: 2,
-    name: '情绪',
-    tags: [
-      { id: 'mood_1', name: '欢快' },
-      { id: 'mood_2', name: '悲伤' },
-      { id: 'mood_3', name: '放松' },
-      { id: 'mood_4', name: '激动' }
-    ]
+// 标签数据 - 替换现有的硬编码数据
+const tagCategories = ref([]);
+
+// 获取标签分类数据
+const fetchTagCategories = async () => {
+  try {
+    const response = await getTagsByCategory({ category: 'SOUND' });  // 修改：传递对象而不是字符串
+    if (response?.code === 0 && Array.isArray(response.data)) {
+      // 将嵌套结构扁平化
+      const flattenTags = (categories) => {
+        return categories.reduce((acc, category) => {
+          acc.push({
+            id: category.id,
+            name: category.tag_name,
+            children: category.children ? flattenTags(category.children) : []
+          });
+          return acc;
+        }, []);
+      };
+
+      tagCategories.value = flattenTags(response.data);
+      console.log("**tagCategories**:", tagCategories.value);
+    }
+  } catch (error) {
+    console.error('获取标签分类失败:', error);
+    message.error('获取标签分类失败');
   }
-]);
+};
 
 // 选中的标签
 const selectedTags = ref([]);
@@ -322,6 +332,7 @@ const handlePaginationChange = (page, pageSize) => {
 // 初始化获取数据
 onMounted(() => {
   fetchMusicList();
+  fetchTagCategories();  // 新增：获取标签分类数据
 });
 
 // 格式化日期
@@ -402,7 +413,7 @@ const columns = [
     align: 'center',
     customRender: ({ record }) => categoryMap[record.category],
     filters: [
-      { text: 'BGM', value: 'BGM' },
+      { text: '背景音乐', value: 'BGM' },
       { text: '音乐', value: 'SOUND' },
       { text: '特效音', value: 'EFFECT' }
     ],
@@ -442,10 +453,11 @@ const columns = [
 
 
 const categoryMap = {
-  'BGM': 'BGM',
+  'BGM': '背景音乐',
   'SOUND': '音乐',
   'EFFECT': '特效音'
 };
+// 音频播放相关状态
 const currentPlaying = ref({ id: null });
 const isPlaying = ref(false);
 // 编辑模态框相关状态
@@ -466,9 +478,16 @@ const musicFormRef = ref(null);
 // 根据标签ID获取标签名称
 const getTagNames = (tagIds) => {
   const names = [];
+  if (!tagIds || !Array.isArray(tagIds)) return names;
+  
   tagIds.forEach(tagId => {
     const foundTag = findTagById(tagId);
-    if (foundTag) names.push(foundTag.name);
+    if (foundTag) {
+      names.push({
+        id: foundTag.id,
+        name: foundTag.name
+      });
+    }
   });
   return names;
 };
@@ -531,37 +550,71 @@ const filteredMusics = computed(() => {
 });
 
 // 切换播放状态
-const togglePlay = (music) => {
-  const audioElement = document.querySelector(`audio[ref="audioPlayer_${music.id}"]`);
-
-  if (!audioElement) return;
-
-  // 如果点击的是当前正在播放的音乐
-  if (currentPlaying.value.id === music.id) {
-    if (isPlaying.value) {
-      audioElement.pause();
-      isPlaying.value = false;
-    } else {
-      audioElement.play();
-      isPlaying.value = true;
-    }
-  }
-  // 如果点击的是其他音乐
-  else {
-    // 停止当前播放的音乐
-    if (currentPlaying.value.id) {
-      const prevAudioElement = document.querySelector(`audio[ref="audioPlayer_${currentPlaying.value.id}"]`);
-      if (prevAudioElement) {
-        prevAudioElement.pause();
-        prevAudioElement.currentTime = 0;
+const togglePlay = async (music) => {
+  try {
+    // 如果点击的是当前正在播放的音乐
+    if (currentPlaying.value.id === music.id && isPlaying.value) {
+      // 暂停播放
+      if (window.currentAudio) {
+        window.currentAudio.pause();
+        isPlaying.value = false;
       }
+      return;
     }
 
-    // 播放新选择的音乐
-    currentPlaying.value = music;
-    audioElement.currentTime = 0;
-    audioElement.play();
-    isPlaying.value = true;
+    // 停止当前播放的音乐
+    if (window.currentAudio) {
+      window.currentAudio.pause();
+      URL.revokeObjectURL(window.currentAudio.src);
+    }
+
+    // 获取音频文件并播放
+    const response = await soundPlay(music.id);
+    if (response && response.data && response.data.file_path) {
+      const filePath = response.data.file_path;
+      const audioResponse = await request({
+        method: 'get',
+        url: `/${filePath}`,
+        responseType: 'arraybuffer'
+      });
+
+      const blob = new Blob([audioResponse], { type: `audio/${response.data.format}` });
+      const audioUrl = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrl);
+      
+      // 保存到全局变量以便控制
+      window.currentAudio = audio;
+      
+      // 设置播放状态
+      currentPlaying.value = music;
+      isPlaying.value = true;
+      
+      // 播放音频
+      audio.play();
+      
+      // 播放结束时清理状态
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        isPlaying.value = false;
+        currentPlaying.value = { id: null };
+        window.currentAudio = null;
+      };
+      
+      // 播放暂停时更新状态
+      audio.onpause = () => {
+        isPlaying.value = false;
+      };
+      
+      // 播放开始时更新状态
+      audio.onplay = () => {
+        isPlaying.value = true;
+      };
+    } else {
+      message.error('获取试听文件路径失败');
+    }
+  } catch (error) {
+    console.error('播放出错:', error);
+    message.error('播放出错: ' + (error.response?.data?.message || error.message));
   }
 };
 
@@ -607,7 +660,8 @@ const resetBasicSearch = () => {
   fetchMusicList();
 };
 
-// 在script setup中添加
+// 在 script setup 顶部添加
+const TAG_CATEGORY = 'SOUND';
 const uploadModalVisible = ref(false);
 const uploadForm = reactive({
   name: '',
@@ -627,7 +681,7 @@ const handleUploadSubmit = async () => {
     const { data } = await uploadSound(formData);
     message.success('上传成功');
     closeUploadModal();
-    fetchMusics();
+    fetchMusicList();
   } catch (error) {
     message.error(error.message || '上传失败');
   }
@@ -701,33 +755,58 @@ const addMusicTag = (tagId) => {
   }
 };
 
-// 移除音乐标签
-const removeMusicTag = (tagId) => {
-  const index = musicForm.tags.indexOf(tagId);
-  if (index > -1) {
-    musicForm.tags.splice(index, 1);
+// 移除音乐标签（从表格中直接删除）
+const removeMusicTag = async (record, tagId) => {
+  try {
+    // 从当前标签列表中移除指定标签
+    const updatedTags = record.tags.filter(id => id !== tagId);
+    
+    // 调用绑定标签API更新
+    await bindTags({
+      sound_id: record.id,
+      tag_ids: updatedTags
+    });
+    
+    // 更新本地数据
+    const index = musicData.value.findIndex(m => m.id === record.id);
+    if (index !== -1) {
+      musicData.value[index].tags = updatedTags;
+    }
+    
+    message.success('标签删除成功');
+  } catch (error) {
+    console.error('删除标签失败:', error);
+    message.error('删除标签失败，请重试');
   }
 };
 
+// 提交编辑
 // 提交编辑
 const handleEditSubmit = async () => {
   try {
     await musicFormRef.value.validate();
 
     if (currentMusic.value) {
-      // 更新音乐信息
+      // 调用绑定标签API
+      await bindTags({
+        sound_id: musicForm.id,
+        tag_ids: musicForm.tags
+      });
+      
+      // 更新本地音乐信息
       const index = musicData.value.findIndex(m => m.id === musicForm.id);
       if (index !== -1) {
         musicData.value[index] = {
           ...musicData.value[index],
           name: musicForm.name,
           artist: musicForm.artist,
-          // 保持原有duration、uploadTime和audioUrl不变
           tags: [...musicForm.tags]
         };
       }
+      
+      message.success('保存成功');
     } else {
-      // 添加新音乐
+      // 添加新音乐逻辑保持不变
       musicData.value.unshift({
         id: Date.now(),
         name: musicForm.name,
@@ -737,12 +816,13 @@ const handleEditSubmit = async () => {
         audioUrl: musicForm.audioUrl,
         tags: [...musicForm.tags]
       });
+      message.success('添加成功');
     }
 
-    message.success('保存成功');
     closeEditModal();
   } catch (error) {
-    console.error('表单验证失败:', error);
+    console.error('保存失败:', error);
+    message.error('保存失败，请重试');
   }
 };
 
