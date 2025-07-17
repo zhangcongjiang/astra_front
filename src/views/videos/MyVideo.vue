@@ -7,21 +7,11 @@
           <a-input v-model:value="basicForm.title" placeholder="输入标题" @pressEnter="handleSearch" />
         </a-form-item>
         <a-form-item label="创作时间">
-          <a-range-picker 
-            v-model:value="basicForm.dateRange" 
-            :show-time="{ format: 'HH:mm' }" 
-            format="YYYY-MM-DD HH:mm"
-            :placeholder="['开始时间', '结束时间']" 
-            @change="handleDateChange"
-          />
+          <a-range-picker v-model:value="basicForm.dateRange" :show-time="{ format: 'HH:mm' }" format="YYYY-MM-DD HH:mm"
+            :placeholder="['开始时间', '结束时间']" @change="handleDateChange" />
         </a-form-item>
         <a-form-item label="创建者">
-          <a-select
-            v-model:value="basicForm.creator"
-            placeholder="选择创建者"
-            style="width: 120px"
-            allowClear
-          >
+          <a-select v-model:value="basicForm.creator" placeholder="选择创建者" style="width: 120px" allowClear>
             <a-select-option :value="undefined">全部</a-select-option>
             <a-select-option v-for="creator in uniqueCreators" :key="creator" :value="creator">
               {{ creator }}
@@ -29,12 +19,7 @@
           </a-select>
         </a-form-item>
         <a-form-item label="生成状态">
-          <a-select
-            v-model:value="basicForm.result"
-            placeholder="选择状态"
-            style="width: 120px"
-            allowClear
-          >
+          <a-select v-model:value="basicForm.result" placeholder="选择状态" style="width: 120px" allowClear>
             <a-select-option :value="undefined">全部</a-select-option>
             <a-select-option value="Process">生成中</a-select-option>
             <a-select-option value="Success">成功</a-select-option>
@@ -50,28 +35,19 @@
 
     <!-- 数据表格 -->
     <n-card>
-      <n-data-table 
-        :columns="columns" 
-        :data="videoList" 
-        :pagination="false" 
-        :loading="loading" 
-      />
+      <n-data-table :columns="columns" :data="videoList" :pagination="false" :loading="loading" />
     </n-card>
 
     <!-- 分页组件 -->
-    <Pagination 
-      v-model:current="pagination.current" 
-      v-model:pageSize="pagination.pageSize" 
-      :total="pagination.total"
-      @change="handlePageChange" 
-    />
+    <Pagination v-model:current="pagination.current" v-model:pageSize="pagination.pageSize" :total="pagination.total"
+      @change="handlePageChange" />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, reactive, onMounted } from 'vue';
 import { h } from 'vue';
-import { NDataTable, NCard, NButton, NProgress, NTag,useDialog, useMessage } from 'naive-ui';
+import { NDataTable, NCard, NButton, NProgress, NTag, useDialog, useMessage } from 'naive-ui';
 import Pagination from '@/components/Pagination.vue';
 import { getVideoList } from '@/api/modules/videoApi.js';
 import dayjs from 'dayjs';
@@ -110,7 +86,7 @@ const uniqueCreators = computed(() => {
 const loadVideoList = async () => {
   try {
     loading.value = true;
-    
+
     const params = {
       page: pagination.current,
       page_size: pagination.pageSize,
@@ -120,9 +96,9 @@ const loadVideoList = async () => {
       creator: basicForm.creator || undefined,
       result: basicForm.result || undefined
     };
-    
+
     const response = await getVideoList(params);
-    
+
     if (response.code === 0) {
       videoList.value = response.data.results || [];
       pagination.total = response.data.count || 0;
@@ -225,10 +201,10 @@ const columns = [
     align: 'center',
     render: (row) => {
       const statusInfo = getStatusInfo(row.result);
-      
+
       if (row.result === 'Process') {
         // 生成中显示进度条和百分比
-        console.log("生成进度：",row.process);
+        console.log("生成进度：", row.process);
         const percentage = Math.round((row.process || 0) * 100);
         return h('div', {
           style: {
@@ -330,13 +306,13 @@ const handleDelete = async (row) => {
       onNegativeClick: () => resolve(false)
     });
   });
-  
+
   if (!confirmed) return;
-  
+
   try {
     // 这里需要调用删除API，假设API函数名为deleteVideo
     // await deleteVideo(row.id);
-    
+
     message.success('删除成功');
     // 重新加载列表
     loadVideoList();
@@ -369,7 +345,7 @@ const handleDelete = async (row) => {
   margin-bottom: 16px;
 }
 
-.search-area .ant-form-item-label > label {
+.search-area .ant-form-item-label>label {
   font-weight: 500;
 }
 

@@ -132,7 +132,7 @@ export const getVideoList = async(params ={}) =>{
 
 export const getVideoDetail = async(video_id) =>{
     try {
-    const response = await request.get(`/video/${video_id}/`);
+    const response = await request.get(`/video/detail/${video_id}/`);
     return response;
 } catch (error) {
     console.error(`获取视频${video_id}详情失败:`, error);
