@@ -49,7 +49,7 @@ import { ref, computed, reactive, onMounted } from 'vue';
 import { h } from 'vue';
 import { NDataTable, NCard, NButton, NProgress, NTag, useDialog, useMessage } from 'naive-ui';
 import Pagination from '@/components/Pagination.vue';
-import { getVideoList } from '@/api/modules/videoApi.js';
+import { getVideoList,deleteVideo } from '@/api/modules/videoApi.js';
 import dayjs from 'dayjs';
 
 
@@ -306,13 +306,13 @@ const handleDelete = async (row) => {
       onNegativeClick: () => resolve(false)
     });
   });
-
+  
   if (!confirmed) return;
-
+  
   try {
-    // 这里需要调用删除API，假设API函数名为deleteVideo
-    // await deleteVideo(row.id);
-
+    // 调用删除API
+    await deleteVideo(row.id);
+    
     message.success('删除成功');
     // 重新加载列表
     loadVideoList();

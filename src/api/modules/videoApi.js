@@ -150,3 +150,15 @@ export const regenerateVideo = async (video_id) => {
     throw error;
   }
 };
+
+export const deleteVideo = async (video_id) => {
+  try {
+    const response = await request.post('/video/delete/', {
+      video_id: video_id
+    });
+    return response;
+  } catch (error) {
+    console.error('删除视频失败:', error);
+    throw error;
+  }
+};
