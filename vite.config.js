@@ -53,6 +53,12 @@ export default defineConfig({
           }
         },
       },
+      // 添加媒体文件代理配置
+      '/media': {
+        target: 'http://127.0.0.1:8089',
+        changeOrigin: true,
+        logLevel: 'debug',
+      },
     },
   },
   resolve: {
