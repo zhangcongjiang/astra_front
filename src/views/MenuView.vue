@@ -58,53 +58,47 @@ const menuData = [
     },
     {
         id: 2,
-        name: '图像素材',
+        name: '素材中心',
         children: [
-            { id: 21, name: '图片列表', content: '这里是用户收集的普通图片...', path: '/images' },
-            { id: 12, name: '背景图片', content: '这里是用户可能使用到的背景图片...', path: '/backgrounds' }
+            { id: 21, name: '图像素材', content: '这里是用户收集的普通图片...', path: '/images' },
+            { id: 22, name: '音乐素材', content: '这里是背景音乐的内容...', path: '/musics' },
+            { id: 23, name: '朗读者', content: '这里是朗读者音色的内容...', path: '/speakers' },
+        { id: 24, name: '视频素材', content: '这里是视频素材内容列表...', path: '/videos' },
         ]
     },
     {
         id: 3,  // 修改前是2，现在改为4
-        name: '音频素材',
+        name: '文案中心',
         children: [
-            { id: 31, name: '音频音乐', content: '这里是背景音乐的内容...', path: '/musics' },
-            { id: 32, name: '朗读者', content: '这里是朗读者音色的内容...', path: '/speakers' },
+            { id: 31, name: '素材集', content: '这里是素材资源的内容...', path: '/assets' },
+            { id: 43, name: '文案集', content: '这里是视频文案管理...', path: '/video-texts' }
         ]
-    }, {
-        id: 4,
-        name: '视频素材',
-        children: [
-            { id: 41, name: '视频素材', content: '这里是视频素材内容列表...', path: '/videos' },
-            { id: 42, name: '转场视频', content: '这里是转场视频内容列表...', path: '/transitions' },
-            { id: 43, name: '视频文案', content: '这里是视频文案管理...', path: '/video-texts' }
-        ]
-    },
+    }, 
     {
-        id: 5,  // 修改前是4，现在改为5
+        id: 4,  // 修改前是4，现在改为5
         name: '视频模板',
         children: [
-            { id: 51, name: '视频模板', content: '这里是视频管理的内容...', path: '/templates' },
-            { id: 52, name: '数据可视化', content: '这里是数据列表动态生成视频的模板内容...', path: '/data-visuals' },
+            { id: 41, name: '视频模板', content: '这里是视频管理的内容...', path: '/templates' },
+            { id: 42, name: '数据可视化', content: '这里是数据列表动态生成视频的模板内容...', path: '/data-visuals' },
 
         ]
     },
     {
-        id: 6,  
+        id: 5,  
         name: '实用工具',
         children: [
-            { id: 61, name: '文本工具', content: '提供各种文本处理工具...', path: '/text-tools' },
-            { id: 62, name: '图像工具', content: '提供图像处理和转换工具...', path: '/image-tools' },
-            { id: 63, name: '音频工具', content: '提供音频编辑和处理工具...', path: '/audio-tools' },
-            { id: 64, name: '视频工具', content: '提供视频编辑和处理工具...', path: '/video-tools' },
-            { id: 65, name: '其他工具', content: '提供其他收录的工具...', path: '/other-tools' }
+            { id: 51, name: '文本工具', content: '提供各种文本处理工具...', path: '/text-tools' },
+            { id: 52, name: '图像工具', content: '提供图像处理和转换工具...', path: '/image-tools' },
+            { id: 53, name: '音频工具', content: '提供音频编辑和处理工具...', path: '/audio-tools' },
+            { id: 54, name: '视频工具', content: '提供视频编辑和处理工具...', path: '/video-tools' },
+            { id: 55, name: '其他工具', content: '提供其他收录的工具...', path: '/other-tools' }
         ]
     }, {
-        id: 7,  
+        id: 6,  
         name: '系统设置',
         children: [
-            { id: 71, name: '视频设置', content: '这里是系统设置内容...', path: '/system-video' },
-            { id: 72, name: '音频设置', content: '这里是系统设置内容...', path: '/system-sound' }
+            { id: 61, name: '视频设置', content: '这里是系统设置内容...', path: '/system-video' },
+            { id: 62, name: '音频设置', content: '这里是系统设置内容...', path: '/system-sound' }
         ]
     },
 ];

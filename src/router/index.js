@@ -4,7 +4,6 @@ import ImageList from '@/views/images/ImageList.vue'
 import MusicList from '@/views/musics/MusicList.vue'
 import VideoTemplateList from '@/views/videos/VideoTemplateList.vue'
 import VideoTemplateApply from '@/views/videos/VideoTemplateApply.vue'
-import BackgroundList from '@/views/images/BackgroundList.vue'
 import MyVideo from '@/views/videos/MyVideo.vue'
 import SpeakerList from '@/views/musics/SpeakerList.vue'
 import MySound from '@/views/musics/MySound.vue'
@@ -14,8 +13,9 @@ import DataVisualList from '@/views/videos/DataVisualList.vue'
 import DataVisualApply from '@/views/videos/DataVisualApply.vue'
 import VideoTextList from '@/views/videos/VideoTextList.vue'
 import GraphicTextList from '@/views/texts/GraphicTextList.vue'
-import TransitionList from '@/views/videos/TransitionList.vue'
 import VideoList from '@/views/videos/VideoList.vue'
+import AssetList from '@/views/assets/AssetList.vue'
+import AssetDetail from '@/views/assets/AssetDetail.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -35,12 +35,6 @@ const router = createRouter({
                     path: 'images',
                     name: 'images',
                     component: ImageList // 图片列表组件
-                },
-                {
-                    path: 'backgrounds',
-                    name: 'BackgroundList',
-                    component: BackgroundList,
-                    meta: { title: '背景图片管理' }
                 },
                 {
                     path: 'musics',
@@ -146,17 +140,25 @@ const router = createRouter({
                     meta: { title: '其他工具' },
                     props: { category: 'other' }
                 },
+            
                 {
-                    path: '/transitions',
-                    name: 'transitions',
-                    component: TransitionList,
-                    meta: { title: '转场视频管理' }
+                    path: 'assets',
+                    name: 'assets',
+                    component: AssetList,
+                    meta: { title: '素材集' }
+                },
+                {
+                    path: 'assets/:id',
+                    name: 'asset-detail',
+                    component: AssetDetail,
+                    meta: { title: '素材集详情' },
+                    props: true
                 },
                 {
                     path: '/videos',
                     name: 'videos',
                     component: VideoList,
-                    meta: { title: '转场视频管理' }
+                    meta: { title: '视频素材管理' }
                 },
                 {
                     path: '/texts/create/:id?',
