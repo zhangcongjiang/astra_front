@@ -11,10 +11,10 @@ import SystemSoundSettings from '@/views/settings/SystemSoundSettings.vue'
 import SystemVideoSettings from '@/views/settings/SystemVideoSettings.vue'
 import DataVisualList from '@/views/videos/DataVisualList.vue'
 import DataVisualApply from '@/views/videos/DataVisualApply.vue'
-import VideoTextList from '@/views/videos/VideoTextList.vue'
 import GraphicTextList from '@/views/texts/GraphicTextList.vue'
 import VideoList from '@/views/videos/VideoList.vue'
 import AssetList from '@/views/assets/AssetList.vue'
+import VideoDraftList from '@/views/assets/VideoDraftList.vue'
 import AssetDetail from '@/views/assets/AssetDetail.vue'
 
 const router = createRouter({
@@ -93,10 +93,10 @@ const router = createRouter({
                     component: SystemSoundSettings // 修改为新的系统音频设置组件
                 },
                 {
-                    path: 'video-texts',
-                    name: 'video-texts',
-                    component: VideoTextList,
-                    meta: { title: '视频文案管理' }
+                    path: 'drafts',
+                    name: 'drafts',
+                    component: VideoDraftList,
+                    meta: { title: '视频草稿' }
                 },
                 // 在children数组中添加
                 {
