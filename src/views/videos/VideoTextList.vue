@@ -62,10 +62,10 @@
 
     <!-- 新增/编辑模态框 -->
     <a-modal
-      v-model:visible="modalVisible"
+      v-model:open="modalVisible"
       :title="modalTitle"
       @ok="handleSubmit"
-      @cancel="closeModal"
+      @cancel="modalVisible = false"
       width="800px"
     >
       <a-form :model="formState" layout="vertical">

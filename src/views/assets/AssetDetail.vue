@@ -10,7 +10,7 @@
         <div class="meta-info">
           <span>创建者: {{ assetDetail.creator }}</span>
           <span>创建时间: {{ formatTime(assetDetail.createTime) }}</span>
-          <span>素材数量: {{ assetItems.length }}</span>
+          <span>素材数量: {{ totalItemsCount }}</span>
         </div>
       </div>
       <div class="actions">
@@ -232,6 +232,40 @@
           </div>
         </div>
 
+        <!-- 文本文案分类 - 移到最后 -->
+        <div class="category-section">
+          <div class="category-header">
+            <h3><FileTextOutlined /> 文本文案</h3>
+            <!-- 移除新增文案按钮 -->
+          </div>
+          <div class="text-items-container">
+            <!-- 显示默认的空文案 -->
+            <div class="text-item-card">
+              <div class="text-item-header">
+                <h4>{{ defaultTextItem.name }}</h4>
+                <div class="text-item-actions">
+                  <a-button type="link" size="small" @click="editTextItem(defaultTextItem)">
+                    <EditOutlined /> 编辑段落
+                  </a-button>
+                </div>
+              </div>
+              <div class="text-content">
+                <div v-if="defaultTextItem.text.length > 0">
+                  <div v-for="(paragraph, index) in defaultTextItem.text" :key="index" class="paragraph-item">
+                    <p>{{ paragraph }}</p>
+                  </div>
+                </div>
+                <div v-else class="empty-text">
+                  <a-empty description="暂无段落内容，点击编辑添加段落" size="small" />
+                </div>
+              </div>
+              <div class="text-item-meta">
+                <span>更新时间: {{ formatTime(defaultTextItem.updateTime) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 全局空状态 -->
         <div v-if="filteredItems.length === 0 && searchKeyword" class="empty-state">
           <a-empty description="未找到匹配的素材" />
@@ -252,6 +286,42 @@
         <!-- TODO: 实现素材选择界面 -->
       </div>
     </a-modal>
+
+    <!-- 文本文案编辑模态框 -->
+    <a-modal
+      v-model:open="textModalVisible"
+      :title="textModalTitle"
+      width="800px"
+      @ok="handleTextSubmit"
+      @cancel="closeTextModal"
+    >
+      <a-form :model="textFormState" layout="vertical">
+        <a-form-item label="文案内容">
+          <div class="paragraph-container">
+            <div v-for="(paragraph, index) in textFormState.text" :key="index" class="paragraph-item">
+              <a-textarea
+                v-model:value="textFormState.text[index]"
+                :placeholder="`请输入第${index + 1}段内容`"
+                :rows="3"
+                style="margin-bottom: 8px;"
+              />
+              <a-button 
+                type="text" 
+                danger 
+                size="small" 
+                @click="removeParagraph(index)"
+                style="margin-left: 8px;"
+              >
+                <DeleteOutlined /> 删除段落
+              </a-button>
+            </div>
+            <a-button type="dashed" @click="addParagraph" style="width: 100%; margin-top: 8px;">
+              <PlusOutlined /> 添加段落
+            </a-button>
+          </div>
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -268,7 +338,8 @@ import {
   UploadOutlined,
   DeleteOutlined,
   FileImageOutlined,
-  VideoCameraOutlined
+  VideoCameraOutlined,
+  FileTextOutlined  // Make sure this is imported
 } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
 
@@ -278,9 +349,26 @@ const route = useRoute()
 // 响应式数据
 const assetDetail = ref({})
 const assetItems = ref([])
-const searchKeyword = ref('')
-const showAddModal = ref(false)
-const selectedItems = ref([])
+const textItems = ref([])
+const searchKeyword = ref('') // 添加这行 - 搜索关键词
+
+// 默认文案对象
+const defaultTextItem = ref({
+  id: 'default',
+  name: '文案内容',
+  text: [],
+  createTime: new Date().toISOString(),
+  updateTime: new Date().toISOString()
+})
+
+// 文本文案相关状态
+const textModalVisible = ref(false)
+const textModalTitle = ref('编辑文案段落')
+const textFormState = ref({
+  id: '',
+  name: '',
+  text: []
+})
 
 // 计算属性 - 按类型分类的素材
 const filteredItems = computed(() => {
@@ -295,6 +383,27 @@ const filteredItems = computed(() => {
   return items
 })
 
+// 过滤文本文案
+const filteredTextItems = computed(() => {
+  let items = textItems.value
+  
+  if (searchKeyword.value) {
+    items = items.filter(item => 
+      item.name.toLowerCase().includes(searchKeyword.value.toLowerCase()) ||
+      item.text.some(paragraph => 
+        paragraph.toLowerCase().includes(searchKeyword.value.toLowerCase())
+      )
+    )
+  }
+  
+  return items
+})
+
+// Remove this duplicate computed property that causes circular dependency:
+// const textItems = computed(() => {
+//   return filteredTextItems.value
+// })
+
 const imageItems = computed(() => {
   return filteredItems.value.filter(item => item.type === 'image')
 })
@@ -307,7 +416,82 @@ const audioItems = computed(() => {
   return filteredItems.value.filter(item => item.type === 'audio')
 })
 
-// 方法
+// 总素材数量
+const totalItemsCount = computed(() => {
+  return assetItems.value.length + textItems.value.length
+})
+
+// 文本文案相关方法
+const showTextModal = () => {
+  textModalTitle.value = '新增文案'
+  textFormState.id = null
+  textFormState.name = ''
+  textFormState.text = [''] // 初始化时包含一个空段落
+  textModalVisible.value = true
+}
+
+const editTextItem = (record) => {
+  textModalTitle.value = '编辑文案段落'
+  textFormState.value = {
+    id: record.id,
+    name: record.name,
+    text: [...record.text] // 复制文案数组
+  }
+  textModalVisible.value = true
+}
+
+const addParagraph = () => {
+  textFormState.value.text.push('')
+}
+
+const removeParagraph = (index) => {
+  textFormState.value.text.splice(index, 1)
+}
+
+const handleTextSubmit = () => {
+  const formData = textFormState.value
+  
+  // 过滤空段落
+  const paragraphs = formData.text
+    .map(p => p.trim())
+    .filter(p => p !== '')
+
+  if (paragraphs.length === 0) {
+    message.error('请至少添加一个段落')
+    return
+  }
+
+  // 更新默认文案
+  defaultTextItem.value = {
+    ...defaultTextItem.value,
+    text: paragraphs,
+    updateTime: new Date().toISOString()
+  }
+  
+  message.success('文案段落保存成功')
+  closeTextModal()
+}
+
+const closeTextModal = () => {
+  textModalVisible.value = false
+  textFormState.value = {
+    id: '',
+    name: '文案内容',
+    text: []
+  }
+}
+
+const removeTextItem = async (itemId) => {
+  try {
+    // TODO: 调用API删除文本文案
+    textItems.value = textItems.value.filter(item => item.id !== itemId)
+    message.success('删除成功')
+  } catch (error) {
+    message.error('删除失败')
+  }
+}
+
+// 原有方法
 const loadAssetDetail = async () => {
   try {
     const assetId = route.params.id
@@ -359,11 +543,54 @@ const loadAssetDetail = async () => {
         size: 20971520 // 20MB
       }
     ]
+
+    // 模拟文本文案数据
+    textItems.value = [
+      {
+        id: 101,
+        name: '旅游宣传文案',
+        text: [
+          '探索世界的美好，从这里开始。',
+          '每一次旅行都是一次心灵的洗礼，让我们一起踏上这段美妙的旅程。',
+          '发现未知的风景，体验不同的文化，创造属于你的独特回忆。'
+        ],
+        createTime: '2024-01-15 10:30:00'
+      },
+      {
+        id: 102,
+        name: '产品介绍文案',
+        text: [
+          '我们的旅游产品为您提供最优质的服务体验。',
+          '专业的导游团队，精心设计的行程路线，让您的旅行更加轻松愉快。'
+        ],
+        createTime: '2024-01-16 14:20:00'
+      }
+    ]
   } catch (error) {
     message.error('加载素材集详情失败')
   }
 }
 
+// 生命周期
+onMounted(() => {
+  loadAssetDetail()
+})
+
+// 工具函数
+const formatTime = (time) => {
+  if (!time) return '-'
+  return dayjs(time).format('YYYY-MM-DD HH:mm:ss')
+}
+
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+// 其他方法
 const goBack = () => {
   router.back()
 }
@@ -377,96 +604,50 @@ const handleSearch = () => {
   // 搜索逻辑已在计算属性中实现
 }
 
-// 上传功能
-const handleUpload = async (file, type) => {
-  try {
-    // 文件类型验证
-    const validTypes = {
-      image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-      video: ['video/mp4', 'video/avi', 'video/mov', 'video/wmv'],
-      audio: ['audio/mp3', 'audio/wav', 'audio/aac', 'audio/ogg']
-    }
-    
-    if (!validTypes[type].includes(file.type)) {
-      message.error(`请选择正确的${type === 'image' ? '图片' : type === 'video' ? '视频' : '音频'}格式文件`)
-      return false
-    }
-    
-    // 文件大小验证（可根据需要调整）
-    const maxSize = {
-      image: 10 * 1024 * 1024, // 10MB
-      video: 100 * 1024 * 1024, // 100MB
-      audio: 20 * 1024 * 1024 // 20MB
-    }
-    
-    if (file.size > maxSize[type]) {
-      const sizeLimit = maxSize[type] / (1024 * 1024)
-      message.error(`文件大小不能超过 ${sizeLimit}MB`)
-      return false
-    }
-    
-    // TODO: 实现文件上传到服务器的逻辑
-    // 这里模拟上传过程
-    message.loading('正在上传...', 0)
-    
-    // 模拟上传延迟
-    setTimeout(() => {
-      message.destroy()
-      
-      // 创建新的素材项
-      const newItem = {
-        id: Date.now(),
-        name: file.name,
-        type: type,
-        url: URL.createObjectURL(file), // 临时URL，实际应该是服务器返回的URL
-        size: file.size
-      }
-      
-      // 添加到素材列表
-      assetItems.value.push(newItem)
-      message.success(`${file.name} 上传成功`)
-    }, 2000)
-    
-  } catch (error) {
-    message.error('上传失败，请重试')
+const handleUpload = (file, type) => {
+  // 文件大小限制检查
+  const isLt10M = file.size / 1024 / 1024 < 10
+  if (!isLt10M) {
+    message.error('文件大小不能超过 10MB!')
+    return false
   }
+
+  // 模拟上传过程
+  message.loading('上传中...', 1)
+  
+  setTimeout(() => {
+    // 创建新的素材项
+    const newItem = {
+      id: Date.now(),
+      name: file.name,
+      type: type,
+      url: URL.createObjectURL(file),
+      size: file.size
+    }
+    
+    // 添加到对应的素材列表
+    assetItems.value.unshift(newItem)
+    message.success('上传成功!')
+  }, 1000)
   
   return false // 阻止默认上传行为
 }
 
 const removeItem = async (itemId) => {
   try {
-    // TODO: 调用API从素材集中移除素材
+    // TODO: 调用API删除素材
     assetItems.value = assetItems.value.filter(item => item.id !== itemId)
-    message.success('移除成功')
+    message.success('删除成功')
   } catch (error) {
-    message.error('移除失败')
+    message.error('删除失败')
   }
 }
 
 const handleAddItems = () => {
   // TODO: 实现添加素材功能
-  message.success('添加素材功能待实现')
+  message.info('添加素材功能待实现')
   showAddModal.value = false
 }
-
-// 工具函数
-const formatTime = (time) => {
-  if (!time) return ''
-  return dayjs(time).format('YYYY-MM-DD HH:mm:ss')
-}
-
-const formatFileSize = (bytes) => {
-  if (!bytes) return '未知大小'
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
-}
-
-// 生命周期
-onMounted(() => {
-  loadAssetDetail()
-})
 </script>
 
 <style scoped>
@@ -690,6 +871,92 @@ onMounted(() => {
     flex-direction: column;
     gap: 12px;
     align-items: flex-start;
+  }
+}
+
+
+/* 文本文案相关样式 */
+.text-items-container {
+  margin-top: 16px;
+}
+
+.text-item-card {
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: #fafafa;
+}
+
+.text-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.text-item-header h4 {
+  margin: 0;
+  color: #262626;
+}
+
+.text-item-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.text-content {
+  margin-bottom: 12px;
+}
+
+.paragraph-item {
+  margin-bottom: 8px;
+}
+
+.paragraph-item p {
+  margin: 0;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 4px;
+  border-left: 3px solid #1890ff;
+  line-height: 1.6;
+}
+
+.empty-text {
+  text-align: center;
+  padding: 20px;
+}
+
+.text-item-meta {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.paragraph-container {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.paragraph-container .paragraph-item {
+  position: relative;
+  padding-bottom: 24px;
+}
+
+.paragraph-container .remove-btn {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .text-item-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .text-item-actions {
+    align-self: flex-end;
   }
 }
 </style>

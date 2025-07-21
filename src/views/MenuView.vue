@@ -70,8 +70,8 @@ const menuData = [
         id: 3,  // 修改前是2，现在改为4
         name: '文案中心',
         children: [
-        { id: 31, name: '文案集', content: '这里是视频文案管理...', path: '/video-texts' },
-            { id: 32, name: '素材集', content: '这里是素材资源的内容...', path: '/assets' },
+            { id: 31, name: '素材集', content: '这里是素材资源的内容...', path: '/assets' },
+            { id: 32, name: '视频草稿', content: '这里是所有的视频草稿内容...', path: '/drafts' },
             
         ]
     }, 
