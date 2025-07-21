@@ -429,14 +429,14 @@ watch(() => props.selectedValue, () => {
 }, { deep: true });
 
 const getResourceUrl = (item) => {
-  if (!item) return 'https://via.placeholder.com/150';
+  if (!item) return '';
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8089';
   const staticBaseUrl = baseUrl.replace('/api', '');
   
   // 处理文本类型
   if (item.type === 'text') {
-    return 'https://via.placeholder.com/150'; // 文本不需要URL
+    return ''; // 文本不需要URL
   }
   
   const type = item.type;

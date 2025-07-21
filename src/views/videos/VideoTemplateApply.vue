@@ -33,9 +33,26 @@
               <template v-if="field.type !== 'group'">
                  <a-form-item :label="field.label" :name="field.name" :rules="generateRules(field)">
                     <!-- Standard Inputs -->
-                    <a-input v-if="field.type === 'input' && (field.inputType === 'text' || field.inputType === 'url')" v-model:value="formData[field.name]" :placeholder="field.placeholder" />
+                    <a-input 
+                      v-if="field.type === 'input' && (field.inputType === 'text' || field.inputType === 'url')" 
+                      v-model:value="formData[field.name]" 
+                      :placeholder="field.placeholder"
+                      @dragover.prevent="handleTextDragOver"
+                      @dragleave.prevent="handleTextDragLeave"
+                      @drop.prevent="handleTextDrop($event, field.name)"
+                      :class="{ 'text-drop-active': isTextDragOver }"
+                    />
                     <a-input-number v-if="field.type === 'input' && field.inputType === 'number'" v-model:value="formData[field.name]" :placeholder="field.placeholder" style="width: 100%" />
-                    <a-textarea v-if="field.type === 'textarea'" v-model:value="formData[field.name]" :rows="field.rows" :placeholder="field.placeholder" />
+                    <a-textarea 
+                      v-if="field.type === 'textarea'" 
+                      v-model:value="formData[field.name]" 
+                      :rows="field.rows" 
+                      :placeholder="field.placeholder"
+                      @dragover.prevent="handleTextDragOver"
+                      @dragleave.prevent="handleTextDragLeave"
+                      @drop.prevent="handleTextDrop($event, field.name)"
+                      :class="{ 'text-drop-active': isTextDragOver }"
+                    />
                     
                     <!-- Static & Remote Select -->
                     <a-select v-if="field.type === 'select' && (field.options.source === 'static' || field.options.source === 'remote')" v-model:value="formData[field.name]" :mode="field.multiple ? 'multiple' : 'default'" :placeholder="field.placeholder" :loading="field.options && field.options.loading" allow-clear>
@@ -109,9 +126,26 @@
                        <!-- Inlined logic for inner fields -->
                        <template v-for="innerField in field.fields" :key="innerField.name">
                           <a-form-item :label="innerField.label" :name="[field.name, index, innerField.name]" :rules="generateRules(innerField)">
-                            <a-input v-if="innerField.type === 'input' && (innerField.inputType === 'text' || innerField.inputType === 'url')" v-model:value="groupInstance[innerField.name]" :placeholder="innerField.placeholder" />
+                            <a-input 
+                              v-if="innerField.type === 'input' && (innerField.inputType === 'text' || innerField.inputType === 'url')" 
+                              v-model:value="groupInstance[innerField.name]" 
+                              :placeholder="innerField.placeholder"
+                              @dragover.prevent="handleTextDragOver"
+                              @dragleave.prevent="handleTextDragLeave"
+                              @drop.prevent="handleTextDropInGroup($event, groupInstance, innerField.name)"
+                              :class="{ 'text-drop-active': isTextDragOver }"
+                            />
                             <a-input-number v-if="innerField.type === 'input' && innerField.inputType === 'number'" v-model:value="groupInstance[innerField.name]" :placeholder="innerField.placeholder" style="width: 100%" />
-                            <a-textarea v-if="innerField.type === 'textarea'" v-model:value="groupInstance[innerField.name]" :rows="innerField.rows" :placeholder="innerField.placeholder" />
+                            <a-textarea 
+                              v-if="innerField.type === 'textarea'" 
+                              v-model:value="groupInstance[innerField.name]" 
+                              :rows="innerField.rows" 
+                              :placeholder="innerField.placeholder"
+                              @dragover.prevent="handleTextDragOver"
+                              @dragleave.prevent="handleTextDragLeave"
+                              @drop.prevent="handleTextDropInGroup($event, groupInstance, innerField.name)"
+                              :class="{ 'text-drop-active': isTextDragOver }"
+                            />
                             
                             <!-- Static & Remote Select in Group -->
                             <a-select v-if="innerField.type === 'select' && (innerField.options.source === 'static' || innerField.options.source === 'remote')" v-model:value="groupInstance[innerField.name]" :mode="innerField.multiple ? 'multiple' : 'default'" :placeholder="innerField.placeholder" :loading="innerField.options && innerField.options.loading" allow-clear>
@@ -177,9 +211,26 @@
                     <!-- Inlined logic for inner fields -->
                     <template v-for="innerField in field.fields" :key="innerField.name">
                        <a-form-item :label="innerField.label" :name="[field.name, innerField.name]" :rules="generateRules(innerField)">
-                         <a-input v-if="innerField.type === 'input' && (innerField.inputType === 'text' || innerField.inputType === 'url')" v-model:value="formData[field.name][innerField.name]" :placeholder="innerField.placeholder" />
+                         <a-input 
+                           v-if="innerField.type === 'input' && (innerField.inputType === 'text' || innerField.inputType === 'url')" 
+                           v-model:value="formData[field.name][innerField.name]" 
+                           :placeholder="innerField.placeholder"
+                           @dragover.prevent="handleTextDragOver"
+                           @dragleave.prevent="handleTextDragLeave"
+                           @drop.prevent="handleTextDropInGroup($event, formData[field.name], innerField.name)"
+                           :class="{ 'text-drop-active': isTextDragOver }"
+                         />
                          <a-input-number v-if="innerField.type === 'input' && innerField.inputType === 'number'" v-model:value="formData[field.name][innerField.name]" :placeholder="innerField.placeholder" style="width: 100%" />
-                         <a-textarea v-if="innerField.type === 'textarea'" v-model:value="formData[field.name][innerField.name]" :rows="innerField.rows" :placeholder="innerField.placeholder" />
+                         <a-textarea 
+                           v-if="innerField.type === 'textarea'" 
+                           v-model:value="formData[field.name][innerField.name]" 
+                           :rows="innerField.rows" 
+                           :placeholder="innerField.placeholder"
+                           @dragover.prevent="handleTextDragOver"
+                           @dragleave.prevent="handleTextDragLeave"
+                           @drop.prevent="handleTextDropInGroup($event, formData[field.name], innerField.name)"
+                           :class="{ 'text-drop-active': isTextDragOver }"
+                         />
                          
                          <!-- Static & Remote Select in Non-replicable Group -->
                          <a-select v-if="innerField.type === 'select' && (innerField.options.source === 'static' || innerField.options.source === 'remote')" v-model:value="formData[field.name][innerField.name]" :mode="innerField.multiple ? 'multiple' : 'default'" :placeholder="innerField.placeholder" :loading="innerField.options && innerField.options.loading" allow-clear>
@@ -306,6 +357,7 @@ const formDefinition = computed(() => template.params?.form || [])
 const isDragOver = ref(false)
 const currentDragType = ref(null)
 const draggedItem = ref(null)
+const isTextDragOver = ref(false)
 
 // Modal State - 保留但不再使用
 const modalConfig = reactive({
@@ -774,6 +826,98 @@ const handleDropInGroup = (event, groupInstance, fieldName) => {
   }
 };
 
+// 处理文本拖拽
+const handleTextDragOver = (event) => {
+  // 只有当拖拽的是文本类素材时才允许
+  if (currentDragType.value === 'text') {
+    isTextDragOver.value = true
+  }
+}
+
+const handleTextDragLeave = (event) => {
+  isTextDragOver.value = false
+}
+
+const handleTextDrop = (event, fieldName) => {
+      isTextDragOver.value = false
+      
+      if (!draggedItem.value) {
+        return
+      }
+
+      // 检查是否为文本类素材
+      const items = Array.isArray(draggedItem.value) ? draggedItem.value : [draggedItem.value]
+      const textItems = items.filter(item => item.type === 'text')
+      
+      if (textItems.length === 0) {
+        message.warning('只能拖拽文本类素材到此处')
+        return
+      }
+
+      // 提取所有文本内容并用换行符拼接
+       const textContents = textItems
+         .map(item => {
+           // 对于文本类型，优先使用 resource_detail.text
+           const content = item.resource_detail?.text || item.content || item.text || item.name || ''
+           return typeof content === 'string' ? content : String(content)
+         })
+         .filter(content => content.trim())
+      
+      if (textContents.length === 0) {
+        message.warning('文本素材内容为空')
+        return
+      }
+      
+      // 用换行符拼接多个文本
+      const combinedText = textContents.join('\n')
+      
+      // 填充到表单字段
+      formData[fieldName] = combinedText
+      
+      const count = textContents.length
+      message.success(`已填充 ${count} 个文本素材到字段`)
+    }
+
+const handleTextDropInGroup = (event, groupInstance, fieldName) => {
+      isTextDragOver.value = false
+      
+      if (!draggedItem.value) {
+        return
+      }
+
+      // 检查是否为文本类素材
+      const items = Array.isArray(draggedItem.value) ? draggedItem.value : [draggedItem.value]
+      const textItems = items.filter(item => item.type === 'text')
+      
+      if (textItems.length === 0) {
+        message.warning('只能拖拽文本类素材到此处')
+        return
+      }
+
+      // 提取所有文本内容并用换行符拼接
+       const textContents = textItems
+         .map(item => {
+           // 对于文本类型，优先使用 resource_detail.text
+           const content = item.resource_detail?.text || item.content || item.text || item.name || ''
+           return typeof content === 'string' ? content : String(content)
+         })
+         .filter(content => content.trim())
+      
+      if (textContents.length === 0) {
+        message.warning('文本素材内容为空')
+        return
+      }
+      
+      // 用换行符拼接多个文本
+      const combinedText = textContents.join('\n')
+      
+      // 填充到组内字段
+      groupInstance[fieldName] = combinedText
+      
+      const count = textContents.length
+      message.success(`已填充 ${count} 个文本素材到字段`)
+    }
+
 </script>
 
 
@@ -1042,6 +1186,12 @@ const handleDropInGroup = (event, groupInstance, fieldName) => {
   display: flex;
   justify-content: center;
   gap: 12px;
+}
+
+.text-drop-active {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+  background-color: #f6ffed !important;
 }
 
 @media (max-width: 768px) {
