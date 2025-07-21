@@ -144,3 +144,23 @@ export const updateSound = async (data) => {
         throw error;
     }
 };
+
+export const ttsPlay = async (ttsId) => {
+    try {
+        const response = await request.get(`/voice/tts/play/?ttsId=${ttsId}`,)
+        return response;
+    } catch (error) {
+        console.error(`音频播放失败:`, error);
+        throw error;
+    }
+}
+
+export const getTtsList = async (params) => {
+    try {
+        const response = await request.get(`/voice/tts/`, formatParams(params));
+        return response;
+    } catch (error) {
+        console.error(`获取TTs音频列表出错:`, error);
+        throw error;
+    }
+}
