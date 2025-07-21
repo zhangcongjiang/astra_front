@@ -619,7 +619,12 @@ const getResourceTypeLabel = (resourceType) => {
 
 const handleDragStart = (item) => {
   draggedItem.value = item;
-  currentDragType.value = item.type;
+  // 处理多选情况：如果是数组，取第一个元素的类型作为当前拖拽类型
+  if (Array.isArray(item)) {
+    currentDragType.value = item.length > 0 ? item[0].type : null;
+  } else {
+    currentDragType.value = item.type;
+  }
 };
 
 const handleDragEnd = () => {
@@ -658,27 +663,52 @@ const handleDrop = (event, fieldName) => {
   const fieldDef = formDefinition.value.find(f => f.name === fieldName);
   if (!fieldDef) return;
   
-  // 检查类型匹配
-  if (draggedItem.value.type !== fieldDef.options.resourceType) {
+  // 处理多选素材拖拽
+  const itemsToAdd = Array.isArray(draggedItem.value) ? draggedItem.value : [draggedItem.value];
+  
+  // 检查所有素材的类型是否匹配
+  const invalidItems = itemsToAdd.filter(item => item.type !== fieldDef.options.resourceType);
+  if (invalidItems.length > 0) {
     message.warning(`只能拖拽${getResourceTypeLabel(fieldDef.options.resourceType)}类型的素材到此处`);
     return;
   }
   
   // 处理拖放
   if (fieldDef.multiple) {
-    // 多选模式
+    // 多选模式：添加所有素材
     const currentValue = formData[fieldName] || [];
-    const exists = currentValue.some(item => item.id === draggedItem.value.id);
-    if (!exists) {
-      formData[fieldName] = [...currentValue, draggedItem.value];
-      message.success(`已添加${draggedItem.value.name}`);
-    } else {
-      message.warning('该素材已存在');
+    const newItems = [];
+    let duplicateCount = 0;
+    
+    itemsToAdd.forEach(item => {
+      const exists = currentValue.some(existingItem => existingItem.id === item.id);
+      if (!exists) {
+        newItems.push(item);
+      } else {
+        duplicateCount++;
+      }
+    });
+    
+    if (newItems.length > 0) {
+      formData[fieldName] = [...currentValue, ...newItems];
+      if (newItems.length === 1) {
+        message.success(`已添加${newItems[0].name}`);
+      } else {
+        message.success(`已添加${newItems.length}个素材`);
+      }
+    }
+    
+    if (duplicateCount > 0) {
+      message.warning(`${duplicateCount}个素材已存在，已跳过`);
     }
   } else {
-    // 单选模式
-    formData[fieldName] = draggedItem.value;
-    message.success(`已选择${draggedItem.value.name}`);
+    // 单选模式：只能添加一个素材
+    if (itemsToAdd.length > 1) {
+      message.warning('该字段只能选择一个素材');
+      return;
+    }
+    formData[fieldName] = itemsToAdd[0];
+    message.success(`已选择${itemsToAdd[0].name}`);
   }
 };
 
@@ -695,27 +725,52 @@ const handleDropInGroup = (event, groupInstance, fieldName) => {
   const fieldDef = groupField.fields.find(f => f.name === fieldName);
   if (!fieldDef) return;
   
-  // 检查类型匹配
-  if (draggedItem.value.type !== fieldDef.options.resourceType) {
+  // 处理多选素材拖拽
+  const itemsToAdd = Array.isArray(draggedItem.value) ? draggedItem.value : [draggedItem.value];
+  
+  // 检查所有素材的类型是否匹配
+  const invalidItems = itemsToAdd.filter(item => item.type !== fieldDef.options.resourceType);
+  if (invalidItems.length > 0) {
     message.warning(`只能拖拽${getResourceTypeLabel(fieldDef.options.resourceType)}类型的素材到此处`);
     return;
   }
   
   // 处理拖放
   if (fieldDef.multiple) {
-    // 多选模式
+    // 多选模式：添加所有素材
     const currentValue = groupInstance[fieldName] || [];
-    const exists = currentValue.some(item => item.id === draggedItem.value.id);
-    if (!exists) {
-      groupInstance[fieldName] = [...currentValue, draggedItem.value];
-      message.success(`已添加${draggedItem.value.name}`);
-    } else {
-      message.warning('该素材已存在');
+    const newItems = [];
+    let duplicateCount = 0;
+    
+    itemsToAdd.forEach(item => {
+      const exists = currentValue.some(existingItem => existingItem.id === item.id);
+      if (!exists) {
+        newItems.push(item);
+      } else {
+        duplicateCount++;
+      }
+    });
+    
+    if (newItems.length > 0) {
+      groupInstance[fieldName] = [...currentValue, ...newItems];
+      if (newItems.length === 1) {
+        message.success(`已添加${newItems[0].name}`);
+      } else {
+        message.success(`已添加${newItems.length}个素材`);
+      }
+    }
+    
+    if (duplicateCount > 0) {
+      message.warning(`${duplicateCount}个素材已存在，已跳过`);
     }
   } else {
-    // 单选模式
-    groupInstance[fieldName] = draggedItem.value;
-    message.success(`已选择${draggedItem.value.name}`);
+    // 单选模式：只能添加一个素材
+    if (itemsToAdd.length > 1) {
+      message.warning('该字段只能选择一个素材');
+      return;
+    }
+    groupInstance[fieldName] = itemsToAdd[0];
+    message.success(`已选择${itemsToAdd[0].name}`);
   }
 };
 

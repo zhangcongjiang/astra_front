@@ -2,7 +2,16 @@
   <div class="resource-selector-panel">
     <!-- 标题栏 -->
     <div class="panel-header">
-      <h3>素材选择器</h3>
+      <h3>{{ resourceType === 'image' ? '图片素材' : resourceType === 'video' ? '视频素材' : resourceType === 'audio' ? '音频素材' : '素材选择器' }}</h3>
+      <div class="multi-select-tip">
+        <span class="tip-text">💡 按住 Ctrl/Cmd 键可多选同类型素材</span>
+        <div v-if="selectedItems.length > 0" class="selected-info">
+          <span class="selected-count">
+            已选择 {{ selectedItems.length }} 个{{ selectedItems[0]?.type === 'image' ? '图片' : selectedItems[0]?.type === 'video' ? '视频' : selectedItems[0]?.type === 'audio' ? '音频' : '文本' }}素材
+          </span>
+          <a-button size="small" type="link" @click="clearSelection">清空选择</a-button>
+        </div>
+      </div>
     </div>
 
     <!-- 素材集选择器 -->
@@ -18,7 +27,7 @@
             :loading="collectionsLoading"
           >
             <a-select-option v-for="collection in assetCollections" :key="collection.id" :value="collection.id">
-              {{ collection.set_name }} ({{ collection.itemCount || 0 }} 个素材)
+              {{ collection.set_name }} ({{ collection.asset_count || 0 }} 个素材)
             </a-select-option>
           </a-select>
         </a-form-item>
@@ -45,7 +54,7 @@
                     hoverable
                     class="item-card"
                     :class="{ 'selected': isSelected(item) }"
-                    @click="toggleSelection(item)"
+                    @click="(event) => toggleSelection(item, event)"
                     draggable="true"
                     @dragstart="handleDragStart(item)"
                     @dragend="handleDragEnd"
@@ -86,7 +95,7 @@
                     hoverable
                     class="item-card"
                     :class="{ 'selected': isSelected(item) }"
-                    @click="toggleSelection(item)"
+                    @click="(event) => toggleSelection(item, event)"
                     draggable="true"
                     @dragstart="handleDragStart(item)"
                     @dragend="handleDragEnd"
@@ -125,7 +134,7 @@
                     hoverable
                     class="item-card"
                     :class="{ 'selected': isSelected(item) }"
-                    @click="toggleSelection(item)"
+                    @click="(event) => toggleSelection(item, event)"
                     draggable="true"
                     @dragstart="handleDragStart(item)"
                     @dragend="handleDragEnd"
@@ -156,7 +165,7 @@
                 :key="item.id"
                 class="text-item-card"
                 :class="{ 'selected': isSelected(item) }"
-                @click="toggleSelection(item)"
+                @click="(event) => toggleSelection(item, event)"
                 draggable="true"
                 @dragstart="handleDragStart(item)"
                 @dragend="handleDragEnd"
@@ -231,10 +240,6 @@ const props = defineProps({
   resourceType: {
     type: String,
     required: true,
-  },
-  multiple: {
-    type: Boolean,
-    default: false,
   },
   selectedValue: {
     type: [Object, Array],
@@ -403,14 +408,12 @@ const filterCollectionOption = (input, option) => {
 
 // 初始化选择状态
 const initializeSelection = () => {
-  if (props.multiple) {
-    selectedItems.value = Array.isArray(props.selectedValue)
-      ? props.selectedValue.filter(item => item && item.id)
-      : [];
+  if (Array.isArray(props.selectedValue)) {
+    selectedItems.value = props.selectedValue.filter(item => item && item.id);
+  } else if (props.selectedValue && props.selectedValue.id) {
+    selectedItems.value = [props.selectedValue];
   } else {
-    selectedItems.value = (props.selectedValue && props.selectedValue.id)
-      ? [props.selectedValue]
-      : [];
+    selectedItems.value = [];
   }
 };
 
@@ -442,7 +445,7 @@ const getResourceUrl = (item) => {
   if (type === 'image') {
     const fileName = item.img_name || item.name;
     if (fileName) {
-      return `${staticBaseUrl}/media/image/${fileName}`;
+      return `${staticBaseUrl}/media/images/${fileName}`;
     }
   } else if (type === 'video') {
     const fileName = item.video_name || item.name;
@@ -463,31 +466,49 @@ const isSelected = (item) => {
   return selectedItems.value.some(selected => selected.id === item.id);
 };
 
-const toggleSelection = (item) => {
-  if (props.multiple) {
-    const index = selectedItems.value.findIndex(selected => selected.id === item.id);
-    if (index > -1) {
-      selectedItems.value.splice(index, 1);
-    } else {
-      selectedItems.value.push(item);
-    }
-    // 多选模式下发出数组
-    emit('select', [...selectedItems.value]);
-  } else {
-    selectedItems.value = [item];
-    // 单选模式下发出单个对象
-    emit('select', item);
-  }
+// 检查是否可以多选（同类型素材）
+const canMultiSelect = (item) => {
+  if (selectedItems.value.length === 0) return true;
+  
+  // 检查是否为同类型素材
+  const firstSelectedType = selectedItems.value[0].type;
+  return item.type === firstSelectedType;
 };
 
-// 监听selectedItems变化，确保数据同步
-watch(selectedItems, (newValue) => {
-  if (props.multiple) {
-    emit('select', [...newValue]);
+const toggleSelection = (item, event) => {
+  // 检测是否按住了 Ctrl 或 Command 键
+  const isCtrlOrCmd = event?.ctrlKey || event?.metaKey;
+  
+  const index = selectedItems.value.findIndex(selected => selected.id === item.id);
+  
+  if (isCtrlOrCmd) {
+    // 按住 Ctrl/Cmd 键的多选逻辑
+    if (index > -1) {
+      // 取消选择
+      selectedItems.value.splice(index, 1);
+    } else {
+      // 检查是否可以多选（同类型）
+      if (canMultiSelect(item)) {
+        selectedItems.value.push(item);
+      } else {
+        message.warning('不能同时选择不同类型的素材');
+        return;
+      }
+    }
   } else {
-    emit('select', newValue.length > 0 ? newValue[0] : null);
+    // 不按住 Ctrl/Cmd 键，单选逻辑
+    if (index > -1) {
+      // 如果已选中，则取消选择
+      selectedItems.value = [];
+    } else {
+      // 选择当前项，清空其他选择
+      selectedItems.value = [item];
+    }
   }
-}, { deep: true });
+  
+  // 发出选择事件
+  emit('select', selectedItems.value.length === 1 ? selectedItems.value[0] : selectedItems.value);
+};
 
 const previewResource = (item) => {
   if (!item || !item.id) return;
@@ -497,13 +518,28 @@ const previewResource = (item) => {
 
 // 拖拽相关方法
 const handleDragStart = (item) => {
-  // 通过父组件传递拖拽事件
-  emit('drag-start', item);
+  // 如果拖拽的素材没有被选中，则只拖拽当前素材
+  if (!isSelected(item)) {
+    emit('drag-start', item);
+  } else {
+    // 如果拖拽的素材已被选中，则拖拽所有选中的素材
+    if (selectedItems.value.length > 1) {
+      emit('drag-start', selectedItems.value);
+    } else {
+      emit('drag-start', item);
+    }
+  }
 };
 
 const handleDragEnd = () => {
   // 通过父组件传递拖拽结束事件
   emit('drag-end');
+};
+
+// 清空选择
+const clearSelection = () => {
+  selectedItems.value = [];
+  emit('select', []);
 };
 </script>
 
@@ -533,9 +569,34 @@ const handleDragEnd = () => {
 }
 
 .panel-header h3 {
-  margin: 0;
+  margin: 0 0 8px 0;
   font-size: 16px;
   color: #262626;
+}
+
+.multi-select-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tip-text {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.selected-count {
+  font-size: 12px;
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.selected-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .asset-collection-selector {
@@ -630,6 +691,25 @@ const handleDragEnd = () => {
 .item-card.selected {
   border-color: #1890ff;
   box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+  position: relative;
+}
+
+.item-card.selected::after {
+  content: '✓';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  background: #1890ff;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  z-index: 10;
 }
 
 .item-cover {
@@ -747,6 +827,25 @@ const handleDragEnd = () => {
   border-color: #1890ff;
   box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
   background: #f6ffed;
+  position: relative;
+}
+
+.text-item-card.selected::after {
+  content: '✓';
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  background: #1890ff;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  z-index: 10;
 }
 
 .text-item-header {
