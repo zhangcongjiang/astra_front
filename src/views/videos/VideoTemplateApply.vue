@@ -14,12 +14,12 @@
         </div>
       </div>
 
-      <!-- Main Form Section -->
+      <!-- Form Section -->
       <div class="params-section">
         <div class="params-editor">
-          <div class="params-header">
-            <h3>自定义参数配置</h3>
-          </div>
+        <div class="params-header">
+          <h3>自定义参数配置</h3>
+        </div>
           <a-form 
             :model="formData" 
             layout="vertical"
@@ -42,16 +42,40 @@
                       <a-select-option v-for="option in (field.options && field.options.data) || []" :key="option.value" :value="option.value">{{ option.label }}</a-select-option>
                     </a-select>
                     
-                    <!-- Server Select (New) -->
+                    <!-- Server Select (New) - 改为拖放区域 -->
                     <div v-if="field.type === 'select' && field.options.source === 'server'" class="server-select-wrapper">
-                        <div class="selected-display">
-                            <span v-if="!formData[field.name] || (Array.isArray(formData[field.name]) && formData[field.name].length === 0)" class="placeholder">未选择</span>
-                            <template v-else>
-                                <a-tag v-if="!field.multiple" closable @close="clearServerSelection(field.name)">{{ formData[field.name].name }}</a-tag>
-                                <a-tag v-if="field.multiple" v-for="item in formData[field.name]" :key="item.id" closable @close="removeServerSelectionItem(field.name, item.id)">{{ item.name }}</a-tag>
-                            </template>
+                        <div 
+                          class="drop-zone"
+                          :class="{ 
+                            'drop-zone-active': isDragOver && canAcceptDrop(field.options.resourceType),
+                            'drop-zone-disabled': isDragOver && !canAcceptDrop(field.options.resourceType),
+                            'has-content': formData[field.name] && (Array.isArray(formData[field.name]) ? formData[field.name].length > 0 : true)
+                          }"
+                          @dragover.prevent="handleDragOver($event, field.options.resourceType)"
+                          @dragleave.prevent="handleDragLeave"
+                          @drop.prevent="handleDrop($event, field.name)"
+                        >
+                          <div class="drop-zone-content">
+                            <div v-if="!formData[field.name] || (Array.isArray(formData[field.name]) && formData[field.name].length === 0)" class="drop-placeholder">
+                              <CloudUploadOutlined :style="{ fontSize: '24px', color: '#ccc' }" />
+                              <p>拖拽{{ getResourceTypeLabel(field.options.resourceType) }}到此处</p>
+                            </div>
+                            <div v-else class="selected-items">
+                              <a-tag v-if="!field.multiple" closable @close="clearServerSelection(field.name)">
+                                {{ formData[field.name].name }}
+                              </a-tag>
+                              <a-tag 
+                                v-if="field.multiple" 
+                                v-for="item in formData[field.name]" 
+                                :key="item.id" 
+                                closable 
+                                @close="removeServerSelectionItem(field.name, item.id)"
+                              >
+                                {{ item.name }}
+                              </a-tag>
+                            </div>
+                          </div>
                         </div>
-                        <a-button @click="openResourceModal(field)">从服务器选择</a-button>
                     </div>
 
                     <a-radio-group v-if="field.type === 'radio'" v-model:value="formData[field.name]">
@@ -94,16 +118,40 @@
                               <a-select-option v-for="option in (innerField.options && innerField.options.data) || []" :key="option.value" :value="option.value">{{ option.label }}</a-select-option>
                             </a-select>
 
-                            <!-- Server Select in Group (New) -->
+                            <!-- Server Select in Group (New) - 改为拖放区域 -->
                             <div v-if="innerField.type === 'select' && innerField.options.source === 'server'" class="server-select-wrapper">
-                                <div class="selected-display">
-                                    <span v-if="!groupInstance[innerField.name] || (Array.isArray(groupInstance[innerField.name]) && groupInstance[innerField.name].length === 0)" class="placeholder">未选择</span>
-                                    <template v-else>
-                                        <a-tag v-if="!innerField.multiple" closable @close="clearServerSelection(groupInstance, innerField.name)">{{ groupInstance[innerField.name].name }}</a-tag>
-                                        <a-tag v-if="innerField.multiple" v-for="item in groupInstance[innerField.name]" :key="item.id" closable @close="removeServerSelectionItem(groupInstance, innerField.name, item.id)">{{ item.name }}</a-tag>
-                                    </template>
+                                <div 
+                                  class="drop-zone"
+                                  :class="{ 
+                                    'drop-zone-active': isDragOver && canAcceptDrop(innerField.options.resourceType),
+                                    'drop-zone-disabled': isDragOver && !canAcceptDrop(innerField.options.resourceType),
+                                    'has-content': groupInstance[innerField.name] && (Array.isArray(groupInstance[innerField.name]) ? groupInstance[innerField.name].length > 0 : true)
+                                  }"
+                                  @dragover.prevent="handleDragOver($event, innerField.options.resourceType)"
+                                  @dragleave.prevent="handleDragLeave"
+                                  @drop.prevent="handleDropInGroup($event, groupInstance, innerField.name)"
+                                >
+                                  <div class="drop-zone-content">
+                                    <div v-if="!groupInstance[innerField.name] || (Array.isArray(groupInstance[innerField.name]) && groupInstance[innerField.name].length === 0)" class="drop-placeholder">
+                                      <CloudUploadOutlined :style="{ fontSize: '24px', color: '#ccc' }" />
+                                      <p>拖拽{{ getResourceTypeLabel(innerField.options.resourceType) }}到此处</p>
+                                    </div>
+                                    <div v-else class="selected-items">
+                                      <a-tag v-if="!innerField.multiple" closable @close="clearServerSelection(groupInstance, innerField.name)">
+                                        {{ groupInstance[innerField.name].name }}
+                                      </a-tag>
+                                      <a-tag 
+                                        v-if="innerField.multiple" 
+                                        v-for="item in groupInstance[innerField.name]" 
+                                        :key="item.id" 
+                                        closable 
+                                        @close="removeServerSelectionItem(groupInstance, innerField.name, item.id)"
+                                      >
+                                        {{ item.name }}
+                                      </a-tag>
+                                    </div>
+                                  </div>
                                 </div>
-                                <a-button @click="openResourceModal(innerField, groupInstance)">从服务器选择</a-button>
                             </div>
 
                             <a-radio-group v-if="innerField.type === 'radio'" v-model:value="groupInstance[innerField.name]">
@@ -123,6 +171,70 @@
                         <template #icon><plus-outlined /></template> 添加{{ field.label }}
                     </a-button>
                   </template>
+
+                  <!-- Non-replicable Group -->
+                  <template v-else>
+                    <!-- Inlined logic for inner fields -->
+                    <template v-for="innerField in field.fields" :key="innerField.name">
+                       <a-form-item :label="innerField.label" :name="[field.name, innerField.name]" :rules="generateRules(innerField)">
+                         <a-input v-if="innerField.type === 'input' && (innerField.inputType === 'text' || innerField.inputType === 'url')" v-model:value="formData[field.name][innerField.name]" :placeholder="innerField.placeholder" />
+                         <a-input-number v-if="innerField.type === 'input' && innerField.inputType === 'number'" v-model:value="formData[field.name][innerField.name]" :placeholder="innerField.placeholder" style="width: 100%" />
+                         <a-textarea v-if="innerField.type === 'textarea'" v-model:value="formData[field.name][innerField.name]" :rows="innerField.rows" :placeholder="innerField.placeholder" />
+                         
+                         <!-- Static & Remote Select in Non-replicable Group -->
+                         <a-select v-if="innerField.type === 'select' && (innerField.options.source === 'static' || innerField.options.source === 'remote')" v-model:value="formData[field.name][innerField.name]" :mode="innerField.multiple ? 'multiple' : 'default'" :placeholder="innerField.placeholder" :loading="innerField.options && innerField.options.loading" allow-clear>
+                           <a-select-option v-for="option in (innerField.options && innerField.options.data) || []" :key="option.value" :value="option.value">{{ option.label }}</a-select-option>
+                         </a-select>
+
+                         <!-- Server Select in Non-replicable Group -->
+                         <div v-if="innerField.type === 'select' && innerField.options.source === 'server'" class="server-select-wrapper">
+                             <div 
+                               class="drop-zone"
+                               :class="{ 
+                                 'drop-zone-active': isDragOver && canAcceptDrop(innerField.options.resourceType),
+                                 'drop-zone-disabled': isDragOver && !canAcceptDrop(innerField.options.resourceType),
+                                 'has-content': formData[field.name][innerField.name] && (Array.isArray(formData[field.name][innerField.name]) ? formData[field.name][innerField.name].length > 0 : true)
+                               }"
+                               @dragover.prevent="handleDragOver($event, innerField.options.resourceType)"
+                               @dragleave.prevent="handleDragLeave"
+                               @drop.prevent="handleDropInGroup($event, formData[field.name], innerField.name)"
+                             >
+                               <div class="drop-zone-content">
+                                 <div v-if="!formData[field.name][innerField.name] || (Array.isArray(formData[field.name][innerField.name]) && formData[field.name][innerField.name].length === 0)" class="drop-placeholder">
+                                   <CloudUploadOutlined :style="{ fontSize: '24px', color: '#ccc' }" />
+                                   <p>拖拽{{ getResourceTypeLabel(innerField.options.resourceType) }}到此处</p>
+                                 </div>
+                                 <div v-else class="selected-items">
+                                   <a-tag v-if="!innerField.multiple" closable @close="clearServerSelection(formData[field.name], innerField.name)">
+                                     {{ formData[field.name][innerField.name].name }}
+                                   </a-tag>
+                                   <a-tag 
+                                     v-if="innerField.multiple" 
+                                     v-for="item in formData[field.name][innerField.name]" 
+                                     :key="item.id" 
+                                     closable 
+                                     @close="removeServerSelectionItem(formData[field.name], innerField.name, item.id)"
+                                   >
+                                     {{ item.name }}
+                                   </a-tag>
+                                 </div>
+                               </div>
+                             </div>
+                         </div>
+
+                         <a-radio-group v-if="innerField.type === 'radio'" v-model:value="formData[field.name][innerField.name]">
+                           <a-radio v-for="option in (innerField.options && innerField.options.data) || []" :key="option.value" :value="option.value">{{ option.label }}</a-radio>
+                         </a-radio-group>
+                         <a-checkbox-group v-if="innerField.type === 'checkbox'" v-model:value="formData[field.name][innerField.name]" :options="(innerField.options && innerField.options.data) || []" />
+                         <a-slider v-if="innerField.type === 'input' && innerField.inputType === 'range'" v-model:value="formData[field.name][innerField.name]" :min="Number(innerField.min)" :max="Number(innerField.max)" :step="Number(innerField.step)" />
+                         <input v-if="innerField.type === 'input' && innerField.inputType === 'color'" type="color" v-model="formData[field.name][innerField.name]" class="color-picker" />
+                         <a-upload v-if="innerField.type === 'input' && innerField.inputType === 'file'" v-model:file-list="formData[field.name][innerField.name]" :customRequest="customUpload" :multiple="innerField.multiple" :accept="innerField.accept" list-type="picture">
+                           <a-button><upload-outlined /> 点击上传</a-button>
+                         </a-upload>
+                         <template #extra v-if="innerField.description"><p class="field-description">{{ innerField.description }}</p></template>
+                       </a-form-item>
+                    </template>
+                  </template>
                 </div>
               </template>
             </template>
@@ -138,17 +250,14 @@
           </a-form>
         </div>
       </div>
+
+      <!-- Resource Selector - 浮动显示 -->
+      <ResourceSelectorModal
+        :draggable="true"
+        @drag-start="handleDragStart"
+        @drag-end="handleDragEnd"
+      />
     </a-spin>
-    
-    <!-- Resource Selector Modal -->
-    <ResourceSelectorModal
-        v-if="modalConfig.resourceType"
-        v-model:visible="modalConfig.visible"
-        :resource-type="modalConfig.resourceType"
-        :multiple="modalConfig.multiple"
-        :selected-value="modalConfig.selectedValue"
-        @select="handleResourceSelect"
-    />
 
     <a-modal v-model:visible="showSuccessModal" title="视频生成任务已提交" :footer="null" centered >
       <div class="success-modal">
@@ -174,7 +283,8 @@ import {
   CheckCircleOutlined,
   UploadOutlined,
   DeleteOutlined,
-  PlusOutlined
+  PlusOutlined,
+  CloudUploadOutlined
 } from '@ant-design/icons-vue'
 // Import your API functions and the new modal component
 import { uploadFile, createVideoTask, fetchRemoteData } from '@/api/modules/videoApi.js' 
@@ -192,13 +302,18 @@ const formRef = ref(null)
 const formData = reactive({})
 const formDefinition = computed(() => template.params?.form || [])
 
-// Modal State
+// 拖放相关状态
+const isDragOver = ref(false)
+const currentDragType = ref(null)
+const draggedItem = ref(null)
+
+// Modal State - 保留但不再使用
 const modalConfig = reactive({
     visible: false,
     resourceType: null,
     multiple: false,
     activeField: null,
-    activeGroupInstance: null, // To handle selections within a group
+    activeGroupInstance: null,
     selectedValue: null,
 });
 
@@ -491,12 +606,124 @@ const goToMyVideos = () => {
   showSuccessModal.value = false;
 };
 
+// 拖放相关方法
+const getResourceTypeLabel = (resourceType) => {
+  const labels = {
+    'image': '图片',
+    'video': '视频', 
+    'audio': '音频',
+    'text': '文本'
+  };
+  return labels[resourceType] || '素材';
+};
+
+const handleDragStart = (item) => {
+  draggedItem.value = item;
+  currentDragType.value = item.type;
+};
+
+const handleDragEnd = () => {
+  draggedItem.value = null;
+  currentDragType.value = null;
+  isDragOver.value = false;
+};
+
+const handleDragOver = (event, targetResourceType) => {
+  event.preventDefault();
+  isDragOver.value = true;
+  
+  // 检查是否可以接受当前拖拽的素材类型
+  if (currentDragType.value && currentDragType.value !== targetResourceType) {
+    event.dataTransfer.dropEffect = 'none';
+  } else {
+    event.dataTransfer.dropEffect = 'copy';
+  }
+};
+
+const handleDragLeave = () => {
+  isDragOver.value = false;
+};
+
+const canAcceptDrop = (targetResourceType) => {
+  return currentDragType.value === targetResourceType;
+};
+
+const handleDrop = (event, fieldName) => {
+  event.preventDefault();
+  isDragOver.value = false;
+  
+  if (!draggedItem.value) return;
+  
+  // 获取字段定义
+  const fieldDef = formDefinition.value.find(f => f.name === fieldName);
+  if (!fieldDef) return;
+  
+  // 检查类型匹配
+  if (draggedItem.value.type !== fieldDef.options.resourceType) {
+    message.warning(`只能拖拽${getResourceTypeLabel(fieldDef.options.resourceType)}类型的素材到此处`);
+    return;
+  }
+  
+  // 处理拖放
+  if (fieldDef.multiple) {
+    // 多选模式
+    const currentValue = formData[fieldName] || [];
+    const exists = currentValue.some(item => item.id === draggedItem.value.id);
+    if (!exists) {
+      formData[fieldName] = [...currentValue, draggedItem.value];
+      message.success(`已添加${draggedItem.value.name}`);
+    } else {
+      message.warning('该素材已存在');
+    }
+  } else {
+    // 单选模式
+    formData[fieldName] = draggedItem.value;
+    message.success(`已选择${draggedItem.value.name}`);
+  }
+};
+
+const handleDropInGroup = (event, groupInstance, fieldName) => {
+  event.preventDefault();
+  isDragOver.value = false;
+  
+  if (!draggedItem.value) return;
+  
+  // 获取字段定义
+  const groupField = formDefinition.value.find(f => f.type === 'group');
+  if (!groupField) return;
+  
+  const fieldDef = groupField.fields.find(f => f.name === fieldName);
+  if (!fieldDef) return;
+  
+  // 检查类型匹配
+  if (draggedItem.value.type !== fieldDef.options.resourceType) {
+    message.warning(`只能拖拽${getResourceTypeLabel(fieldDef.options.resourceType)}类型的素材到此处`);
+    return;
+  }
+  
+  // 处理拖放
+  if (fieldDef.multiple) {
+    // 多选模式
+    const currentValue = groupInstance[fieldName] || [];
+    const exists = currentValue.some(item => item.id === draggedItem.value.id);
+    if (!exists) {
+      groupInstance[fieldName] = [...currentValue, draggedItem.value];
+      message.success(`已添加${draggedItem.value.name}`);
+    } else {
+      message.warning('该素材已存在');
+    }
+  } else {
+    // 单选模式
+    groupInstance[fieldName] = draggedItem.value;
+    message.success(`已选择${draggedItem.value.name}`);
+  }
+};
+
 </script>
 
 
 <style>
 /* Basic styles for clarity */
-.template-apply-container { max-width: 800px; margin: 0 auto; padding: 24px; }
 .template-info { margin-bottom: 24px; }
 .template-info .description { color: #888; }
 .params-section { background-color: #fdfdfd; border: 1px solid #e8e8e8; border-radius: 8px; }
@@ -572,6 +799,83 @@ const goToMyVideos = () => {
 .success-modal { text-align: center; }
 .success-icon { font-size: 48px; color: #52c41a; margin-bottom: 16px; }
 .success-modal .actions { margin-top: 24px; }
+
+/* 拖放相关样式 */
+.drop-zone {
+  min-height: 60px;
+  border: 2px dashed #d9d9d9;
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: #fafafa;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.drop-zone:hover {
+  border-color: #40a9ff;
+  background-color: #f0f8ff;
+}
+
+.drop-zone.drag-over {
+  border-color: #1890ff;
+  background-color: #e6f7ff;
+  border-style: solid;
+}
+
+.drop-zone.disabled {
+  border-color: #f0f0f0;
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.drop-zone.disabled:hover {
+  border-color: #f0f0f0;
+  background-color: #f5f5f5;
+}
+
+.drop-placeholder {
+  color: #8c8c8c;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drop-placeholder .anticon {
+  font-size: 18px;
+}
+
+.selected-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.selected-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background-color: #f0f0f0;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.selected-tag .remove-btn {
+  cursor: pointer;
+  color: #999;
+  font-size: 12px;
+}
+
+.selected-tag .remove-btn:hover {
+  color: #ff4d4f;
+}
 </style>
 
 
@@ -581,6 +885,7 @@ const goToMyVideos = () => {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
+  padding-right: 200px;
 }
 
 .template-info {

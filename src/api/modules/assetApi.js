@@ -1,10 +1,10 @@
-import request from "../config/request";
+import { request } from "../config/request";
 import formatParams from "@/utils/formatParams";
 
 // 获取素材集列表
 export const getAssetCollectionList = async (params) => {
   try {
-    const response = await request.get("/asset-collection/", formatParams(params));
+    const response = await request.get("/asset/list/", formatParams(params));
     return response;
   } catch (error) {
     console.error(`获取素材集列表出错:`, error);
@@ -15,7 +15,7 @@ export const getAssetCollectionList = async (params) => {
 // 获取素材集详情
 export const getAssetCollectionDetail = async (id) => {
   try {
-    const response = await request.get(`/asset-collection/${id}/`);
+    const response = await request.get(`/asset/detail/${id}/`);
     return response;
   } catch (error) {
     console.error(`获取素材集详情出错:`, error);
