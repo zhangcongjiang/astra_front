@@ -59,7 +59,9 @@ export const updateAssetCollection = async (id, data) => {
 // 删除素材集
 export const deleteAssetCollection = async (id) => {
   try {
-    const response = await request.delete(`/asset-collection/${id}/`);
+    const response = await request.post('/asset/delete/', {
+      asset_id: id
+    });
     return response;
   } catch (error) {
     console.error('删除素材集失败:', error);
