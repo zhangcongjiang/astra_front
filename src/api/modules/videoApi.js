@@ -162,3 +162,97 @@ export const deleteVideo = async (video_id) => {
     throw error;
   }
 };
+
+
+/**
+ * 上传视频素材
+ * @param {FormData} data - 包含视频文件的表单数据
+ * @returns {Promise<object>} - 返回上传结果
+ */
+export const uploadVideoAsset = async (data) => {
+    try {
+        const response = await request.upload("/video/assets/upload/", data);
+        return response;
+    } catch (error) {
+        console.error(`视频素材上传失败:`, error);
+        throw error;
+    }
+};
+
+/**
+ * 获取视频素材列表
+ * @param {object} params - 查询参数，例如 { page: 1, page_size: 10, name: '' }
+ * @returns {Promise<object>} - 返回视频素材列表数据
+ */
+export const getVideoAssetList = async (params = {}) => {
+    try {
+        const response = await request.get("/video/assets/", formatParams(params));
+        return response;
+    } catch (error) {
+        console.error(`获取视频素材列表失败:`, error);
+        throw error;
+    }
+};
+
+/**
+ * 删除视频素材
+ * @param {string|number} assetId - 视频素材ID
+ * @returns {Promise<object>} - 返回删除结果
+ */
+export const deleteVideoAsset = async (assetId) => {
+    try {
+        const response = await request.post("/video/assets/delete/", {
+            asset_id: assetId
+        });
+        return response;
+    } catch (error) {
+        console.error(`删除视频素材失败:`, error);
+        throw error;
+    }
+};
+
+/**
+ * 编辑视频素材
+ * @param {object} data - 编辑数据，包含asset_id和其他要更新的字段
+ * @returns {Promise<object>} - 返回编辑结果
+ */
+export const editVideoAsset = async (data) => {
+    try {
+        const response = await request.post("/video/assets/edit/", data);
+        return response;
+    } catch (error) {
+        console.error(`编辑视频素材失败:`, error);
+        throw error;
+    }
+};
+
+/**
+ * 播放视频素材
+ * @param {string} assetId - 视频素材ID
+ * @returns {Promise<object>} - 返回播放URL或相关信息
+ */
+export const playVideoAsset = async (assetId) => {
+    try {
+        const response = await request.get(`/video/assets/play/${assetId}/`);
+        return response;
+    } catch (error) {
+        console.error(`获取视频素材播放信息失败:`, error);
+        throw error;
+    }
+};
+
+
+/**
+ * 更新视频素材标签
+ * @param {FormData} data - 包含asset_id和tag_ids的表单数据
+ * @returns {Promise<object>} - 返回更新结果
+ */
+export const updateVideoAssetTags = async (data) => {
+    try {
+        const response = await request.post("/video/assets/update-tags/", data);
+        return response;
+    } catch (error) {
+        console.error(`更新视频素材标签失败:`, error);
+        throw error;
+    }
+};
