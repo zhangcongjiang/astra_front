@@ -24,12 +24,14 @@
                         <a-form-item label="方向">
                             <a-select v-model:value="basicForm.orientation" placeholder="请选择方向" style="width: 120px;"
                                 allowClear>
+                                <a-select-option value="">全部</a-select-option>
                                 <a-select-option value="horizontal">横向</a-select-option>
                                 <a-select-option value="vertical">纵向</a-select-option>
                             </a-select>
                         </a-form-item>
                         <a-form-item label="创建时间">
                             <a-range-picker v-model:value="basicForm.dateRange" style="width: 240px;"
+                                :placeholder="['开始时间', '结束时间']"
                                 @change="handleDateChange" />
                         </a-form-item>
                     </a-form>

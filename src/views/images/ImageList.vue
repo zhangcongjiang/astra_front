@@ -177,7 +177,7 @@ const TAG_CATEGORY = 'IMAGE';
 // 分页配置
 const pagination = ref({
   current: 1,
-  pageSize: 10,
+  pageSize: 20,
   total: 0
 });
 
