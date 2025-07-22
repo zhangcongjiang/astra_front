@@ -46,9 +46,12 @@ export const createAssetCollection = async (data) => {
 };
 
 // 更新素材集
-export const updateAssetCollection = async (id, data) => {
+export const updateAssetCollection = async (id, set_name) => {
   try {
-    const response = await request.put(`/asset-collection/${id}/`, data);
+    const response = await request.post(`/asset/update/`, {
+      asset_id: id,
+      set_name: set_name
+    });
     return response;
   } catch (error) {
     console.error('更新素材集失败:', error);

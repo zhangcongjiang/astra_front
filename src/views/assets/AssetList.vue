@@ -229,15 +229,16 @@ const handleCreateAsset = async () => {
   }
   
   try {
-    const data = {
-      set_name: assetForm.name.trim(), // 使用后台字段名 set_name
-      description: assetForm.description.trim()
-    }
-    
     if (editingAsset.value) {
-      await updateAssetCollection(editingAsset.value.id, data)
+      // 编辑模式 - 使用你提供的API格式
+      await updateAssetCollection(editingAsset.value.id, assetForm.name.trim())
       message.success('编辑成功')
     } else {
+      // 创建模式
+      const data = {
+        set_name: assetForm.name.trim(),
+        description: assetForm.description.trim()
+      }
       await createAssetCollection(data)
       message.success('创建成功')
     }
