@@ -46,8 +46,14 @@
             </template>
             
             <template #actions>
-              <EditOutlined @click.stop="editAsset(asset)" />
-              <DeleteOutlined @click.stop="deleteAsset(asset.id)" />
+              <span class="action-item" @click.stop="editAsset(asset)">
+                <EditOutlined />
+                <span class="action-text">编辑</span>
+              </span>
+              <span class="action-item" @click.stop="deleteAsset(asset.id)">
+                <DeleteOutlined />
+                <span class="action-text">删除</span>
+              </span>
             </template>
             
             <a-card-meta>
@@ -426,5 +432,28 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   margin-top: 32px;
+}
+
+.action-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.action-item:hover {
+  background-color: #f5f5f5;
+}
+
+.action-text {
+  font-size: 12px;
+  color: #666;
+}
+
+.action-item:hover .action-text {
+  color: #1890ff;
 }
 </style>

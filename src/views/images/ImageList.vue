@@ -70,13 +70,15 @@
             </a-card-meta>
             <template #actions>
               <!-- 删除按钮 -->
-              <a-tooltip title="删除图片">
-                <delete-outlined @click.stop="showDeleteConfirm(image.id)" />
-              </a-tooltip>
+              <span class="action-item" @click.stop="showDeleteConfirm(image.id)">
+                <delete-outlined />
+                <span class="action-text">删除</span>
+              </span>
               <!-- 编辑标签按钮 -->
-              <a-tooltip title="编辑标签">
-                <tags-outlined @click.stop="showTagModal(image)" />
-              </a-tooltip>
+              <span class="action-item" @click.stop="showTagModal(image)">
+                <tags-outlined />
+                <span class="action-text">标签</span>
+              </span>
             </template>
           </a-card>
         </a-col>
@@ -883,5 +885,29 @@ const fetchTagCategories = async () => {
     margin-right: 0;
     margin-bottom: 4px;
   }
+}
+
+.action-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-right: 8px;
+}
+
+.action-item:hover {
+  background-color: #f5f5f5;
+}
+
+.action-text {
+  font-size: 12px;
+  color: #666;
+}
+
+.action-item:hover .action-text {
+  color: #1890ff;
 }
 </style>
