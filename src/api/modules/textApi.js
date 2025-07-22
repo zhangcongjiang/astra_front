@@ -117,25 +117,19 @@ export const uploadMarkdown = (file, title, onProgress) => {
 };
 
 
-/**
- * 保存图文（创建或更新）
- * @param {string|null} text_id - 图文ID，创建时为空字符串或null，编辑时传入ID
- * @param {string} title - 图文标题
- * @param {string} content - Markdown内容
- * @returns {Promise} API响应
- */
 export const saveText = async (text_id, title, content) => {
-  try {
-    const requestData = {
-      text_id: text_id || '', // 创建时传空字符串，编辑时传实际ID
-      title: title,
-      content: content
-    };
-    
-    const response = await request.post('/text/save/', requestData);
-    return response;
-  } catch (error) {
-    console.error('保存文件失败:', error);
-    throw error;
-  }
+    try {
+        const response = await request.post(`/text/save/`,
+            {
+                text_id: text_id,
+                title: title,
+                content: content
+            }
+        );
+        return response;
+    } catch (error) {
+        console.error(`保存文件失败:`, error);
+        throw error;
+    }
+
 };

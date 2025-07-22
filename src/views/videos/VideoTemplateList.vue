@@ -154,7 +154,7 @@ const templates = ref([]);
 // 分页配置
 const pagination = reactive({
     current: 1,
-    pageSize: 10,
+    pageSize: 20,
     total: 0
 });
 

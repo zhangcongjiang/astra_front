@@ -17,11 +17,12 @@
     </div>
 
     <div class="asset-grid">
+      
       <a-row :gutter="[16, 16]">
         <a-col 
           v-for="asset in assetList" 
           :key="asset.id"
-          :xs="24" :sm="12" :md="8" :lg="6" :xl="4"
+          :span="6"
         >
           <a-card 
             hoverable
@@ -30,6 +31,8 @@
           >
             <template #cover>
               <div class="cover-container">
+                <!-- 右上角素材数量标签 -->
+                <div class="asset-count-badge">{{ asset.itemCount || 0 }}</div>
                 <img 
                   v-if="asset.cover" 
                   :src="asset.cover" 
@@ -51,7 +54,6 @@
               <template #title>
                 <div class="card-title-row">
                   <span class="asset-name">{{ asset.name }}</span>
-                  <span class="asset-count">{{ asset.itemCount || 0 }} 个素材</span>
                 </div>
               </template>
               <template #description>
@@ -95,7 +97,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { 
@@ -106,6 +108,13 @@ import {
 } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
 import Pagination from '@/components/Pagination.vue'
+// 添加API导入
+import {
+  getAssetCollectionList,
+  createAssetCollection,
+  updateAssetCollection,
+  deleteAssetCollection
+} from '@/api/modules/assetApi'
 
 const router = useRouter()
 
@@ -113,7 +122,7 @@ const router = useRouter()
 const assetList = ref([])
 const searchKeyword = ref('')
 const currentPage = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(20)
 const total = ref(0)
 const showCreateModal = ref(false)
 const editingAsset = ref(null)
@@ -126,54 +135,50 @@ const assetForm = reactive({
 // 方法
 const loadAssetList = async () => {
   try {
-    // TODO: 调用API获取素材集列表
-    // const response = await getAssetList({
-    //   page: currentPage.value,
-    //   pageSize: pageSize.value,
-    //   keyword: searchKeyword.value
-    // })
+    const params = {
+      page: currentPage.value,
+      pageSize: pageSize.value,
+    }
     
-    // 模拟数据
-    assetList.value = [
-      {
-        id: 1,
-        name: '旅游素材集',
-        description: '包含各种旅游相关的图片和视频',
-        cover: 'https://via.placeholder.com/200x150',
-        itemCount: 25,
-        creator: '张三',
-        createTime: '2024-01-15 10:30:00'
-      },
-      {
-        id: 2,
-        name: '美食素材集',
-        description: '美食相关的高质量素材',
-        cover: 'https://via.placeholder.com/200x150',
-        itemCount: 18,
-        creator: '李四',
-        createTime: '2024-01-14 15:20:00'
-      },
-      {
-        id: 3,
-        name: '风景素材集',
-        description: '自然风景高清素材',
-        cover: 'https://via.placeholder.com/200x150',
-        itemCount: 32,
-        creator: '王五',
-        createTime: '2024-01-13 09:15:00'
-      },
-      {
-        id: 4,
-        name: '人物素材集',
-        description: '人物摄影素材',
-        cover: 'https://via.placeholder.com/200x150',
-        itemCount: 15,
-        creator: '赵六',
-        createTime: '2024-01-12 14:30:00'
-      }
-    ]
-    total.value = 50
+    if (searchKeyword.value.trim()) {
+      params.search = searchKeyword.value.trim()
+    }
+    
+    const response = await getAssetCollectionList(params)
+    
+    // 检查不同的响应结构可能性
+    let data
+    if (response.data) {
+      data = response.data
+    } else if (response.results) {
+      data = response
+    } else {
+      data = response
+    }
+    
+    console.log('处理后的数据:', data)
+    
+    if (data && data.results) {
+      // 映射后端数据到前端格式
+      const mappedData = data.results.map(item => ({
+        id: item.id,
+        name: item.set_name,
+        itemCount: item.asset_count,
+        creator: item.creator,
+        createTime: item.create_time,
+        coverImage: item.cover_image || '/default-cover.jpg' // 如果有封面图片字段
+      }))
+      
+      assetList.value = mappedData
+      total.value = data.count
+      
+      // 强制触发更新
+      nextTick(() => {
+        console.log('DOM 更新完成')
+      })
+    }
   } catch (error) {
+    console.error('加载素材集列表失败:', error)
     message.error('加载素材集列表失败')
   }
 }
@@ -202,11 +207,11 @@ const editAsset = (asset) => {
 
 const deleteAsset = async (id) => {
   try {
-    // TODO: 调用删除API
-    // await deleteAsset(id)
+    await deleteAssetCollection(id)
     message.success('删除成功')
     loadAssetList()
   } catch (error) {
+    console.error('删除失败:', error)
     message.error('删除失败')
   }
 }
@@ -218,19 +223,23 @@ const handleCreateAsset = async () => {
   }
   
   try {
+    const data = {
+      set_name: assetForm.name.trim(), // 使用后台字段名 set_name
+      description: assetForm.description.trim()
+    }
+    
     if (editingAsset.value) {
-      // TODO: 调用编辑API
-      // await updateAsset(editingAsset.value.id, assetForm)
+      await updateAssetCollection(editingAsset.value.id, data)
       message.success('编辑成功')
     } else {
-      // TODO: 调用创建API
-      // await createAsset(assetForm)
+      await createAssetCollection(data)
       message.success('创建成功')
     }
     
     resetForm()
     loadAssetList()
   } catch (error) {
+    console.error('操作失败:', error)
     message.error(editingAsset.value ? '编辑失败' : '创建失败')
   }
 }
@@ -304,8 +313,46 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   background: #f5f5f5;
+  position: relative; /* 添加相对定位 */
 }
 
+/* 右上角素材数量标签样式 */
+.asset-count-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #1890ff;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 12px;
+  z-index: 10;
+  min-width: 20px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card-title-row {
+  display: flex;
+  justify-content: flex-start; /* 改为左对齐 */
+  align-items: center;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.asset-name {
+  font-weight: 500;
+  font-size: 16px;
+  color: #262626;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* 移除原来的 asset-count 样式，因为已经移到右上角 */
 .cover-image {
   width: 100%;
   height: 100%;
