@@ -166,7 +166,7 @@ const loadAssetList = async () => {
         itemCount: item.asset_count,
         creator: item.creator,
         createTime: item.create_time,
-        coverImage: item.cover_image || '/default-cover.jpg' // 如果有封面图片字段
+        cover: item.cover_img // 修改为 cover，与模板中的字段名一致
       }))
       
       assetList.value = mappedData
@@ -356,7 +356,8 @@ onMounted(() => {
 .cover-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain; /* 改为 contain，保持图片完整显示 */
+  object-position: center; /* 图片居中显示 */
 }
 
 .default-cover {
