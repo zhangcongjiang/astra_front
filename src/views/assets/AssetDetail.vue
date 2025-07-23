@@ -94,8 +94,8 @@
                 >
                   <template #cover>
                     <div class="item-cover">
-                      <div class="video-cover">
-                        <video :src="item.url" class="cover-video" />
+                      <div class="video-cover" @click="playVideo(item)">
+                        <video :src="item.url" class="cover-video" ref="videoRef" />
                         <div class="play-overlay">
                           <PlayCircleOutlined :style="{ fontSize: '32px', color: '#fff' }" />
                         </div>
@@ -153,8 +153,11 @@
                 >
                   <template #cover>
                     <div class="item-cover">
-                      <div class="audio-cover">
-                        <SoundOutlined :style="{ fontSize: '48px', color: '#1890ff' }" />
+                      <div class="audio-cover" @click="playAudio(item)">
+                        <SoundOutlined :style="{ fontSize: '48px', color: isPlaying(item.id) ? '#52c41a' : '#1890ff' }" />
+                        <div v-if="isPlaying(item.id)" class="audio-playing-indicator">
+                          <div class="wave-animation"></div>
+                        </div>
                       </div>
                       <div class="delete-overlay">
                         <a-popconfirm
@@ -343,9 +346,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, h } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { Modal, message } from 'ant-design-vue'
 import { 
   ArrowLeftOutlined,
   PlusOutlined, 
@@ -378,6 +381,12 @@ const selectedItems = ref([])
 const imageItems = ref([])
 const videoItems = ref([])
 const audioItems = ref([])
+const playingAudioId = ref(null)
+
+// 播放状态管理
+const currentPlayingAudio = ref(null)
+const currentPlayingVideo = ref(null)
+const playingItems = ref(new Set())
 
 // 图片预览相关状态
 const previewVisible = ref(false)
@@ -496,6 +505,94 @@ const handleKeydown = (event) => {
       closePreview()
       break
   }
+}
+
+// 播放视频
+const playVideo = (item) => {
+  // 停止当前播放的视频
+  if (currentPlayingVideo.value) {
+    currentPlayingVideo.value.pause()
+    currentPlayingVideo.value.currentTime = 0
+  }
+  
+  // 创建视频播放模态框
+  const modal = Modal.info({
+    title: item.name,
+    width: '80vw',
+    content: h('div', {
+      style: {
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '400px'
+      }
+    }, [
+      h('video', {
+        src: item.url,
+        controls: true,
+        autoplay: true,
+        style: {
+          maxWidth: '100%',
+          maxHeight: '70vh'
+        },
+        onLoadeddata: (e) => {
+          currentPlayingVideo.value = e.target
+        }
+      })
+    ]),
+    onOk: () => {
+      if (currentPlayingVideo.value) {
+        currentPlayingVideo.value.pause()
+        currentPlayingVideo.value = null
+      }
+    }
+  })
+}
+
+// 播放音频
+const playAudio = (item) => {
+  // 如果当前音频正在播放，则停止
+  if (playingItems.value.has(item.id)) {
+    if (currentPlayingAudio.value) {
+      currentPlayingAudio.value.pause()
+      currentPlayingAudio.value = null
+    }
+    playingItems.value.delete(item.id)
+    return
+  }
+  
+  // 停止其他音频
+  if (currentPlayingAudio.value) {
+    currentPlayingAudio.value.pause()
+    playingItems.value.clear()
+  }
+  
+  // 创建新的音频实例
+  const audio = new Audio(item.url)
+  currentPlayingAudio.value = audio
+  playingItems.value.add(item.id)
+  
+  audio.addEventListener('ended', () => {
+    playingItems.value.delete(item.id)
+    currentPlayingAudio.value = null
+  })
+  
+  audio.addEventListener('error', () => {
+    message.error('音频播放失败')
+    playingItems.value.delete(item.id)
+    currentPlayingAudio.value = null
+  })
+  
+  audio.play().catch(() => {
+    message.error('音频播放失败')
+    playingItems.value.delete(item.id)
+    currentPlayingAudio.value = null
+  })
+}
+
+// 检查是否正在播放
+const isPlaying = (itemId) => {
+  return playingItems.value.has(itemId)
 }
 
 // 文本文案相关方法
@@ -725,6 +822,12 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
+  if (currentPlayingAudio.value) {
+    currentPlayingAudio.value.pause()
+  }
+  if (currentPlayingVideo.value) {
+    currentPlayingVideo.value.pause()
+  }
 })
 </script>
 
@@ -881,19 +984,19 @@ onUnmounted(() => {
   transform: scale(1.05);
 }
 
+/* 视频封面样式 */
 .video-cover {
   position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: 120px;
+  cursor: pointer;
+  overflow: hidden;
 }
 
 .cover-video {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  pointer-events: none;
 }
 
 .play-overlay {
@@ -903,19 +1006,60 @@ onUnmounted(() => {
   transform: translate(-50%, -50%);
   background: rgba(0, 0, 0, 0.6);
   border-radius: 50%;
-  padding: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 8px;
+  transition: all 0.3s ease;
 }
 
+.video-cover:hover .play-overlay {
+  background: rgba(0, 0, 0, 0.8);
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+/* 音频封面样式 */
 .audio-cover {
-  width: 100%;
-  height: 100%;
+  position: relative;
+  height: 120px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f9f9f9;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.audio-cover:hover {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  transform: scale(1.02);
+}
+
+/* 音频播放指示器 */
+.audio-playing-indicator {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+}
+
+.wave-animation {
+  width: 20px;
+  height: 20px;
+  background: #52c41a;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(82, 196, 26, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(82, 196, 26, 0);
+  }
 }
 
 .delete-overlay {
