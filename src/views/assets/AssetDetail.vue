@@ -13,42 +13,18 @@
           <span>素材数量: {{ totalItemsCount }}</span>
         </div>
       </div>
-      <div class="actions">
-        <a-button @click="showAddModal = true">
-          <PlusOutlined /> 添加素材
-        </a-button>
-        <a-button type="primary" @click="editAsset">
-          <EditOutlined /> 编辑
-        </a-button>
-      </div>
     </div>
 
     <div class="content">
-      <div class="toolbar">
-        <a-input-search
-          v-model:value="searchKeyword"
-          placeholder="搜索素材"
-          style="width: 300px"
-          @search="handleSearch"
-        />
-      </div>
-
       <!-- 分类展示区域 -->
       <div class="categorized-content">
         <!-- 图片分类 -->
         <div class="category-section">
           <div class="category-header">
             <h3><FileImageOutlined /> 图片素材 ({{ imageItems.length }})</h3>
-            <a-upload
-              :show-upload-list="false"
-              :before-upload="(file) => handleUpload(file, 'image')"
-              accept="image/*"
-              multiple
-            >
-              <a-button type="primary" size="small">
-                <UploadOutlined /> 上传图片
-              </a-button>
-            </a-upload>
+            <a-button type="primary" size="small" @click="handleAddItems">
+              <PlusOutlined /> 新增
+            </a-button>
           </div>
           <div v-if="imageItems.length > 0" class="items-grid">
             <a-row :gutter="[16, 16]">
@@ -59,7 +35,8 @@
               >
                 <a-card 
                   hoverable
-                  class="item-card"
+                  class="item-card image-card"
+                  @click="openPreview(item, index)"
                 >
                   <template #cover>
                     <div class="item-cover">
@@ -68,8 +45,7 @@
                         :alt="item.name"
                         class="cover-image"
                       />
-                      <!-- 悬浮删除按钮 -->
-                      <div class="delete-overlay">
+                      <div class="delete-overlay" @click.stop>
                         <a-popconfirm
                           title="确定要删除这个素材吗？"
                           @confirm="removeItem(item.id)"
@@ -88,10 +64,6 @@
                       </div>
                     </div>
                   </template>
-                  
-                  <a-card-meta 
-                    :title="item.name"
-                  />
                 </a-card>
               </a-col>
             </a-row>
@@ -105,16 +77,9 @@
         <div class="category-section">
           <div class="category-header">
             <h3><VideoCameraOutlined /> 视频素材 ({{ videoItems.length }})</h3>
-            <a-upload
-              :show-upload-list="false"
-              :before-upload="(file) => handleUpload(file, 'video')"
-              accept="video/*"
-              multiple
-            >
-              <a-button type="primary" size="small">
-                <UploadOutlined /> 上传视频
-              </a-button>
-            </a-upload>
+            <a-button type="primary" size="small" @click="handleAddItems">
+              <PlusOutlined /> 新增
+            </a-button>
           </div>
           <div v-if="videoItems.length > 0" class="items-grid">
             <a-row :gutter="[16, 16]">
@@ -135,7 +100,6 @@
                           <PlayCircleOutlined :style="{ fontSize: '32px', color: '#fff' }" />
                         </div>
                       </div>
-                      <!-- 悬浮删除按钮 -->
                       <div class="delete-overlay">
                         <a-popconfirm
                           title="确定要删除这个素材吗？"
@@ -172,16 +136,9 @@
         <div class="category-section">
           <div class="category-header">
             <h3><SoundOutlined /> 音频素材 ({{ audioItems.length }})</h3>
-            <a-upload
-              :show-upload-list="false"
-              :before-upload="(file) => handleUpload(file, 'audio')"
-              accept="audio/*"
-              multiple
-            >
-              <a-button type="primary" size="small">
-                <UploadOutlined /> 上传音频
-              </a-button>
-            </a-upload>
+            <a-button type="primary" size="small" @click="handleAddItems">
+              <PlusOutlined /> 新增
+            </a-button>
           </div>
           <div v-if="audioItems.length > 0" class="items-grid">
             <a-row :gutter="[16, 16]">
@@ -199,7 +156,6 @@
                       <div class="audio-cover">
                         <SoundOutlined :style="{ fontSize: '48px', color: '#1890ff' }" />
                       </div>
-                      <!-- 悬浮删除按钮 -->
                       <div class="delete-overlay">
                         <a-popconfirm
                           title="确定要删除这个素材吗？"
@@ -232,36 +188,45 @@
           </div>
         </div>
 
-        <!-- 文本文案分类 - 移到最后 -->
+        <!-- 文本文案分类 -->
         <div class="category-section">
           <div class="category-header">
-            <h3><FileTextOutlined /> 文本文案</h3>
-            <!-- 移除新增文案按钮 -->
+            <h3><FileTextOutlined /> 文本文案 ({{ textItems.length }})</h3>
+            <a-button type="primary" size="small" @click="showTextModal">
+              <PlusOutlined /> 新增
+            </a-button>
           </div>
           <div class="text-items-container">
-            <!-- 显示默认的空文案 -->
-            <div class="text-item-card">
-              <div class="text-item-header">
-                <h4>{{ defaultTextItem.name }}</h4>
-                <div class="text-item-actions">
-                  <a-button type="link" size="small" @click="editTextItem(defaultTextItem)">
-                    <EditOutlined /> 编辑段落
-                  </a-button>
-                </div>
-              </div>
-              <div class="text-content">
-                <div v-if="defaultTextItem.text.length > 0">
-                  <div v-for="(paragraph, index) in defaultTextItem.text" :key="index" class="paragraph-item">
-                    <p>{{ paragraph }}</p>
+            <div v-if="textItems.length > 0">
+              <div v-for="item in textItems" :key="item.id" class="text-item-card">
+                <div class="text-item-header">
+                  <h4>{{ item.name }}</h4>
+                  <div class="text-item-actions">
+                    <a-button type="link" size="small" @click="editTextItem(item)">
+                      <EditOutlined /> 编辑
+                    </a-button>
+                    <a-popconfirm
+                      title="确定要删除这个文本素材吗？"
+                      @confirm="removeTextItem(item.id)"
+                    >
+                      <a-button type="link" size="small" danger>
+                        <DeleteOutlined /> 删除
+                      </a-button>
+                    </a-popconfirm>
                   </div>
                 </div>
-                <div v-else class="empty-text">
-                  <a-empty description="暂无段落内容，点击编辑添加段落" size="small" />
+                <div class="text-content">
+                  <div class="paragraph-item">
+                    <p>{{ item.text }}</p>
+                  </div>
+                </div>
+                <div class="text-item-meta">
+                  <span>创建时间: {{ formatTime(item.createTime) }}</span>
                 </div>
               </div>
-              <div class="text-item-meta">
-                <span>更新时间: {{ formatTime(defaultTextItem.updateTime) }}</span>
-              </div>
+            </div>
+            <div v-else class="empty-text">
+              <a-empty description="暂无文本素材" size="small" />
             </div>
           </div>
         </div>
@@ -283,7 +248,6 @@
     >
       <div class="add-items-content">
         <p>选择要添加到素材集的素材</p>
-        <!-- TODO: 实现素材选择界面 -->
       </div>
     </a-modal>
 
@@ -322,11 +286,64 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <!-- 使用全屏覆盖的方式替代模态框 -->
+    <div v-if="previewVisible" class="fullscreen-preview" @click="closePreview">
+      <div class="preview-content" @click.stop>
+        <!-- 右上角操作按钮 -->
+        <div class="preview-top-actions">
+          <a-popconfirm
+            title="确定要删除这张图片吗？"
+            @confirm="deleteCurrentImage"
+            ok-text="确定"
+            cancel-text="取消"
+          >
+            <a-button type="text" danger class="preview-action-btn">
+              <DeleteOutlined />
+            </a-button>
+          </a-popconfirm>
+          <a-button type="text" @click="closePreview" class="preview-action-btn">
+            <CloseOutlined />
+          </a-button>
+        </div>
+
+        <!-- 左侧切换按钮 -->
+        <div class="preview-nav-btn preview-nav-left" v-if="imageItems.length > 1">
+          <a-button 
+            type="text" 
+            @click="showPrevImage" 
+            :disabled="currentPreviewIndex === 0"
+            class="nav-btn"
+          >
+            <LeftOutlined :style="{ fontSize: '24px' }" />
+          </a-button>
+        </div>
+
+        <!-- 图片 -->
+        <img 
+          :src="currentPreviewImage.url" 
+          :alt="currentPreviewImage.name"
+          class="preview-image"
+        />
+
+        <!-- 右侧切换按钮 -->
+        <div class="preview-nav-btn preview-nav-right" v-if="imageItems.length > 1">
+          <a-button 
+            type="text" 
+            @click="showNextImage" 
+            :disabled="currentPreviewIndex === imageItems.length - 1"
+            class="nav-btn"
+          >
+            <RightOutlined :style="{ fontSize: '24px' }" />
+          </a-button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { 
@@ -339,9 +356,14 @@ import {
   DeleteOutlined,
   FileImageOutlined,
   VideoCameraOutlined,
-  FileTextOutlined  // Make sure this is imported
+  FileTextOutlined,
+  LeftOutlined,
+  RightOutlined,
+  CloseOutlined
 } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
+import { getAssetCollectionDetail } from '@/api/modules/assetApi'
+import { getImageContent } from '@/api/modules/imageApi'
 
 const router = useRouter()
 const route = useRoute()
@@ -350,7 +372,17 @@ const route = useRoute()
 const assetDetail = ref({})
 const assetItems = ref([])
 const textItems = ref([])
-const searchKeyword = ref('') // 添加这行 - 搜索关键词
+const searchKeyword = ref('')
+const showAddModal = ref(false)
+const selectedItems = ref([])
+const imageItems = ref([])
+const videoItems = ref([])
+const audioItems = ref([])
+
+// 图片预览相关状态
+const previewVisible = ref(false)
+const currentPreviewImage = ref({})
+const currentPreviewIndex = ref(0)
 
 // 默认文案对象
 const defaultTextItem = ref({
@@ -370,7 +402,7 @@ const textFormState = ref({
   text: []
 })
 
-// 计算属性 - 按类型分类的素材
+// 计算属性
 const filteredItems = computed(() => {
   let items = assetItems.value
   
@@ -383,7 +415,6 @@ const filteredItems = computed(() => {
   return items
 })
 
-// 过滤文本文案
 const filteredTextItems = computed(() => {
   let items = textItems.value
   
@@ -399,34 +430,80 @@ const filteredTextItems = computed(() => {
   return items
 })
 
-// Remove this duplicate computed property that causes circular dependency:
-// const textItems = computed(() => {
-//   return filteredTextItems.value
-// })
-
-const imageItems = computed(() => {
-  return filteredItems.value.filter(item => item.type === 'image')
-})
-
-const videoItems = computed(() => {
-  return filteredItems.value.filter(item => item.type === 'video')
-})
-
-const audioItems = computed(() => {
-  return filteredItems.value.filter(item => item.type === 'audio')
-})
-
-// 总素材数量
 const totalItemsCount = computed(() => {
-  return assetItems.value.length + textItems.value.length
+  return imageItems.value.length + videoItems.value.length + audioItems.value.length + textItems.value.length
 })
+
+// 图片预览相关方法
+const openPreview = (image, index) => {
+  currentPreviewImage.value = image
+  currentPreviewIndex.value = index
+  previewVisible.value = true
+}
+
+const closePreview = () => {
+  previewVisible.value = false
+  currentPreviewImage.value = {}
+  currentPreviewIndex.value = 0
+}
+
+const showPrevImage = () => {
+  if (currentPreviewIndex.value > 0) {
+    currentPreviewIndex.value--
+    currentPreviewImage.value = imageItems.value[currentPreviewIndex.value]
+  }
+}
+
+const showNextImage = () => {
+  if (currentPreviewIndex.value < imageItems.value.length - 1) {
+    currentPreviewIndex.value++
+    currentPreviewImage.value = imageItems.value[currentPreviewIndex.value]
+  }
+}
+
+const deleteCurrentImage = async () => {
+  try {
+    const imageId = currentPreviewImage.value.id
+    await removeItem(imageId)
+    
+    // 更新预览状态
+    if (imageItems.value.length === 0) {
+      closePreview()
+    } else {
+      // 调整当前预览索引
+      if (currentPreviewIndex.value >= imageItems.value.length) {
+        currentPreviewIndex.value = imageItems.value.length - 1
+      }
+      currentPreviewImage.value = imageItems.value[currentPreviewIndex.value]
+    }
+  } catch (error) {
+    message.error('删除失败')
+  }
+}
+
+// 键盘事件处理
+const handleKeydown = (event) => {
+  if (!previewVisible.value) return
+  
+  switch (event.key) {
+    case 'ArrowLeft':
+      showPrevImage()
+      break
+    case 'ArrowRight':
+      showNextImage()
+      break
+    case 'Escape':
+      closePreview()
+      break
+  }
+}
 
 // 文本文案相关方法
 const showTextModal = () => {
   textModalTitle.value = '新增文案'
   textFormState.id = null
   textFormState.name = ''
-  textFormState.text = [''] // 初始化时包含一个空段落
+  textFormState.text = ['']
   textModalVisible.value = true
 }
 
@@ -435,7 +512,7 @@ const editTextItem = (record) => {
   textFormState.value = {
     id: record.id,
     name: record.name,
-    text: [...record.text] // 复制文案数组
+    text: [...record.text]
   }
   textModalVisible.value = true
 }
@@ -451,7 +528,6 @@ const removeParagraph = (index) => {
 const handleTextSubmit = () => {
   const formData = textFormState.value
   
-  // 过滤空段落
   const paragraphs = formData.text
     .map(p => p.trim())
     .filter(p => p !== '')
@@ -461,7 +537,6 @@ const handleTextSubmit = () => {
     return
   }
 
-  // 更新默认文案
   defaultTextItem.value = {
     ...defaultTextItem.value,
     text: paragraphs,
@@ -483,7 +558,6 @@ const closeTextModal = () => {
 
 const removeTextItem = async (itemId) => {
   try {
-    // TODO: 调用API删除文本文案
     textItems.value = textItems.value.filter(item => item.id !== itemId)
     message.success('删除成功')
   } catch (error) {
@@ -491,90 +565,143 @@ const removeTextItem = async (itemId) => {
   }
 }
 
-// 原有方法
+// 加载素材详情
 const loadAssetDetail = async () => {
   try {
     const assetId = route.params.id
-    // TODO: 调用API获取素材集详情
+    const response = await getAssetCollectionDetail(assetId)
     
-    // 模拟数据
-    assetDetail.value = {
-      id: assetId,
-      name: '旅游素材集',
-      description: '包含各种旅游相关的图片和视频素材',
-      creator: '张三',
-      createTime: '2024-01-15 10:30:00'
-    }
-    
-    assetItems.value = [
-      {
-        id: 1,
-        name: '海滩风景.jpg',
-        type: 'image',
-        url: 'https://via.placeholder.com/400x300',
-        size: 2621440 // 2.5MB
-      },
-      {
-        id: 2,
-        name: '旅游宣传片.mp4',
+    if (response.code === 0) {
+      const data = response.data
+      
+      assetDetail.value = {
+        id: data.id,
+        name: data.set_name,
+        description: '',
+        creator: data.creator,
+        createTime: data.create_time
+      }
+      
+      imageItems.value = data.images
+        .filter(item => item.asset_type === 'image')
+        .map(item => ({
+          id: item.id,
+          resource_id: item.resource_id,
+          name: item.resource_detail.name,
+          type: 'image',
+          url: item.resource_detail.url,
+          width: item.resource_detail.width,
+          height: item.resource_detail.height,
+          format: item.resource_detail.format,
+          createTime: item.resource_detail.create_time,
+          index: item.index
+        }))
+      
+      textItems.value = (data.texts || []).map(item => ({
+        id: item.id,
+        resource_id: item.resource_id,
+        name: `文本素材_${item.index}`,
+        text: item.resource_detail.text,
+        createTime: item.resource_detail.create_time,
+        index: item.index
+      }))
+      
+      videoItems.value = data.videos.map(item => ({
+        id: item.id,
+        resource_id: item.resource_id,
+        name: item.resource_detail.name || `视频素材_${item.index}`,
         type: 'video',
-        url: 'https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4',
-        size: 15728640 // 15MB
-      },
-      {
-        id: 3,
-        name: '背景音乐.mp3',
+        url: item.resource_detail.url,
+        createTime: item.resource_detail.create_time,
+        index: item.index
+      }))
+      
+      audioItems.value = data.sounds.map(item => ({
+        id: item.id,
+        resource_id: item.resource_id,
+        name: item.resource_detail.name || `音频素材_${item.index}`,
         type: 'audio',
-        url: 'https://sample-music.com/sample.mp3',
-        size: 4194304 // 4MB
-      },
-      {
-        id: 4,
-        name: '山景图片.jpg',
-        type: 'image',
-        url: 'https://via.placeholder.com/400x300',
-        size: 1048576 // 1MB
-      },
-      {
-        id: 5,
-        name: '城市夜景.mp4',
-        type: 'video',
-        url: 'https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4',
-        size: 20971520 // 20MB
-      }
-    ]
-
-    // 模拟文本文案数据
-    textItems.value = [
-      {
-        id: 101,
-        name: '旅游宣传文案',
-        text: [
-          '探索世界的美好，从这里开始。',
-          '每一次旅行都是一次心灵的洗礼，让我们一起踏上这段美妙的旅程。',
-          '发现未知的风景，体验不同的文化，创造属于你的独特回忆。'
-        ],
-        createTime: '2024-01-15 10:30:00'
-      },
-      {
-        id: 102,
-        name: '产品介绍文案',
-        text: [
-          '我们的旅游产品为您提供最优质的服务体验。',
-          '专业的导游团队，精心设计的行程路线，让您的旅行更加轻松愉快。'
-        ],
-        createTime: '2024-01-16 14:20:00'
-      }
-    ]
+        url: item.resource_detail.url,
+        createTime: item.resource_detail.create_time,
+        index: item.index
+      }))
+      
+      assetItems.value = [...imageItems.value, ...videoItems.value, ...audioItems.value]
+      
+    } else {
+      message.error(response.message || '获取素材集详情失败')
+    }
   } catch (error) {
+    console.error('加载素材集详情失败:', error)
     message.error('加载素材集详情失败')
   }
 }
 
-// 生命周期
-onMounted(() => {
-  loadAssetDetail()
-})
+// 其他方法
+const goBack = () => {
+  router.back()
+}
+
+const editAsset = () => {
+  message.info('编辑功能待实现')
+}
+
+const handleAddItems = () => {
+  message.success('素材添加成功')
+  showAddModal.value = false
+  selectedItems.value = []
+}
+
+const handleSearch = () => {
+  // 搜索逻辑已经通过计算属性实现
+}
+
+const handleUpload = (file, type) => {
+  const isLt10M = file.size / 1024 / 1024 < 10
+  if (!isLt10M) {
+    message.error('文件大小不能超过 10MB!')
+    return false
+  }
+
+  message.loading('上传中...', 1)
+  
+  setTimeout(() => {
+    const newItem = {
+      id: Date.now(),
+      name: file.name,
+      type: type,
+      url: URL.createObjectURL(file),
+      size: file.size
+    }
+    
+    if (type === 'image') {
+      imageItems.value.unshift(newItem)
+    } else if (type === 'video') {
+      videoItems.value.unshift(newItem)
+    } else if (type === 'audio') {
+      audioItems.value.unshift(newItem)
+    }
+    
+    assetItems.value.unshift(newItem)
+    message.success('上传成功!')
+  }, 1000)
+  
+  return false
+}
+
+const removeItem = async (itemId) => {
+  try {
+    // 从各个数组中删除
+    imageItems.value = imageItems.value.filter(item => item.id !== itemId)
+    videoItems.value = videoItems.value.filter(item => item.id !== itemId)
+    audioItems.value = audioItems.value.filter(item => item.id !== itemId)
+    assetItems.value = assetItems.value.filter(item => item.id !== itemId)
+    
+    message.success('删除成功')
+  } catch (error) {
+    message.error('删除失败')
+  }
+}
 
 // 工具函数
 const formatTime = (time) => {
@@ -590,64 +717,15 @@ const formatFileSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-// 其他方法
-const goBack = () => {
-  router.back()
-}
+// 生命周期
+onMounted(() => {
+  loadAssetDetail()
+  document.addEventListener('keydown', handleKeydown)
+})
 
-const editAsset = () => {
-  // TODO: 实现编辑功能
-  message.info('编辑功能待实现')
-}
-
-const handleSearch = () => {
-  // 搜索逻辑已在计算属性中实现
-}
-
-const handleUpload = (file, type) => {
-  // 文件大小限制检查
-  const isLt10M = file.size / 1024 / 1024 < 10
-  if (!isLt10M) {
-    message.error('文件大小不能超过 10MB!')
-    return false
-  }
-
-  // 模拟上传过程
-  message.loading('上传中...', 1)
-  
-  setTimeout(() => {
-    // 创建新的素材项
-    const newItem = {
-      id: Date.now(),
-      name: file.name,
-      type: type,
-      url: URL.createObjectURL(file),
-      size: file.size
-    }
-    
-    // 添加到对应的素材列表
-    assetItems.value.unshift(newItem)
-    message.success('上传成功!')
-  }, 1000)
-  
-  return false // 阻止默认上传行为
-}
-
-const removeItem = async (itemId) => {
-  try {
-    // TODO: 调用API删除素材
-    assetItems.value = assetItems.value.filter(item => item.id !== itemId)
-    message.success('删除成功')
-  } catch (error) {
-    message.error('删除失败')
-  }
-}
-
-const handleAddItems = () => {
-  // TODO: 实现添加素材功能
-  message.info('添加素材功能待实现')
-  showAddModal.value = false
-}
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <style scoped>
@@ -742,11 +820,44 @@ const handleAddItems = () => {
 .item-card {
   height: 100%;
   transition: all 0.3s;
+  cursor: pointer;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.item-card .ant-card-body {
+  padding: 12px;
+}
+
+.item-card .ant-card-meta-title {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .item-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 图片卡片样式优化 */
+.image-card {
+  height: 200px;
+  overflow: hidden;
+}
+
+.image-card .ant-card-body {
+  display: none; /* 隐藏卡片底部，只显示图片 */
+}
+
+.image-only-card {
+  height: 180px; /* 固定高度，因为没有底部文字区域 */
+}
+
+.image-only-card .item-cover {
+  height: 100%;
+  border-radius: 6px;
 }
 
 .item-cover {
@@ -762,7 +873,12 @@ const handleAddItems = () => {
 .cover-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: cover; /* 保持图片比例，填满容器 */
+  transition: transform 0.3s ease;
+}
+
+.item-card:hover .cover-image {
+  transform: scale(1.05);
 }
 
 .video-cover {
@@ -802,7 +918,6 @@ const handleAddItems = () => {
   background: #f9f9f9;
 }
 
-/* 删除按钮悬浮样式 */
 .delete-overlay {
   position: absolute;
   top: 8px;
@@ -816,7 +931,8 @@ const handleAddItems = () => {
 }
 
 .delete-btn {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
   border: none;
   border-radius: 50%;
   width: 32px;
@@ -824,14 +940,11 @@ const handleAddItems = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
 }
 
 .delete-btn:hover {
-  background: #ff4d4f;
+  background: rgba(255, 77, 79, 0.8);
   color: white;
-  transform: scale(1.1);
 }
 
 .empty-state {
@@ -849,31 +962,6 @@ const handleAddItems = () => {
   text-align: center;
   padding: 24px;
 }
-
-@media (max-width: 768px) {
-  .header {
-    flex-direction: column;
-    gap: 16px;
-  }
-  
-  .meta-info {
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  .toolbar {
-    flex-direction: column;
-    gap: 16px;
-    align-items: stretch;
-  }
-  
-  .category-header {
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
-  }
-}
-
 
 /* 文本文案相关样式 */
 .text-items-container {
@@ -948,7 +1036,132 @@ const handleAddItems = () => {
   bottom: 0;
 }
 
+/* 全屏预览样式 */
+.fullscreen-preview {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.preview-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
+.preview-image {
+  max-width: 80vw;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+/* 右上角操作按钮 */
+.preview-top-actions {
+  position: absolute;
+  top: -50px;
+  right: 0;
+  z-index: 1001;
+  display: flex;
+  gap: 8px;
+}
+
+.preview-action-btn {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(4px);
+}
+
+.preview-action-btn:hover {
+  background: rgba(0, 0, 0, 0.9) !important;
+  color: white !important;
+  transform: scale(1.1);
+}
+
+/* 导航按钮 */
+.preview-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1000;
+}
+
+.preview-nav-left {
+  left: -80px;
+}
+
+.preview-nav-right {
+  right: -80px;
+}
+
+.nav-btn {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(4px);
+}
+
+.nav-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.9) !important;
+  color: white !important;
+  transform: scale(1.1);
+}
+
+.nav-btn:disabled {
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: not-allowed;
+}
+
+/* 响应式设计 */
 @media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .meta-info {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .toolbar {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+  
+  .category-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
   .text-item-header {
     flex-direction: column;
     gap: 12px;
@@ -957,6 +1170,32 @@ const handleAddItems = () => {
   
   .text-item-actions {
     align-self: flex-end;
+  }
+  
+  .preview-image {
+    max-width: 95%;
+    max-height: 95%;
+  }
+  
+  .preview-nav-btn {
+    display: none; /* 移动端隐藏导航按钮，只使用触摸滑动 */
+  }
+  
+  .preview-top-actions {
+    top: -40px;
+    right: 0;
+  }
+  
+  .preview-action-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@media (max-width: 480px) {
+  .preview-image {
+    max-width: 98%;
+    max-height: 98%;
   }
 }
 </style>
