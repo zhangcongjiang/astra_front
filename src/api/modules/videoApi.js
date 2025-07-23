@@ -212,6 +212,53 @@ export const deleteVideoAsset = async (assetId) => {
 };
 
 /**
+ * 获取草稿视频列表
+ * @param {object} params - 查询参数，例如 { page: 1, pageSize: 20, template_id: '', creator: '' }
+ * @returns {Promise<object>} - 返回草稿列表数据
+ */
+export const getVideoDraftList = async (params = {}) => {
+    try {
+        const response = await request.get("/video/drafts/", formatParams(params));
+        return response;
+    } catch (error) {
+        console.error(`获取草稿视频列表失败:`, error);
+        throw error;
+    }
+};
+
+/**
+ * 获取草稿视频详情
+ * @param {string} draftId - 草稿ID (UUID格式)
+ * @returns {Promise<object>} - 返回草稿详情数据
+ */
+export const getVideoDraftDetail = async (draftId) => {
+    try {
+        const response = await request.get(`/video/drafts/${draftId}/`);
+        return response;
+    } catch (error) {
+        console.error(`获取草稿视频详情失败:`, error);
+        throw error;
+    }
+};
+
+/**
+ * 删除草稿视频
+ * @param {string} draftId - 草稿ID (UUID格式)
+ * @returns {Promise<object>} - 返回删除结果
+ */
+export const deleteVideoDraft = async (draftId) => {
+    try {
+        const response = await request.post("/video/drafts/delete/", {
+            draft_id: draftId
+        });
+        return response;
+    } catch (error) {
+        console.error(`删除草稿视频失败:`, error);
+        throw error;
+    }
+};
+
+/**
  * 编辑视频素材
  * @param {object} data - 编辑数据，包含asset_id和其他要更新的字段
  * @returns {Promise<object>} - 返回编辑结果
