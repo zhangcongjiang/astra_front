@@ -22,7 +22,7 @@
         <div class="category-section">
           <div class="category-header">
             <h3><FileImageOutlined /> 图片素材 ({{ imageItems.length }})</h3>
-            <a-button type="primary" size="small" @click="handleAddItems">
+            <a-button type="primary" size="small" @click="handleAddAudioItems">
               <PlusOutlined /> 新增
             </a-button>
           </div>
@@ -48,7 +48,7 @@
                       <div class="delete-overlay" @click.stop>
                         <a-popconfirm
                           title="确定要删除这个素材吗？"
-                          @confirm="removeItem(item.id)"
+                          @confirm="deleteAssetItem(item.id,'image')"
                           ok-text="确定"
                           cancel-text="取消"
                         >
@@ -77,7 +77,7 @@
         <div class="category-section">
           <div class="category-header">
             <h3><VideoCameraOutlined /> 视频素材 ({{ videoItems.length }})</h3>
-            <a-button type="primary" size="small" @click="handleAddItems">
+            <a-button type="primary" size="small" @click="handleAddAudioItems">
               <PlusOutlined /> 新增
             </a-button>
           </div>
@@ -103,7 +103,7 @@
                       <div class="delete-overlay">
                         <a-popconfirm
                           title="确定要删除这个素材吗？"
-                          @confirm="removeItem(item.id)"
+                          @confirm="deleteAssetItem(item.id,'video')"
                           ok-text="确定"
                           cancel-text="取消"
                         >
@@ -136,7 +136,7 @@
         <div class="category-section">
           <div class="category-header">
             <h3><SoundOutlined /> 音频素材 ({{ audioItems.length }})</h3>
-            <a-button type="primary" size="small" @click="handleAddItems">
+            <a-button type="primary" size="small" @click="handleAddAudioItems">
               <PlusOutlined /> 新增
             </a-button>
           </div>
@@ -162,7 +162,7 @@
                       <div class="delete-overlay">
                         <a-popconfirm
                           title="确定要删除这个素材吗？"
-                          @confirm="removeItem(item.id)"
+                          @confirm="deleteAssetItem(item.id,'audio')"
                           ok-text="确定"
                           cancel-text="取消"
                         >
@@ -213,7 +213,7 @@
                     </div>
                     <a-popconfirm
                       title="确定要删除这个文本素材吗？"
-                      @confirm="removeTextItem(item.id)"
+                      @confirm="deleteAssetItem(item.id,'text')"
                     >
                       <a-button type="link" size="small" danger>
                         <DeleteOutlined /> 删除
@@ -241,25 +241,11 @@
           </div>
         </div>
 
-        <!-- 全局空状态 -->
-        <div v-if="filteredItems.length === 0 && searchKeyword" class="empty-state">
-          <a-empty description="未找到匹配的素材" />
-        </div>
+
       </div>
     </div>
 
-    <!-- 添加素材模态框 -->
-    <a-modal
-      v-model:open="showAddModal"
-      title="添加素材到素材集"
-      width="800px"
-      @ok="handleAddItems"
-      @cancel="selectedItems = []"
-    >
-      <div class="add-items-content">
-        <p>选择要添加到素材集的素材</p>
-      </div>
-    </a-modal>
+
 
     <!-- 文本文案编辑模态框 -->
     <a-modal
@@ -355,16 +341,14 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick, h } from 'vue'
+import { ref, computed, onMounted, onUnmounted, h } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { 
   ArrowLeftOutlined,
   PlusOutlined, 
-  EditOutlined, 
   PlayCircleOutlined,
   SoundOutlined,
-  UploadOutlined,
   DeleteOutlined,
   FileImageOutlined,
   VideoCameraOutlined,
@@ -378,11 +362,10 @@ import {
 import dayjs from 'dayjs'
 import { 
   getAssetCollectionDetail,
-  removeAssetsFromCollection,
   createTextAsset,
-  updateTextAsset
+  updateTextAsset,
+  deleteAssetInfo
 } from '@/api/modules/assetApi'
-import { getImageContent } from '@/api/modules/imageApi'
 
 const router = useRouter()
 const route = useRoute()
@@ -397,8 +380,7 @@ const assetDetail = ref({
 const assetItems = ref([])
 const textItems = ref([])
 const searchKeyword = ref('')
-const showAddModal = ref(false)
-const selectedItems = ref([])
+// 添加缺失的 imageItems 定义
 const imageItems = ref([])
 const videoItems = ref([])
 const audioItems = ref([])
@@ -414,14 +396,7 @@ const previewVisible = ref(false)
 const currentPreviewImage = ref({})
 const currentPreviewIndex = ref(0)
 
-// 默认文案对象
-const defaultTextItem = ref({
-  id: 'default',
-  name: '文案内容',
-  text: [],
-  createTime: new Date().toISOString(),
-  updateTime: new Date().toISOString()
-})
+
 
 // 文本文案相关状态
 const textModalVisible = ref(false)
@@ -436,17 +411,6 @@ const textSaveTimers = new Map() // 存储每个文本项的保存定时器
 const SAVE_DELAY = 1000 // 1秒延迟保存
 
 // 计算属性
-const filteredItems = computed(() => {
-  let items = assetItems.value
-  
-  if (searchKeyword.value) {
-    items = items.filter(item => 
-      item.name.toLowerCase().includes(searchKeyword.value.toLowerCase())
-    )
-  }
-  
-  return items
-})
 
 const filteredTextItems = computed(() => {
   let items = textItems.value
@@ -497,7 +461,7 @@ const showNextImage = () => {
 const deleteCurrentImage = async () => {
   try {
     const imageId = currentPreviewImage.value.id
-    await removeItem(imageId)
+    await deleteAssetItem(imageId,'image')
     
     // 更新预览状态
     if (imageItems.value.length === 0) {
@@ -695,14 +659,6 @@ const closeTextModal = () => {
   }
 }
 
-const removeTextItem = async (itemId) => {
-  try {
-    textItems.value = textItems.value.filter(item => item.id !== itemId)
-    message.success('删除成功')
-  } catch (error) {
-    message.error('删除失败')
-  }
-}
 
 // 处理文本变化
 const handleTextChange = (item) => {
@@ -753,27 +709,47 @@ const saveTextItem = async (item) => {
   }
 }
 
+const handleAddImageItems = () => {
+  message.info('图片素材新增功能暂未开放')
+}
+
+const handleAddVideoItems = () => {
+  message.info('视频素材新增功能暂未开放')
+}
+
+const handleAddAudioItems = () => {
+  message.info('音频素材新增功能暂未开放')
+}
 // 加载素材详情
 const loadAssetDetail = async () => {
   try {
-    console.log('开始加载素材详情，ID:', route.params.id); // 添加调试日志
+    console.log('开始加载素材详情，ID:', route.params.id)
     const response = await getAssetCollectionDetail(route.params.id)
     
-    console.log('API响应:', response); // 添加调试日志
+    console.log('API响应:', response)
     
     if (response.code === 0) {
       const data = response.data
       
-      // 安全地更新 assetDetail，确保不会设置为 undefined
-      if (data.asset_detail) {
+      // 更灵活的数据赋值，兼容不同的字段名
+      if (data.asset_detail || data) {
+        const detail = data.asset_detail || data
         assetDetail.value = {
-          name: data.asset_detail.name || '',
-          description: data.asset_detail.description || '',
-          creator: data.asset_detail.creator || '',
-          createTime: data.asset_detail.createTime || ''
+          name: detail.name || detail.set_name || '',
+          description: detail.description || '',
+          creator: detail.creator || detail.creator_name || '',
+          createTime: detail.createTime || detail.create_time || detail.created_at || ''
         }
+        console.log('更新后的 assetDetail:', assetDetail.value)
       } else {
-        console.warn('API返回的 asset_detail 为空，保持默认值')
+        console.warn('API返回的数据结构异常:', data)
+        // 尝试直接从 data 中获取
+        assetDetail.value = {
+          name: data.name || data.set_name || '',
+          description: data.description || '',
+          creator: data.creator || data.creator_name || '',
+          createTime: data.createTime || data.create_time || data.created_at || ''
+        }
       }
       
       imageItems.value = data.images
@@ -824,15 +800,13 @@ const loadAssetDetail = async () => {
         index: item.index
       }))
       
-      assetItems.value = [...imageItems.value, ...videoItems.value, ...audioItems.value]
-      
     } else {
-      console.error('API返回错误:', response); // 添加调试日志
+      console.error('API返回错误:', response)
       message.error(response.message || '获取素材集详情失败')
     }
   } catch (error) {
     console.error('加载素材集详情失败:', error)
-    console.error('错误详情:', error.response); // 添加更详细的错误日志
+    console.error('错误详情:', error.response)
     message.error('加载素材集详情失败')
   }
 }
@@ -842,63 +816,34 @@ const goBack = () => {
   router.back()
 }
 
-const editAsset = () => {
-  message.info('编辑功能待实现')
-}
-
-const handleAddItems = () => {
-  message.success('素材添加成功')
-  showAddModal.value = false
-  selectedItems.value = []
-}
-
-const handleSearch = () => {
-  // 搜索逻辑已经通过计算属性实现
-}
-
-const handleUpload = (file, type) => {
-  const isLt10M = file.size / 1024 / 1024 < 10
-  if (!isLt10M) {
-    message.error('文件大小不能超过 10MB!')
-    return false
-  }
-
-  message.loading('上传中...', 1)
-  
-  setTimeout(() => {
-    const newItem = {
-      id: Date.now(),
-      name: file.name,
-      type: type,
-      url: URL.createObjectURL(file),
-      size: file.size
-    }
-    
-    if (type === 'image') {
-      imageItems.value.unshift(newItem)
-    } else if (type === 'video') {
-      videoItems.value.unshift(newItem)
-    } else if (type === 'audio') {
-      audioItems.value.unshift(newItem)
-    }
-    
-    assetItems.value.unshift(newItem)
-    message.success('上传成功!')
-  }, 1000)
-  
-  return false
-}
-
-const removeItem = async (itemId) => {
+// 统一的删除方法
+const deleteAssetItem = async (itemId, assetType) => {
   try {
-    // 从各个数组中删除
-    imageItems.value = imageItems.value.filter(item => item.id !== itemId)
-    videoItems.value = videoItems.value.filter(item => item.id !== itemId)
-    audioItems.value = audioItems.value.filter(item => item.id !== itemId)
-    assetItems.value = assetItems.value.filter(item => item.id !== itemId)
+    // 调用 API 删除素材
+    const response = await deleteAssetInfo(itemId)
     
-    message.success('删除成功')
+    if (response.code === 0) {
+      // 根据素材类型从对应数组中移除
+      switch (assetType) {
+        case 'image':
+          imageItems.value = imageItems.value.filter(item => item.id !== itemId)
+          break
+        case 'video':
+          videoItems.value = videoItems.value.filter(item => item.id !== itemId)
+          break
+        case 'audio':
+          audioItems.value = audioItems.value.filter(item => item.id !== itemId)
+          break
+        case 'text':
+          textItems.value = textItems.value.filter(item => item.id !== itemId)
+          break
+      }
+      message.success('删除成功')
+    } else {
+      message.error(response.message || '删除失败')
+    }
   } catch (error) {
+    console.error('删除素材失败:', error)
     message.error('删除失败')
   }
 }
@@ -909,13 +854,7 @@ const formatTime = (time) => {
   return dayjs(time).format('YYYY-MM-DD HH:mm:ss')
 }
 
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
+
 
 // 生命周期
 onMounted(() => {
