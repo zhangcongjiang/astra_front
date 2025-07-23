@@ -117,19 +117,33 @@
 
                                 <div class="card-actions">
                                     <a-space>
-                                        <a-button type="text" size="small" @click="handleEdit(item)">
-                                            <EditOutlined /> 编辑
-                                        </a-button>
+                    
                                         <a-button type="text" size="small" @click="showTagModal(item)">
                                             <TagOutlined /> 标签
                                         </a-button>
-                                        <a-button type="text" size="small" @click="handleDownload(item)">
-                                            <DownloadOutlined /> 下载
+                                        <a-button type="text" size="small" @click="showAddToAssetModal(item)">
+                                            <FolderAddOutlined /> 加入素材集
                                         </a-button>
-                                        <a-button type="text" size="small" class="danger-item"
-                                            @click="handleDelete(item)">
-                                            <DeleteOutlined /> 删除
-                                        </a-button>
+                                        <a-dropdown>
+                                            <template #overlay>
+                                                <a-menu>
+                                                    <a-menu-item key="download" @click="handleDownload(item)">
+                                                        <DownloadOutlined /> 下载
+                                                    </a-menu-item>
+                                                    <a-menu-item key="edit" @click="editVideo(video)">
+                                                            <EditOutlined />
+                                                            编辑
+                                                        </a-menu-item>
+                                                 
+                                                    <a-menu-item key="delete" class="danger-item" @click="handleDelete(item)">
+                                                        <DeleteOutlined /> 删除
+                                                    </a-menu-item>
+                                                </a-menu>
+                                            </template>
+                                            <a-button type="text" size="small">
+                                                更多 <DownOutlined />
+                                            </a-button>
+                                        </a-dropdown>
                                     </a-space>
                                 </div>
                             </div>
@@ -183,6 +197,36 @@
                 </a-form-item>
             </a-form>
         </a-modal>
+
+        <!-- 加入素材集模态框 -->
+        <a-modal
+            v-model:open="addToAssetVisible"
+            title="加入素材集"
+            @ok="handleAddToAsset"
+            @cancel="() => { addToAssetVisible = false; selectedAssetId = null; }"
+            :confirm-loading="loadingAssets"
+        >
+            <div style="margin-bottom: 16px;">
+                <strong>视频：</strong>{{ selectedVideo?.asset_name || selectedVideo?.name }}
+            </div>
+            <div>
+                <strong>选择素材集：</strong>
+                <a-select
+                    v-model:value="selectedAssetId"
+                    placeholder="请选择素材集"
+                    style="width: 100%; margin-top: 8px;"
+                    :loading="loadingAssets"
+                >
+                    <a-select-option
+                        v-for="asset in assetCollections"
+                        :key="asset.id"
+                        :value="asset.id"
+                    >
+                        {{ asset.set_name }}
+                    </a-select-option>
+                </a-select>
+            </div>
+        </a-modal>
     </div>
 </template>
 
@@ -195,7 +239,9 @@ import {
     EditOutlined,
     TagOutlined,
     DownloadOutlined,
-    DeleteOutlined
+    DeleteOutlined,
+    FolderAddOutlined,
+    DownOutlined
 } from '@ant-design/icons-vue';
 import { message, Modal } from 'ant-design-vue';
 import dayjs from 'dayjs';
@@ -209,6 +255,7 @@ import {
     uploadVideoAsset
 } from '@/api/modules/videoApi';
 import { getTagsByCategory } from '@/api/modules/tagApi';
+import { getAssetCollectionList, addItemToAsset } from '@/api/modules/assetApi';
 
 // 搜索类型
 const searchType = ref('basic');
@@ -248,6 +295,13 @@ const tagForm = reactive({
     assetId: null,
     currentTags: []
 });
+
+// 素材集相关变量
+const addToAssetVisible = ref(false);
+const selectedVideo = ref(null);
+const assetCollections = ref([]);
+const selectedAssetId = ref(null);
+const loadingAssets = ref(false);
 
 // 获取标签分类
 // 获取标签分类
@@ -604,6 +658,67 @@ onMounted(() => {
     fetchData();
     fetchTagCategories();
 });
+
+// 显示加入素材集模态框
+const showAddToAssetModal = async (video) => {
+    selectedVideo.value = video;
+    addToAssetVisible.value = true;
+    await fetchAssetCollections();
+};
+
+// 获取素材集列表
+const fetchAssetCollections = async () => {
+    try {
+        loadingAssets.value = true;
+        console.log('开始获取素材集列表...');
+        const response = await getAssetCollectionList({});
+        console.log('素材集API返回:', response);
+        
+        if (response && response.results && Array.isArray(response.results)) {
+            assetCollections.value = response.results;
+            console.log('素材集列表:', assetCollections.value);
+        } else {
+            console.warn('素材集数据格式异常:', response);
+            assetCollections.value = [];
+        }
+    } catch (error) {
+        console.error('获取素材集列表失败:', error);
+        message.error('获取素材集列表失败');
+        assetCollections.value = [];
+    } finally {
+        loadingAssets.value = false;
+    }
+};
+
+// 处理加入素材集
+const handleAddToAsset = async () => {
+    if (!selectedAssetId.value) {
+        message.warning('请选择素材集');
+        return;
+    }
+    
+    try {
+        loadingAssets.value = true;
+        const response = await addItemToAsset({
+            set_id: selectedAssetId.value,
+            resource_id: selectedVideo.value.id,
+            asset_type: 'video'
+        });
+        
+        if (response.code === 0) {
+            message.success('加入素材集成功');
+            addToAssetVisible.value = false;
+            selectedAssetId.value = null;
+        } else {
+            message.error(response.message || '加入素材集失败');
+        }
+    } catch (error) {
+        console.error('加入素材集失败:', error);
+        message.error('加入素材集失败');
+    } finally {
+        loadingAssets.value = false;
+    }
+};
 </script>
 
 <style scoped>
