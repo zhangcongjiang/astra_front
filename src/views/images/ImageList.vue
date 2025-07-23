@@ -85,6 +85,11 @@
                 <tags-outlined />
                 <span class="action-text">标签</span>
               </span>
+              <!-- 加入素材集按钮 -->
+              <span class="action-item" @click.stop="showAddToAssetModal(image)">
+                <folder-add-outlined />
+                <span class="action-text">加入素材集</span>
+              </span>
             </template>
           </a-card>
         </a-col>
@@ -130,18 +135,65 @@
       <TagSearch :tags="tagCategories" :show-actions="false" :allow-image-tagging="true"
         :image-tags="tagForm.currentTags" @add-image-tag="addImageTag" @remove-image-tag="removeImageTag" />
     </a-modal>
+
+    <!-- 加入素材集模态框 -->
+    <a-modal
+      v-model:visible="addToAssetVisible"
+      title="加入素材集"
+      @ok="handleAddToAsset"
+      @cancel="handleCancelAddToAsset"
+      :confirmLoading="loadingAssets"
+    >
+      <div v-if="selectedImage">
+        <p>将图片 "{{ selectedImage.name }}" 加入到素材集：</p>
+        <a-select
+          v-model:value="selectedAssetId"
+          placeholder="请选择素材集"
+          style="width: 100%"
+          :loading="loadingAssets"
+        >
+          <a-select-option
+            v-for="asset in assetCollections"
+            :key="asset.id"
+            :value="asset.id"
+          >
+            {{ asset.set_name }}
+          </a-select-option>
+        </a-select>
+      </div>
+    </a-modal>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
-import { UploadOutlined, LeftCircleOutlined, RightCircleOutlined, DeleteOutlined, TagsOutlined, ExclamationCircleOutlined } from '@ant-design/icons-vue';
-import dayjs from 'dayjs';
+import { ref, reactive, computed, onMounted, onUnmounted} from 'vue';
 import { Modal, message } from 'ant-design-vue';
-import Pagination from '@/components/Pagination.vue';
-import TagSearch from '@/components/TagSearch.vue';
+import dayjs from 'dayjs';
+import { 
+  UploadOutlined, 
+  LeftCircleOutlined, 
+  RightCircleOutlined, 
+  DeleteOutlined, 
+  TagsOutlined, 
+  ExclamationCircleOutlined,
+  FolderAddOutlined 
+} from '@ant-design/icons-vue';
+
+// API 导入
 import { getImageList, getImageSummary, getImageContent, getImageDetail, deleteImages, uploadImages, bindTags } from '@/api/modules/imageApi';
 import { getTagsByCategory } from '@/api/modules/tagApi';
+import { getAssetCollectionList, addItemToAsset } from '@/api/modules/assetApi';
+
+// 组件导入
+import Pagination from '@/components/Pagination.vue';
+import TagSearch from '@/components/TagSearch.vue';
+
+// 添加响应式数据
+const addToAssetVisible = ref(false);
+const selectedImage = ref(null);
+const assetCollections = ref([]);
+const selectedAssetId = ref(null);
+const loadingAssets = ref(false);
 
 
 // 格式化日期函数
@@ -639,6 +691,71 @@ const handleTagSubmit = async () => {
 };
 
 
+// 显示加入素材集模态框
+const showAddToAssetModal = async (image) => {
+  selectedImage.value = image;
+  addToAssetVisible.value = true;
+  await fetchAssetCollections();
+};
+
+// 获取素材集列表
+const fetchAssetCollections = async () => {
+  try {
+    loadingAssets.value = true;
+    const response = await getAssetCollectionList({});
+    console.log('API返回数据:', response);
+    
+    // 修改条件判断：直接检查 results 数组
+    if (response?.results && Array.isArray(response.results)) {
+      assetCollections.value = response.results;
+      console.log('设置的素材集数据:', assetCollections.value);
+    } else {
+      console.log('数据格式不正确:', response);
+    }
+  } catch (error) {
+    console.error('获取素材集列表失败:', error);
+    message.error('获取素材集列表失败');
+  } finally {
+    loadingAssets.value = false;
+  }
+};
+
+// 处理加入素材集
+const handleAddToAsset = async () => {
+  if (!selectedAssetId.value || !selectedImage.value) {
+    message.warning('请选择素材集');
+    return;
+  }
+
+  try {
+    loadingAssets.value = true;
+    const response = await addItemToAsset({
+      set_id: selectedAssetId.value,
+      resource_id: selectedImage.value.id,
+      asset_type: 'image'
+    });
+
+    if (response?.code === 0) {
+      message.success('成功加入素材集');
+      handleCancelAddToAsset();
+    } else {
+      message.error(response?.message || '加入素材集失败');
+    }
+  } catch (error) {
+    console.error('加入素材集失败:', error);
+    message.error('加入素材集失败');
+  } finally {
+    loadingAssets.value = false;
+  }
+};
+
+// 取消加入素材集
+const handleCancelAddToAsset = () => {
+  addToAssetVisible.value = false;
+  selectedImage.value = null;
+  selectedAssetId.value = null;
+};
+
 // 修改标签数据获取方式
 const tagCategories = ref([]);
 
@@ -675,6 +792,8 @@ const fetchTagCategories = async () => {
     message.error('获取标签分类失败');
   }
 };
+
+
 </script>
 
 <style scoped>
@@ -940,26 +1059,20 @@ const fetchTagCategories = async () => {
 }
 
 .action-item {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 8px;
   cursor: pointer;
-  transition: background-color 0.2s;
-  margin-right: 8px;
+  transition: color 0.3s;
 }
 
 .action-item:hover {
-  background-color: #f5f5f5;
+  color: #1890ff;
 }
 
 .action-text {
   font-size: 12px;
-  color: #666;
-}
-
-.action-item:hover .action-text {
-  color: #1890ff;
+  margin-top: 4px;
 }
 </style>

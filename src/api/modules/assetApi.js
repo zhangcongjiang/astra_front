@@ -86,6 +86,16 @@ export const createTextAsset = async (data) => {
   }
 };
 
+export const addItemToAsset = async (data) => {
+  try {
+    const response = await request.post('/asset/asset-info/create/', data);
+    return response;
+  } catch (error) {
+    console.error('添加素材到素材集失败:', error);
+    throw error;
+  }
+};
+
 // 更新文本素材
 export const updateTextAsset = async (data) => {
   try {
