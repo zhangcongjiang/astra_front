@@ -48,26 +48,32 @@
       <a-row :gutter="[16, 16]">
         <a-col v-for="(image, index) in currentPageImages" :key="image.id" :xs="24" :sm="12" :md="8" :lg="6" :xl="4.8"
           class="image-col">
-          <a-card hoverable class="image-card"
-            @click="openPreview(image, index + (pagination.current - 1) * pagination.pageSize)">
+          <a-card hoverable class="image-card" @click="openPreview(image, index)">
             <template #cover>
-              <img :src="image.url" class="image-preview" :style="{ height: `${imageHeight}px` }" />
-            </template>
-            <a-card-meta>
-              <template #description>
-                <div class="image-meta">
-                  <!-- <div>上传者: {{ image.uploader }}</div> -->
-                  <div>上传时间: {{ formatDate(image.uploadTime) }}</div>
-                  <!-- 图片标签 -->
-                  <div class="image-tags">
-                    <a-tag v-for="tag in getTagNames(image.tags)" :key="tag.id" color="blue"
-                      @click.stop="handleTagClick(tag.id)">
-                      {{ tag.name }}
-                    </a-tag>
-                  </div>
+              <div class="cover-container" :style="{ height: imageHeight + 'px' }">
+                <!-- 加载中状态 -->
+                <div v-if="image.loading" class="loading-placeholder">
+                  <a-spin size="large" />
+                  <p>加载中...</p>
                 </div>
-              </template>
-            </a-card-meta>
+                <!-- 加载失败状态 -->
+                <div v-else-if="image.loadError" class="error-placeholder">
+                  <ExclamationCircleOutlined style="font-size: 24px; color: #ff4d4f;" />
+                  <p>加载失败</p>
+                </div>
+                <!-- 正常显示图片 -->
+                <img v-else-if="image.url" :src="image.url" :alt="image.name" class="cover-image"
+                  :style="{ height: imageHeight + 'px' }" />
+              </div>
+              <!-- 图片标签 -->
+              <div class="image-tags">
+                <a-tag v-for="tag in getTagNames(image.tags)" :key="tag.id" color="blue"
+                  @click.stop="handleTagClick(tag.id)">
+                  {{ tag.name }}
+                </a-tag>
+              </div>
+            </template>
+            
             <template #actions>
               <!-- 删除按钮 -->
               <span class="action-item" @click.stop="showDeleteConfirm(image.id)">
@@ -129,7 +135,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
-import { UploadOutlined, LeftCircleOutlined, RightCircleOutlined, DeleteOutlined, TagsOutlined } from '@ant-design/icons-vue';
+import { UploadOutlined, LeftCircleOutlined, RightCircleOutlined, DeleteOutlined, TagsOutlined, ExclamationCircleOutlined } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
 import { Modal, message } from 'ant-design-vue';
 import Pagination from '@/components/Pagination.vue';
@@ -206,49 +212,46 @@ const previewImageStyle = computed(() => {
   };
 });
 
-// 修改获取图片列表的方法
+// 修改获取图片列表的方法 - 实现懒加载
 const fetchImageList = async () => {
   try {
     loading.value = true;
     const params = {
       page: pagination.value.current,
       pageSize: pagination.value.pageSize,
-      creator: basicForm.uploader, // 创建人查询条件
-      start_datetime: basicForm.startTime ? dayjs(basicForm.startTime).format('YYYY-MM-DDTHH:mm:ss') : null, // 开始时间
-      end_datetime: basicForm.endTime ? dayjs(basicForm.endTime).format('YYYY-MM-DDTHH:mm:ss') : null, // 结束时间
+      creator: basicForm.uploader,
+      start_datetime: basicForm.startTime ? dayjs(basicForm.startTime).format('YYYY-MM-DDTHH:mm:ss') : null,
+      end_datetime: basicForm.endTime ? dayjs(basicForm.endTime).format('YYYY-MM-DDTHH:mm:ss') : null,
     };
     if (selectedTags.value.length > 0) {
       selectedTags.value.forEach(tagId => {
         params[`tag_ids[]`] = tagId;
       });
     }
+    
     const response = await getImageList(params);
     console.log("**img response**:", response);
+    
     if (response && response.code === 0 && response.data && Array.isArray(response.data.results)) {
-      const images = await Promise.all(response.data.results.map(async (item) => {
-        try {
-          const image_content = await getImageSummary(item.id, {
-            responseType: 'blob'
-          });
-
-          const url = URL.createObjectURL(image_content);
-          return {
-            id: item.id,
-            name: item.img_name,
-            url: url,
-            uploader: item.creator || '未知',
-            uploadTime: item.create_time,
-            tags: item.tags || [] // 直接使用后端返回的标签数组
-          };
-
-        } catch (error) {
-          console.error('Error fetching image content:', error);
-          return null;
-        }
-      }));
-
-      imageData.value = images.filter(image => image !== null);
+      // 先清空现有数据
+      imageData.value = [];
       pagination.value.total = response.data.count || 0;
+      
+      // 为每个图片创建占位符，然后逐个加载
+      const placeholders = response.data.results.map(item => ({
+        id: item.id,
+        name: item.img_name,
+        url: null, // 初始为空，懒加载
+        uploader: item.creator || '未知',
+        uploadTime: item.create_time,
+        tags: item.tags || [],
+        loading: true // 添加加载状态
+      }));
+      
+      imageData.value = placeholders;
+      
+      // 逐个加载图片内容
+      loadImagesSequentially(response.data.results);
     } else {
       message.warning('获取的图片列表为空');
       imageData.value = [];
@@ -259,6 +262,38 @@ const fetchImageList = async () => {
     message.error('获取图片列表失败');
   } finally {
     loading.value = false;
+  }
+};
+
+// 新增：逐个加载图片内容的函数
+const loadImagesSequentially = async (imageItems) => {
+  for (let i = 0; i < imageItems.length; i++) {
+    try {
+      const item = imageItems[i];
+      const image_content = await getImageSummary(item.id, {
+        responseType: 'blob'
+      });
+      
+      const url = URL.createObjectURL(image_content);
+      
+      // 找到对应的图片并更新
+      const index = imageData.value.findIndex(img => img.id === item.id);
+      if (index !== -1) {
+        imageData.value[index].url = url;
+        imageData.value[index].loading = false;
+      }
+      
+      // 可选：添加小延迟避免请求过于频繁
+      await new Promise(resolve => setTimeout(resolve, 50));
+    } catch (error) {
+      console.error(`Error loading image ${imageItems[i].id}:`, error);
+      // 更新加载失败状态
+      const index = imageData.value.findIndex(img => img.id === imageItems[i].id);
+      if (index !== -1) {
+        imageData.value[index].loading = false;
+        imageData.value[index].loadError = true;
+      }
+    }
   }
 };
 const handleTagClick = (tagId) => {
@@ -885,6 +920,23 @@ const fetchTagCategories = async () => {
     margin-right: 0;
     margin-bottom: 4px;
   }
+}
+
+.loading-placeholder,
+.error-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background-color: #f5f5f5;
+  color: #666;
+}
+
+.loading-placeholder p,
+.error-placeholder p {
+  margin-top: 8px;
+  font-size: 12px;
 }
 
 .action-item {
