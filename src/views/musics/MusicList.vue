@@ -126,7 +126,6 @@
 
         <template #action="{ record }">
           <div style="text-align: center;gap: 4px;">
-
             <!-- 选择按钮（仅在选择模式显示） -->
             <a-button v-if="isSelectMode" type="primary" size="small" @click.stop="handleSelect(record)">
               选择
@@ -141,6 +140,9 @@
             </a-button>
             <a-button type="link" size="small" @click="showEditModal(record)">
               编辑
+            </a-button>
+            <a-button type="link" size="small" @click="showAddToAssetModal(record)">
+              <folder-add-outlined /> 加入素材集
             </a-button>
             <a-popconfirm title="确认要删除这首音乐吗？" ok-text="确认" cancel-text="取消" @confirm="() => deleteMusic(record.id)">
               <a-button type="link" size="small" danger>
@@ -186,13 +188,43 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <!-- 加入素材集模态框 -->
+    <a-modal
+      v-model:visible="addToAssetVisible"
+      title="加入素材集"
+      @ok="handleAddToAsset"
+      @cancel="() => { addToAssetVisible = false; selectedAssetId = null; }"
+      :confirm-loading="loadingAssets"
+    >
+      <div style="margin-bottom: 16px;">
+        <strong>音乐：</strong>{{ selectedMusic?.name }}
+      </div>
+      <div>
+        <strong>选择素材集：</strong>
+        <a-select
+          v-model:value="selectedAssetId"
+          placeholder="请选择素材集"
+          style="width: 100%; margin-top: 8px;"
+          :loading="loadingAssets"
+        >
+          <a-select-option
+            v-for="asset in assetCollections"
+            :key="asset.id"
+            :value="asset.id"
+          >
+            {{ asset.set_name }}
+          </a-select-option>
+        </a-select>
+      </div>
+    </a-modal>
   </div>
 </template>
 
 <script setup>
 import { request } from '@/api/config/request';
 import { ref, reactive, computed, onMounted } from 'vue'
-import { UploadOutlined, PlayCircleOutlined, PauseCircleOutlined } from '@ant-design/icons-vue'
+import { UploadOutlined, PlayCircleOutlined, PauseCircleOutlined, FolderAddOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import TagSearch from '@/components/TagSearch.vue'
@@ -206,6 +238,7 @@ import {
   updateSound
 } from '@/api/modules/voiceApi';
 import { getTagsByCategory } from '@/api/modules/tagApi';  // 新增：获取标签分类的API
+import { getAssetCollectionList, addItemToAsset } from '@/api/modules/assetApi';
 
 // Initialize router and route
 const router = useRouter()
@@ -698,6 +731,13 @@ const handleUploadSubmit = async () => {
 };
 const uploadFormRef = ref(null);
 
+// 素材集相关变量
+const addToAssetVisible = ref(false);
+const selectedMusic = ref(null);
+const assetCollections = ref([]);
+const selectedAssetId = ref(null);
+const loadingAssets = ref(false);
+
 const showUploadModal = () => {
   uploadModalVisible.value = true;
 };
@@ -858,6 +898,67 @@ const deleteMusic = async (musicId) => {
   } catch (error) {
     console.error('删除音乐失败:', error);
     message.error('删除失败，请重试');
+  }
+};
+
+// 显示加入素材集模态框
+const showAddToAssetModal = async (music) => {
+  selectedMusic.value = music;
+  addToAssetVisible.value = true;
+  await fetchAssetCollections();
+};
+
+// 获取素材集列表
+const fetchAssetCollections = async () => {
+  try {
+    loadingAssets.value = true;
+    console.log('开始获取素材集列表...');
+    const response = await getAssetCollectionList({});
+    console.log('素材集API返回:', response);
+    
+    if (response && response.results && Array.isArray(response.results)) {
+      assetCollections.value = response.results;
+      console.log('素材集列表:', assetCollections.value);
+    } else {
+      console.warn('素材集数据格式异常:', response);
+      assetCollections.value = [];
+    }
+  } catch (error) {
+    console.error('获取素材集列表失败:', error);
+    message.error('获取素材集列表失败');
+    assetCollections.value = [];
+  } finally {
+    loadingAssets.value = false;
+  }
+};
+
+// 处理加入素材集
+const handleAddToAsset = async () => {
+  if (!selectedAssetId.value) {
+    message.warning('请选择素材集');
+    return;
+  }
+  
+  try {
+    loadingAssets.value = true;
+    const response = await addItemToAsset({
+      set_id: selectedAssetId.value,
+      resource_id: selectedMusic.value.id,
+      asset_type: 'sound'
+    });
+    
+    if (response.code === 0) {
+      message.success('加入素材集成功');
+      addToAssetVisible.value = false;
+      selectedAssetId.value = null;
+    } else {
+      message.error(response.message || '加入素材集失败');
+    }
+  } catch (error) {
+    console.error('加入素材集失败:', error);
+    message.error('加入素材集失败');
+  } finally {
+    loadingAssets.value = false;
   }
 };
 
