@@ -110,3 +110,30 @@ export const updateAssetOrder = async (collectionId, orderData) => {
     throw error;
   }
 };
+
+
+//  获取素材元素的详情，包括图片，音频，视频
+// /video/detail/{video_id}/
+// /image/{id}/
+// /voice/{id}/
+export const getAssetItemDetail = async (type, id)  => {
+  // type: image, audio, video
+  try {
+    if (type === 'image') {
+      const response = await request.get(`/image/${id}/`);
+      return response;
+    } else if (type === 'audio') {
+      const response = await request.get(`/voice/${id}/`);  
+      return response;
+    } else if (type === 'video') {
+      const response = await request.get(`/video/detail/${id}/`);
+      return response;
+    } else {
+      console.error('素材类型错误');
+      throw new Error('素材类型错误');
+    }
+  } catch (error) {
+    console.error('获取素材元素详情失败:', error);
+    throw error;
+  }
+}

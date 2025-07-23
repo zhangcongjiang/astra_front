@@ -2,7 +2,7 @@
   <div class="resource-selector-panel">
     <!-- 标题栏 -->
     <div class="panel-header">
-      <h3>{{ resourceType === 'image' ? '图片素材' : resourceType === 'video' ? '视频素材' : resourceType === 'audio' ? '音频素材' : '素材选择器' }}</h3>
+      <h3>素材选择器</h3>
       <div class="multi-select-tip">
         <span class="tip-text">💡 按住 Ctrl/Cmd 键可多选同类型素材</span>
         <div v-if="selectedItems.length > 0" class="selected-info">
@@ -237,10 +237,6 @@ import {
 import { getAssetCollectionList, getAssetCollectionDetail } from '@/api/modules/assetApi';
 
 const props = defineProps({
-  resourceType: {
-    type: String,
-    required: true,
-  },
   selectedValue: {
     type: [Object, Array],
     default: null,

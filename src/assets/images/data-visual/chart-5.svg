@@ -1,0 +1,6 @@
+<svg width="300" height="180" xmlns="http://www.w3.org/2000/svg">
+  <rect width="300" height="180" fill="#f59e0b"/>
+  <text x="150" y="30" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">数据图表</text>
+  <text x="150" y="60" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Arial, sans-serif" font-size="14">数据图表是用来呈现数据信息的图表，它可以帮助我们更直观地理解数据，并从中找出规律和模式。数据图表的制作方法有很多种，包括柱状图、折线图、饼图、散点图、雷达图、热力图、地图等。下面我们以柱状图为例，介绍如何制作数据图表。</text>
+  
+</svg>

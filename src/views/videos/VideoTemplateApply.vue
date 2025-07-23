@@ -325,7 +325,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
@@ -338,7 +338,7 @@ import {
   CloudUploadOutlined
 } from '@ant-design/icons-vue'
 // Import your API functions and the new modal component
-import { uploadFile, createVideoTask, fetchRemoteData } from '@/api/modules/videoApi.js' 
+import { uploadFile, createVideoTask, fetchRemoteData, getVideoDraftDetail,getVideoTemplates } from '@/api/modules/videoApi.js' 
 import ResourceSelectorModal from './ResourceSelectorModal.vue';
 
 const route = useRoute()
@@ -352,6 +352,110 @@ const showSuccessModal = ref(false)
 const formRef = ref(null)
 const formData = reactive({})
 const formDefinition = computed(() => template.params?.form || [])
+
+// 状态判断
+const draftId = computed(() => route.query.draftId)
+const templateId = computed(() => route.params.id)
+const isEditMode = computed(() => !!draftId.value)
+
+// 缓存相关
+const getCacheKey = () => {
+  const key = isEditMode.value 
+    ? `draft_${draftId.value}_template_${templateId.value}`
+    : `template_${templateId.value}`
+  console.log('生成缓存键:', key, { 
+    isEditMode: isEditMode.value, 
+    draftId: draftId.value, 
+    templateId: templateId.value 
+  })
+  return key
+}
+
+// 保存表单数据到缓存
+const saveToCache = () => {
+  try {
+    // 检查formData是否有实际内容
+    const hasContent = Object.keys(formData).some(key => {
+      const value = formData[key]
+      return value !== null && value !== undefined && value !== '' && 
+             !(Array.isArray(value) && value.length === 0) &&
+             !(typeof value === 'object' && Object.keys(value).length === 0)
+    })
+    
+    if (!hasContent) {
+      console.log('formData为空，跳过缓存')
+      return
+    }
+    
+    const cacheKey = getCacheKey()
+    const cacheData = JSON.stringify(formData)
+    localStorage.setItem(cacheKey, cacheData)
+    console.log('表单数据已缓存:', cacheKey, '数据大小:', cacheData.length, '数据内容:', formData)
+  } catch (error) {
+    console.error('缓存表单数据失败:', error)
+  }
+}
+
+// 从缓存加载表单数据
+const loadFromCache = () => {
+  try {
+    const cacheKey = getCacheKey()
+    console.log('尝试从缓存加载:', cacheKey)
+    const cachedData = localStorage.getItem(cacheKey)
+    console.log('缓存原始数据:', cachedData)
+    
+    if (cachedData && cachedData !== '{}') {
+      const parsedData = JSON.parse(cachedData)
+      console.log('解析后的缓存数据:', parsedData)
+      
+      // 检查解析后的数据是否有实际内容
+      const hasContent = Object.keys(parsedData).some(key => {
+        const value = parsedData[key]
+        return value !== null && value !== undefined && value !== '' && 
+               !(Array.isArray(value) && value.length === 0) &&
+               !(typeof value === 'object' && Object.keys(value).length === 0)
+      })
+      
+      if (hasContent) {
+        // 智能合并缓存数据，保留必要的默认结构
+        for (const key in parsedData) {
+          if (parsedData[key] !== null && parsedData[key] !== undefined) {
+            formData[key] = parsedData[key]
+          }
+        }
+        console.log('从缓存成功加载表单数据:', cacheKey, parsedData)
+        return true
+      } else {
+        console.log('缓存数据为空，跳过加载')
+        return false
+      }
+    }
+    console.log('未找到有效缓存数据')
+    return false
+  } catch (error) {
+    console.error('从缓存加载表单数据失败:', error)
+    return false
+  }
+}
+
+// 清空缓存
+const clearCache = () => {
+  try {
+    const cacheKey = getCacheKey()
+    localStorage.removeItem(cacheKey)
+    console.log('已清空缓存:', cacheKey)
+  } catch (error) {
+    console.error('清空缓存失败:', error)
+  }
+}
+
+// 监听表单数据变化，实时缓存
+watch(formData, () => {
+  // 使用 nextTick 确保数据更新完成后再缓存
+  nextTick(() => {
+    saveToCache()
+  })
+}, { deep: true })
 
 // 拖放相关状态
 const isDragOver = ref(false)
@@ -418,30 +522,99 @@ onMounted(() => {
   loadTemplateData();
 });
 
-// 从 history.state 加载模板数据
+// 从 history.state 或 API 加载模板数据
 const loadTemplateData = async () => {
     loading.value = true;
     try {
-        const passedTemplateStr = history.state.template;
-        if (!passedTemplateStr) {
-            throw new Error('未找到模板数据，请返回列表页重新选择。');
-        }
-        
-        const passedTemplate = JSON.parse(passedTemplateStr);
         const routeId = route.params.id;
-
-        // 校验传递过来的模板ID和URL中的ID是否一致
-        if (!passedTemplate || String(passedTemplate.id) !== routeId) {
-            throw new Error('无效的模板数据，请从列表页重新选择模板。');
+        let templateData = null;
+        
+        // 尝试从 history.state 获取模板数据
+        const passedTemplateStr = history.state?.template;
+        if (passedTemplateStr) {
+            try {
+                const passedTemplate = JSON.parse(passedTemplateStr);
+                // 校验传递过来的模板ID和URL中的ID是否一致
+                if (passedTemplate && String(passedTemplate.id) === routeId) {
+                    templateData = passedTemplate;
+                }
+            } catch (parseError) {
+                console.warn('解析传递的模板数据失败:', parseError);
+            }
         }
         
-        Object.assign(template, passedTemplate);
-        await initializeForm();
+        // 如果没有从 history.state 获取到有效数据，则从API获取
+        if (!templateData) {
+            console.log('从API获取模板数据...');
+            const response = await getVideoTemplates({ id: routeId });
+            if (response.code === 0 && response.data?.results?.length > 0) {
+                // 从模板列表中找到匹配的模板
+                templateData = response.data.results.find(t => String(t.template_id) === routeId);
+                // templateData = templateData.parameters
+                templateData.params = templateData.parameters
+                console.log('API获取到模板数据:', templateData);
+            }
+            
+            if (!templateData) {
+                throw new Error('未找到指定的模板，请检查模板ID是否正确。');
+            }
+        }
+        console.log('加载模板数据成功:', templateData);
+        Object.assign(template, templateData);
+        
+        // 先初始化表单结构（设置默认值）
+        await initializeForm(false);
+        
+        // 然后根据状态加载数据（缓存或API数据会覆盖默认值）
+        await loadFormData();
     } catch (error) {
         message.error(error.message || '加载模板数据失败');
         router.push('/templates');
     } finally {
         loading.value = false;
+    }
+};
+
+// 根据状态加载表单数据
+const loadFormData = async () => {
+  if (isEditMode.value) {
+    // 编辑状态：优先从缓存加载，无缓存则从接口加载
+    const hasCache = loadFromCache()
+    if (!hasCache) {
+      await loadDraftDataFromServer()
+    }
+  } else {
+    // 新建状态：尝试从缓存加载（可能是之前未提交的数据）
+    const hasCache = loadFromCache()
+    if (!hasCache) {
+      console.log('新建状态，使用默认表单数据')
+    }
+  }
+}
+
+// 从服务器加载草稿数据
+const loadDraftDataFromServer = async () => {
+    try {
+        const response = await getVideoDraftDetail(draftId.value);
+        if (response.code === 0 && response.data) {
+            const draftData = response.data.data || {};
+            
+            // 预填充表单数据
+            for (const key in draftData) {
+                if (formData.hasOwnProperty(key)) {
+                    formData[key] = draftData[key];
+                }
+            }
+            
+            message.success('草稿数据已加载');
+            // 加载后立即缓存
+            saveToCache()
+        } else {
+            message.warning('草稿数据加载失败，将使用默认配置');
+        }
+    } catch (error) {
+        console.error('加载草稿数据失败:', error);
+        message.warning('草稿数据加载失败，将使用默认配置');
     }
 };
 
@@ -453,22 +626,27 @@ const getGroupDefault = (groupField) => {
     return defaultInstance;
 };
 
-const initializeForm = async () => {
-  // Clear previous form data to ensure a clean state
-  Object.keys(formData).forEach(key => delete formData[key]);
+const initializeForm = async (clearExisting = true) => {
+  // Only clear previous form data if explicitly requested (for reset)
+  if (clearExisting) {
+    Object.keys(formData).forEach(key => delete formData[key]);
+  }
 
   // Set template_id for submission
   formData.template_id = template.id;
 
   for (const field of formDefinition.value) {
-    if (field.type === 'group') {
-      if (field.replicable) {
-        formData[field.name] = [getGroupDefault(field)];
+    // Only set default values if the field doesn't already have a value (from cache)
+    if (!(field.name in formData)) {
+      if (field.type === 'group') {
+        if (field.replicable) {
+          formData[field.name] = [getGroupDefault(field)];
+        } else {
+          formData[field.name] = getGroupDefault(field);
+        }
       } else {
-        formData[field.name] = getGroupDefault(field);
+        formData[field.name] = field.defaultValue ?? (field.multiple ? [] : null);
       }
-    } else {
-      formData[field.name] = field.defaultValue ?? (field.multiple ? [] : null);
     }
 
     // Handle remote select data loading
@@ -500,7 +678,8 @@ const removeGroupInstance = (groupName, index) => {
 
 const resetParams = () => {
   formRef.value.clearValidate();
-  initializeForm();
+  initializeForm(true); // 重置时清空现有数据
+  clearCache(); // 重置时清空缓存
   message.success('参数已重置');
 };
 
@@ -641,21 +820,25 @@ const onFormFinish = (values) => {
       try {
         applying.value = true;
         await createVideoTask(finalParams); 
-        showSuccessModal.value = true;
-        message.success('任务已提交，您可以在“我的视频”中查看进度。');
-        goToMyVideos();
+        
+        // 提交成功后清空缓存
+        clearCache()
+        
+        showSuccessModal.value = true
+        message.success('任务已提交，您可以在"我的视频"中查看进度。')
+        goToMyVideos()
       } catch (error) {
-        message.error('任务提交失败，请稍后重试。');
+        message.error('任务提交失败，请稍后重试。')
       } finally {
-        applying.value = false;
+        applying.value = false
       }
     },
-  });
+  })
 };
 
 const goToMyVideos = () => {
-  router.push('/my-videos');
-  showSuccessModal.value = false;
+  router.push('/my-videos')
+  showSuccessModal.value = false
 };
 
 // 拖放相关方法
@@ -839,84 +1022,84 @@ const handleTextDragLeave = (event) => {
 }
 
 const handleTextDrop = (event, fieldName) => {
-      isTextDragOver.value = false
-      
-      if (!draggedItem.value) {
-        return
-      }
+  isTextDragOver.value = false
+  
+  if (!draggedItem.value) {
+    return
+  }
 
-      // 检查是否为文本类素材
-      const items = Array.isArray(draggedItem.value) ? draggedItem.value : [draggedItem.value]
-      const textItems = items.filter(item => item.type === 'text')
-      
-      if (textItems.length === 0) {
-        message.warning('只能拖拽文本类素材到此处')
-        return
-      }
+  // 检查是否为文本类素材
+  const items = Array.isArray(draggedItem.value) ? draggedItem.value : [draggedItem.value]
+  const textItems = items.filter(item => item.type === 'text')
+  
+  if (textItems.length === 0) {
+    message.warning('只能拖拽文本类素材到此处')
+    return
+  }
 
-      // 提取所有文本内容并用换行符拼接
-       const textContents = textItems
-         .map(item => {
-           // 对于文本类型，优先使用 resource_detail.text
-           const content = item.resource_detail?.text || item.content || item.text || item.name || ''
-           return typeof content === 'string' ? content : String(content)
-         })
-         .filter(content => content.trim())
-      
-      if (textContents.length === 0) {
-        message.warning('文本素材内容为空')
-        return
-      }
-      
-      // 用换行符拼接多个文本
-      const combinedText = textContents.join('\n')
-      
-      // 填充到表单字段
-      formData[fieldName] = combinedText
-      
-      const count = textContents.length
-      message.success(`已填充 ${count} 个文本素材到字段`)
-    }
+  // 提取所有文本内容并用换行符拼接
+   const textContents = textItems
+     .map(item => {
+       // 对于文本类型，优先使用 resource_detail.text
+       const content = item.resource_detail?.text || item.content || item.text || item.name || ''
+       return typeof content === 'string' ? content : String(content)
+     })
+     .filter(content => content.trim())
+  
+  if (textContents.length === 0) {
+    message.warning('文本素材内容为空')
+    return
+  }
+  
+  // 用换行符拼接多个文本
+  const combinedText = textContents.join('\n')
+  
+  // 填充到表单字段
+  formData[fieldName] = combinedText
+  
+  const count = textContents.length
+  message.success(`已填充 ${count} 个文本素材到字段`)
+}
 
 const handleTextDropInGroup = (event, groupInstance, fieldName) => {
-      isTextDragOver.value = false
-      
-      if (!draggedItem.value) {
-        return
-      }
+  isTextDragOver.value = false
+  
+  if (!draggedItem.value) {
+    return
+  }
 
-      // 检查是否为文本类素材
-      const items = Array.isArray(draggedItem.value) ? draggedItem.value : [draggedItem.value]
-      const textItems = items.filter(item => item.type === 'text')
-      
-      if (textItems.length === 0) {
-        message.warning('只能拖拽文本类素材到此处')
-        return
-      }
+  // 检查是否为文本类素材
+  const items = Array.isArray(draggedItem.value) ? draggedItem.value : [draggedItem.value]
+  const textItems = items.filter(item => item.type === 'text')
+  
+  if (textItems.length === 0) {
+    message.warning('只能拖拽文本类素材到此处')
+    return
+  }
 
-      // 提取所有文本内容并用换行符拼接
-       const textContents = textItems
-         .map(item => {
-           // 对于文本类型，优先使用 resource_detail.text
-           const content = item.resource_detail?.text || item.content || item.text || item.name || ''
-           return typeof content === 'string' ? content : String(content)
-         })
-         .filter(content => content.trim())
-      
-      if (textContents.length === 0) {
-        message.warning('文本素材内容为空')
-        return
-      }
-      
-      // 用换行符拼接多个文本
-      const combinedText = textContents.join('\n')
-      
-      // 填充到组内字段
-      groupInstance[fieldName] = combinedText
-      
-      const count = textContents.length
-      message.success(`已填充 ${count} 个文本素材到字段`)
-    }
+  // 提取所有文本内容并用换行符拼接
+   const textContents = textItems
+     .map(item => {
+       // 对于文本类型，优先使用 resource_detail.text
+       const content = item.resource_detail?.text || item.content || item.text || item.name || ''
+       return typeof content === 'string' ? content : String(content)
+     })
+     .filter(content => content.trim())
+  
+  if (textContents.length === 0) {
+    message.warning('文本素材内容为空')
+    return
+  }
+  
+  // 用换行符拼接多个文本
+  const combinedText = textContents.join('\n')
+  
+  // 填充到组内字段
+  groupInstance[fieldName] = combinedText
+  
+  const count = textContents.length
+  message.success(`已填充 ${count} 个文本素材到字段`)
+}
 
 </script>
 

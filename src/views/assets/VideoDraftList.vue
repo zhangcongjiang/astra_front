@@ -47,8 +47,8 @@
               {{ (pagination.current - 1) * pagination.pageSize + index + 1 }}
             </template>
             
-            <template v-if="column.key === 'id'">
-              <span class="draft-id">{{ record.id }}</span>
+            <template v-if="column.key === 'title'">
+              <span class="video-title">{{ record.title }}</span>
             </template>
             
             <template v-if="column.key === 'templateName'">
@@ -128,17 +128,10 @@ const columns = [
     align: 'center'
   },
   {
-    title: 'ID',
-    key: 'id',
-    dataIndex: 'id',
-    width: 280,
-    ellipsis: true
-  },
-  {
-    title: '模板ID',
-    key: 'templateId',
-    dataIndex: 'templateId',
-    width: 120
+    title: '视频标题',
+    key: 'title',
+    dataIndex: 'title',
+    width: 250
   },
   {
     title: '模板名称',
@@ -222,9 +215,13 @@ const currentPageData = computed(() => {
 // 处理后端数据格式转换
 const transformDraftData = (backendData) => {
   return backendData.map(item => {
+    // 从 data 字段中提取 title
+    const dataContent = item.data || {}
+    const title = dataContent.title || `未命名草稿 ${item.id.slice(0, 8)}`
+    
     return {
-      id: item.id,
-      templateId: item.template_id || '',
+      id: item.id, // 保留ID用于操作，但不在表格中显示
+      title: title,
       templateName: item.template_name || '未知模板',
       creator: item.creator || '未知',
       createTime: dayjs(item.create_time).format('YYYY-MM-DD HH:mm'),
@@ -271,16 +268,28 @@ const handlePaginationChange = ({ current, pageSize }) => {
 
 // 重新编辑
 const handleEdit = (record) => {
-  // 跳转到视频编辑页面，传递草稿ID
-  router.push(`/videos/edit/${record.id}`)
-  message.info(`正在编辑草稿: ${record.id.slice(0, 8)}`)
+  // 跳转到视频模板应用页面，传递模板ID和草稿ID
+  const templateId = record.originalData.template_id
+  if (!templateId) {
+    message.error('草稿缺少模板信息，无法编辑')
+    return
+  }
+  
+  // 跳转到模板应用页面，通过URL传递模板ID，通过查询参数传递草稿ID
+  router.push({
+    path: `/templates/apply/${templateId}`,
+    query: {
+      draftId: record.id
+    }
+  })
+  message.info(`正在编辑草稿: ${record.title}`)
 }
 
 // 删除草稿
 const handleDelete = (record) => {
   Modal.confirm({
     title: '确认删除',
-    content: `确定要删除草稿 "${record.id.slice(0, 8)}" 吗？删除后无法恢复。`,
+    content: `确定要删除草稿 "${record.title}" 吗？删除后无法恢复。`,
     async onOk() {
       try {
         loading.value = true
@@ -383,11 +392,14 @@ onMounted(() => {
     overflow: hidden;
   }
   
-  .draft-id {
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    color: #666;
-    word-break: break-all;
+  .video-title {
+    font-weight: 500;
+    color: #1890ff;
+    cursor: pointer;
+  }
+  
+  .video-title:hover {
+    text-decoration: underline;
   }
   
   .creator {

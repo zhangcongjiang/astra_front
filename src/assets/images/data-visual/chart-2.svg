@@ -1,0 +1,9 @@
+<svg width="300" height="180" xmlns="http://www.w3.org/2000/svg">
+  <rect width="300" height="180" fill="#10b981"/>
+  <text x="150" y="30" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">市场份额</text>
+  <circle cx="150" cy="110" r="50" fill="none" stroke="white" stroke-width="3"/>
+  <path d="M 150 60 A 50 50 0 0 1 200 110 L 150 110 Z" fill="rgba(255,255,255,0.8)"/>
+  <path d="M 200 110 A 50 50 0 0 1 125 145 L 150 110 Z" fill="rgba(255,255,255,0.6)"/>
+  <path d="M 125 145 A 50 50 0 0 1 100 110 L 150 110 Z" fill="rgba(255,255,255,0.4)"/>
+  <path d="M 100 110 A 50 50 0 1 1 150 60 L 150 110 Z" fill="rgba(255,255,255,0.2)"/>
+</svg>

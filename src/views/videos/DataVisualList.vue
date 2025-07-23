@@ -134,14 +134,14 @@ const templates = ref([
         id: 1,
         name: '销售趋势分析',
         description: '适合展示销售数据趋势变化的模板',
-        previewImage: 'https://fakeimg.pl/300x180/4f46e5/ffffff/?text=销售趋势',
+        previewImage: new URL('@/assets/images/data-visual/chart-1.svg', import.meta.url).href,
         tags: ['chart_1', 'size_2', 'scene_1']
     },
     {
         id: 2,
         name: '市场份额分布',
         description: '饼图展示市场份额分布的模板',
-        previewImage: 'https://fakeimg.pl/300x180/10b981/ffffff/?text=市场份额',
+        previewImage: new URL('@/assets/images/data-visual/chart-2.svg', import.meta.url).href,
         tags: ['chart_3', 'size_1', 'scene_1']
     },
     // 更多数据可视化模板...
@@ -186,12 +186,13 @@ function generateMockTemplates(count) {
         const randomSize = dataSizes[Math.floor(Math.random() * dataSizes.length)];
         const randomScene = scenes[Math.floor(Math.random() * scenes.length)];
         const randomDesc = descriptions[Math.floor(Math.random() * descriptions.length)];
+        const chartIndex = Math.floor(Math.random() * 5) + 1;
 
         mockTemplates.push({
             id: i + 2,
             name: `数据模板${i}`,
             description: randomDesc,
-            previewImage: `/images/data-visual/chart-${Math.floor(Math.random() * 5) + 1}.jpg`,
+            previewImage: new URL(`@/assets/images/data-visual/chart-${chartIndex}.svg`, import.meta.url).href,
             tags: [randomChart, randomSize, randomScene]
         });
     }
