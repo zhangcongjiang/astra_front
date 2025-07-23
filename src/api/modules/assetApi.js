@@ -23,16 +23,6 @@ export const getAssetCollectionDetail = async (id) => {
   }
 };
 
-// 获取素材集中的素材列表
-export const getAssetCollectionItems = async (id, params) => {
-  try {
-    const response = await request.get(`/asset-collection/${id}/items/`, formatParams(params));
-    return response;
-  } catch (error) {
-    console.error(`获取素材集内容出错:`, error);
-    throw error;
-  }
-};
 
 // 创建素材集
 export const createAssetCollection = async (data) => {
@@ -107,6 +97,28 @@ export const updateAssetOrder = async (collectionId, orderData) => {
     return response;
   } catch (error) {
     console.error('更新素材顺序失败:', error);
+    throw error;
+  }
+};
+
+// 创建文本素材
+export const createTextAsset = async (data) => {
+  try {
+    const response = await request.post('/asset/text/create/', data);
+    return response;
+  } catch (error) {
+    console.error('创建文本素材失败:', error);
+    throw error;
+  }
+};
+
+// 更新文本素材
+export const updateTextAsset = async (data) => {
+  try {
+    const response = await request.post('/asset/text/update/', data);
+    return response;
+  } catch (error) {
+    console.error('更新文本素材失败:', error);
     throw error;
   }
 };

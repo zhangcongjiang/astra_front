@@ -194,7 +194,7 @@
         <!-- 文本文案分类 -->
         <div class="category-section">
           <div class="category-header">
-            <h3><FileTextOutlined /> 文本文案 ({{ textItems.length }})</h3>
+            <h3><FileTextOutlined /> 文本素材 ({{ textItems.length }})</h3>
             <a-button type="primary" size="small" @click="showTextModal">
               <PlusOutlined /> 新增
             </a-button>
@@ -205,9 +205,12 @@
                 <div class="text-item-header">
                   <h4>{{ item.name }}</h4>
                   <div class="text-item-actions">
-                    <a-button type="link" size="small" @click="editTextItem(item)">
-                      <EditOutlined /> 编辑
-                    </a-button>
+                    <div class="text-status" v-if="item.saving">
+                      <LoadingOutlined /> 保存中...
+                    </div>
+                    <div class="text-status success" v-else-if="item.saved">
+                      <CheckOutlined /> 已保存
+                    </div>
                     <a-popconfirm
                       title="确定要删除这个文本素材吗？"
                       @confirm="removeTextItem(item.id)"
@@ -219,9 +222,13 @@
                   </div>
                 </div>
                 <div class="text-content">
-                  <div class="paragraph-item">
-                    <p>{{ item.text }}</p>
-                  </div>
+                  <a-textarea
+                    v-model:value="item.text"
+                    :auto-size="{ minRows: 3, maxRows: 8 }"
+                    placeholder="请输入文本内容"
+                    @change="handleTextChange(item)"
+                    class="text-input"
+                  />
                 </div>
                 <div class="text-item-meta">
                   <span>创建时间: {{ formatTime(item.createTime) }}</span>
@@ -261,9 +268,10 @@
       width="800px"
       @ok="handleTextSubmit"
       @cancel="closeTextModal"
+      :confirm-loading="textSubmitLoading"
     >
       <a-form :model="textFormState" layout="vertical">
-        <a-form-item label="文案内容">
+        <a-form-item >
           <div class="paragraph-container">
             <div v-for="(paragraph, index) in textFormState.text" :key="index" class="paragraph-item">
               <a-textarea
@@ -273,18 +281,19 @@
                 style="margin-bottom: 8px;"
               />
               <a-button 
-                type="text" 
-                danger 
-                size="small" 
-                @click="removeParagraph(index)"
-                style="margin-left: 8px;"
-              >
-                <DeleteOutlined /> 删除段落
-              </a-button>
+            type="text" 
+            danger 
+            size="small" 
+            @click="removeParagraph(index)"
+            style="margin-left: 8px;"
+            v-if="textFormState.text.length > 1"
+          >
+            <DeleteOutlined /> 删除素材
+          </a-button>
             </div>
             <a-button type="dashed" @click="addParagraph" style="width: 100%; margin-top: 8px;">
-              <PlusOutlined /> 添加段落
-            </a-button>
+          <PlusOutlined /> 添加素材
+        </a-button>
           </div>
         </a-form-item>
       </a-form>
@@ -346,7 +355,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, h } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick, h } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { 
@@ -362,17 +371,29 @@ import {
   FileTextOutlined,
   LeftOutlined,
   RightOutlined,
-  CloseOutlined
+  CloseOutlined,
+  LoadingOutlined,
+  CheckOutlined
 } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
-import { getAssetCollectionDetail } from '@/api/modules/assetApi'
+import { 
+  getAssetCollectionDetail,
+  removeAssetsFromCollection,
+  createTextAsset,
+  updateTextAsset
+} from '@/api/modules/assetApi'
 import { getImageContent } from '@/api/modules/imageApi'
 
 const router = useRouter()
 const route = useRoute()
 
 // 响应式数据
-const assetDetail = ref({})
+const assetDetail = ref({
+  name: '',
+  description: '',
+  creator: '',
+  createTime: ''
+})
 const assetItems = ref([])
 const textItems = ref([])
 const searchKeyword = ref('')
@@ -404,12 +425,15 @@ const defaultTextItem = ref({
 
 // 文本文案相关状态
 const textModalVisible = ref(false)
-const textModalTitle = ref('编辑文案段落')
+const textModalTitle = ref('编辑文本素材')
 const textFormState = ref({
   id: '',
   name: '',
   text: []
 })
+const textSubmitLoading = ref(false)
+const textSaveTimers = new Map() // 存储每个文本项的保存定时器
+const SAVE_DELAY = 1000 // 1秒延迟保存
 
 // 计算属性
 const filteredItems = computed(() => {
@@ -597,15 +621,15 @@ const isPlaying = (itemId) => {
 
 // 文本文案相关方法
 const showTextModal = () => {
-  textModalTitle.value = '新增文案'
-  textFormState.id = null
-  textFormState.name = ''
-  textFormState.text = ['']
+  textModalTitle.value = '新增文本素材'
+  textFormState.value.id = null
+  textFormState.value.name = ''
+  textFormState.value.text = ['']
   textModalVisible.value = true
 }
 
 const editTextItem = (record) => {
-  textModalTitle.value = '编辑文案段落'
+  textModalTitle.value = '编辑文本素材'
   textFormState.value = {
     id: record.id,
     name: record.name,
@@ -622,7 +646,7 @@ const removeParagraph = (index) => {
   textFormState.value.text.splice(index, 1)
 }
 
-const handleTextSubmit = () => {
+const handleTextSubmit = async () => {
   const formData = textFormState.value
   
   const paragraphs = formData.text
@@ -630,18 +654,36 @@ const handleTextSubmit = () => {
     .filter(p => p !== '')
 
   if (paragraphs.length === 0) {
-    message.error('请至少添加一个段落')
+    message.error('请至少添加一个素材')
     return
   }
 
-  defaultTextItem.value = {
-    ...defaultTextItem.value,
-    text: paragraphs,
-    updateTime: new Date().toISOString()
-  }
+  textSubmitLoading.value = true
   
-  message.success('文案段落保存成功')
-  closeTextModal()
+  try {
+    // 构造批量创建的数据
+    const createData = {
+      set_id: route.params.id,
+      texts: paragraphs.map(text => ({ text })),
+      creator: '当前用户' // 可以从用户信息中获取
+    }
+    
+    const response = await createTextAsset(createData)
+    
+    if (response.code === 0) {
+      message.success(`成功创建${response.data.created_count}个文本素材`)
+      closeTextModal()
+      // 重新加载素材详情
+      await loadAssetDetail()
+    } else {
+      message.error(response.message || '创建文本素材失败')
+    }
+  } catch (error) {
+    console.error('创建文本素材失败:', error)
+    message.error('创建文本素材失败')
+  } finally {
+    textSubmitLoading.value = false
+  }
 }
 
 const closeTextModal = () => {
@@ -662,21 +704,76 @@ const removeTextItem = async (itemId) => {
   }
 }
 
+// 处理文本变化
+const handleTextChange = (item) => {
+  // 清除之前的定时器
+  if (textSaveTimers.has(item.id)) {
+    clearTimeout(textSaveTimers.get(item.id))
+  }
+  
+  // 设置保存状态
+  item.saving = false
+  item.saved = false
+  
+  // 设置新的定时器
+  const timer = setTimeout(async () => {
+    await saveTextItem(item)
+  }, SAVE_DELAY)
+  
+  textSaveTimers.set(item.id, timer)
+}
+
+// 保存文本项
+const saveTextItem = async (item) => {
+  if (!item.text || !item.text.trim()) {
+    message.warning('文本内容不能为空')
+    return
+  }
+
+  item.saving = true
+  item.saved = false
+  
+  try {
+    await updateTextAsset({
+      asset_info_id: item.id,
+      text: item.text.trim()
+    })
+    
+    item.saved = true
+    
+    // 2秒后隐藏保存成功状态
+    setTimeout(() => {
+      item.saved = false
+    }, 2000)
+  } catch (error) {
+    console.error('保存文本失败:', error)
+    message.error('保存文本失败')
+  } finally {
+    item.saving = false
+  }
+}
+
 // 加载素材详情
 const loadAssetDetail = async () => {
   try {
-    const assetId = route.params.id
-    const response = await getAssetCollectionDetail(assetId)
+    console.log('开始加载素材详情，ID:', route.params.id); // 添加调试日志
+    const response = await getAssetCollectionDetail(route.params.id)
+    
+    console.log('API响应:', response); // 添加调试日志
     
     if (response.code === 0) {
       const data = response.data
       
-      assetDetail.value = {
-        id: data.id,
-        name: data.set_name,
-        description: '',
-        creator: data.creator,
-        createTime: data.create_time
+      // 安全地更新 assetDetail，确保不会设置为 undefined
+      if (data.asset_detail) {
+        assetDetail.value = {
+          name: data.asset_detail.name || '',
+          description: data.asset_detail.description || '',
+          creator: data.asset_detail.creator || '',
+          createTime: data.asset_detail.createTime || ''
+        }
+      } else {
+        console.warn('API返回的 asset_detail 为空，保持默认值')
       }
       
       imageItems.value = data.images
@@ -694,13 +791,17 @@ const loadAssetDetail = async () => {
           index: item.index
         }))
       
+      // 处理文本数据，添加保存状态
       textItems.value = (data.texts || []).map(item => ({
         id: item.id,
         resource_id: item.resource_id,
         name: `文本素材_${item.index}`,
         text: item.resource_detail.text,
         createTime: item.resource_detail.create_time,
-        index: item.index
+        index: item.index,
+        // 添加保存状态
+        saving: false,
+        saved: false
       }))
       
       videoItems.value = data.videos.map(item => ({
@@ -726,10 +827,12 @@ const loadAssetDetail = async () => {
       assetItems.value = [...imageItems.value, ...videoItems.value, ...audioItems.value]
       
     } else {
+      console.error('API返回错误:', response); // 添加调试日志
       message.error(response.message || '获取素材集详情失败')
     }
   } catch (error) {
     console.error('加载素材集详情失败:', error)
+    console.error('错误详情:', error.response); // 添加更详细的错误日志
     message.error('加载素材集详情失败')
   }
 }
@@ -821,6 +924,12 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // 清理所有文本保存定时器
+  textSaveTimers.forEach(timer => {
+    clearTimeout(timer)
+  })
+  textSaveTimers.clear()
+  
   document.removeEventListener('keydown', handleKeydown)
   if (currentPlayingAudio.value) {
     currentPlayingAudio.value.pause()
@@ -1134,7 +1243,7 @@ onUnmounted(() => {
 
 .text-item-actions {
   display: flex;
-  gap: 8px;
+  align-items: center;
 }
 
 .text-content {
@@ -1162,6 +1271,34 @@ onUnmounted(() => {
 .text-item-meta {
   font-size: 12px;
   color: #8c8c8c;
+}
+
+.text-input {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  transition: all 0.3s;
+}
+
+.text-input:hover {
+  border-color: #40a9ff;
+}
+
+.text-input:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.text-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #666;
+  margin-left: 8px;
+}
+
+.text-status.success {
+  color: #52c41a;
 }
 
 .paragraph-container {
