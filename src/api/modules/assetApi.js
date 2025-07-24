@@ -23,21 +23,11 @@ export const getAssetCollectionDetail = async (id) => {
   }
 };
 
-// 获取素材集中的素材列表
-export const getAssetCollectionItems = async (id, params) => {
-  try {
-    const response = await request.get(`/asset-collection/${id}/items/`, formatParams(params));
-    return response;
-  } catch (error) {
-    console.error(`获取素材集内容出错:`, error);
-    throw error;
-  }
-};
 
 // 创建素材集
 export const createAssetCollection = async (data) => {
   try {
-    const response = await request.post('/asset-collection/', data);
+    const response = await request.post('/asset/create/', data);
     return response;
   } catch (error) {
     console.error('创建素材集失败:', error);
@@ -72,12 +62,33 @@ export const deleteAssetCollection = async (id) => {
   }
 };
 
-// 添加素材到素材集
-export const addAssetsToCollection = async (collectionId, assets) => {
+// 删除素材集内的素材
+export const deleteAssetInfo = async (id) => {
   try {
-    const response = await request.post(`/asset-collection/${collectionId}/add-assets/`, {
-      assets: assets
+    const response = await request.post('/asset/asset-info/delete/', {
+      asset_info_id: id
     });
+    return response;
+  } catch (error) {
+    console.error('删除素材集失败:', error);
+    throw error;
+  }
+};
+
+// 创建文本素材
+export const createTextAsset = async (data) => {
+  try {
+    const response = await request.post('/asset/text/create/', data);
+    return response;
+  } catch (error) {
+    console.error('创建文本素材失败:', error);
+    throw error;
+  }
+};
+
+export const addItemToAsset = async (data) => {
+  try {
+    const response = await request.post('/asset/asset-info/create/', data);
     return response;
   } catch (error) {
     console.error('添加素材到素材集失败:', error);
@@ -85,28 +96,13 @@ export const addAssetsToCollection = async (collectionId, assets) => {
   }
 };
 
-// 从素材集中移除素材
-export const removeAssetsFromCollection = async (collectionId, assetIds) => {
+// 更新文本素材
+export const updateTextAsset = async (data) => {
   try {
-    const response = await request.post(`/asset-collection/${collectionId}/remove-assets/`, {
-      asset_ids: assetIds
-    });
+    const response = await request.post('/asset/text/update/', data);
     return response;
   } catch (error) {
-    console.error('从素材集移除素材失败:', error);
-    throw error;
-  }
-};
-
-// 更新素材集中素材的顺序
-export const updateAssetOrder = async (collectionId, orderData) => {
-  try {
-    const response = await request.post(`/asset-collection/${collectionId}/update-order/`, {
-      order_data: orderData
-    });
-    return response;
-  } catch (error) {
-    console.error('更新素材顺序失败:', error);
+    console.error('更新文本素材失败:', error);
     throw error;
   }
 };

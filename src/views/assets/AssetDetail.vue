@@ -22,7 +22,7 @@
         <div class="category-section">
           <div class="category-header">
             <h3><FileImageOutlined /> 图片素材 ({{ imageItems.length }})</h3>
-            <a-button type="primary" size="small" @click="handleAddItems">
+            <a-button type="primary" size="small" @click="handleAddAudioItems">
               <PlusOutlined /> 新增
             </a-button>
           </div>
@@ -48,7 +48,7 @@
                       <div class="delete-overlay" @click.stop>
                         <a-popconfirm
                           title="确定要删除这个素材吗？"
-                          @confirm="removeItem(item.id)"
+                          @confirm="deleteAssetItem(item.id,'image')"
                           ok-text="确定"
                           cancel-text="取消"
                         >
@@ -77,7 +77,7 @@
         <div class="category-section">
           <div class="category-header">
             <h3><VideoCameraOutlined /> 视频素材 ({{ videoItems.length }})</h3>
-            <a-button type="primary" size="small" @click="handleAddItems">
+            <a-button type="primary" size="small" @click="handleAddAudioItems">
               <PlusOutlined /> 新增
             </a-button>
           </div>
@@ -103,7 +103,7 @@
                       <div class="delete-overlay">
                         <a-popconfirm
                           title="确定要删除这个素材吗？"
-                          @confirm="removeItem(item.id)"
+                          @confirm="deleteAssetItem(item.id,'video')"
                           ok-text="确定"
                           cancel-text="取消"
                         >
@@ -136,7 +136,7 @@
         <div class="category-section">
           <div class="category-header">
             <h3><SoundOutlined /> 音频素材 ({{ audioItems.length }})</h3>
-            <a-button type="primary" size="small" @click="handleAddItems">
+            <a-button type="primary" size="small" @click="handleAddAudioItems">
               <PlusOutlined /> 新增
             </a-button>
           </div>
@@ -162,7 +162,7 @@
                       <div class="delete-overlay">
                         <a-popconfirm
                           title="确定要删除这个素材吗？"
-                          @confirm="removeItem(item.id)"
+                          @confirm="deleteAssetItem(item.id,'audio')"
                           ok-text="确定"
                           cancel-text="取消"
                         >
@@ -194,7 +194,7 @@
         <!-- 文本文案分类 -->
         <div class="category-section">
           <div class="category-header">
-            <h3><FileTextOutlined /> 文本文案 ({{ textItems.length }})</h3>
+            <h3><FileTextOutlined /> 文本素材 ({{ textItems.length }})</h3>
             <a-button type="primary" size="small" @click="showTextModal">
               <PlusOutlined /> 新增
             </a-button>
@@ -205,12 +205,15 @@
                 <div class="text-item-header">
                   <h4>{{ item.name }}</h4>
                   <div class="text-item-actions">
-                    <a-button type="link" size="small" @click="editTextItem(item)">
-                      <EditOutlined /> 编辑
-                    </a-button>
+                    <div class="text-status" v-if="item.saving">
+                      <LoadingOutlined /> 保存中...
+                    </div>
+                    <div class="text-status success" v-else-if="item.saved">
+                      <CheckOutlined /> 已保存
+                    </div>
                     <a-popconfirm
                       title="确定要删除这个文本素材吗？"
-                      @confirm="removeTextItem(item.id)"
+                      @confirm="deleteAssetItem(item.id,'text')"
                     >
                       <a-button type="link" size="small" danger>
                         <DeleteOutlined /> 删除
@@ -219,9 +222,13 @@
                   </div>
                 </div>
                 <div class="text-content">
-                  <div class="paragraph-item">
-                    <p>{{ item.text }}</p>
-                  </div>
+                  <a-textarea
+                    v-model:value="item.text"
+                    :auto-size="{ minRows: 3, maxRows: 8 }"
+                    placeholder="请输入文本内容"
+                    @change="handleTextChange(item)"
+                    class="text-input"
+                  />
                 </div>
                 <div class="text-item-meta">
                   <span>创建时间: {{ formatTime(item.createTime) }}</span>
@@ -234,25 +241,11 @@
           </div>
         </div>
 
-        <!-- 全局空状态 -->
-        <div v-if="filteredItems.length === 0 && searchKeyword" class="empty-state">
-          <a-empty description="未找到匹配的素材" />
-        </div>
+
       </div>
     </div>
 
-    <!-- 添加素材模态框 -->
-    <a-modal
-      v-model:open="showAddModal"
-      title="添加素材到素材集"
-      width="800px"
-      @ok="handleAddItems"
-      @cancel="selectedItems = []"
-    >
-      <div class="add-items-content">
-        <p>选择要添加到素材集的素材</p>
-      </div>
-    </a-modal>
+
 
     <!-- 文本文案编辑模态框 -->
     <a-modal
@@ -261,9 +254,10 @@
       width="800px"
       @ok="handleTextSubmit"
       @cancel="closeTextModal"
+      :confirm-loading="textSubmitLoading"
     >
       <a-form :model="textFormState" layout="vertical">
-        <a-form-item label="文案内容">
+        <a-form-item >
           <div class="paragraph-container">
             <div v-for="(paragraph, index) in textFormState.text" :key="index" class="paragraph-item">
               <a-textarea
@@ -273,18 +267,19 @@
                 style="margin-bottom: 8px;"
               />
               <a-button 
-                type="text" 
-                danger 
-                size="small" 
-                @click="removeParagraph(index)"
-                style="margin-left: 8px;"
-              >
-                <DeleteOutlined /> 删除段落
-              </a-button>
+            type="text" 
+            danger 
+            size="small" 
+            @click="removeParagraph(index)"
+            style="margin-left: 8px;"
+            v-if="textFormState.text.length > 1"
+          >
+            <DeleteOutlined /> 删除素材
+          </a-button>
             </div>
             <a-button type="dashed" @click="addParagraph" style="width: 100%; margin-top: 8px;">
-              <PlusOutlined /> 添加段落
-            </a-button>
+          <PlusOutlined /> 添加素材
+        </a-button>
           </div>
         </a-form-item>
       </a-form>
@@ -346,38 +341,46 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, h } from 'vue'
+import { ref, computed, onMounted, onUnmounted, h } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { 
   ArrowLeftOutlined,
   PlusOutlined, 
-  EditOutlined, 
   PlayCircleOutlined,
   SoundOutlined,
-  UploadOutlined,
   DeleteOutlined,
   FileImageOutlined,
   VideoCameraOutlined,
   FileTextOutlined,
   LeftOutlined,
   RightOutlined,
-  CloseOutlined
+  CloseOutlined,
+  LoadingOutlined,
+  CheckOutlined
 } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
-import { getAssetCollectionDetail } from '@/api/modules/assetApi'
-import { getImageContent } from '@/api/modules/imageApi'
+import { 
+  getAssetCollectionDetail,
+  createTextAsset,
+  updateTextAsset,
+  deleteAssetInfo
+} from '@/api/modules/assetApi'
 
 const router = useRouter()
 const route = useRoute()
 
 // 响应式数据
-const assetDetail = ref({})
+const assetDetail = ref({
+  name: '',
+  description: '',
+  creator: '',
+  createTime: ''
+})
 const assetItems = ref([])
 const textItems = ref([])
 const searchKeyword = ref('')
-const showAddModal = ref(false)
-const selectedItems = ref([])
+// 添加缺失的 imageItems 定义
 const imageItems = ref([])
 const videoItems = ref([])
 const audioItems = ref([])
@@ -393,36 +396,21 @@ const previewVisible = ref(false)
 const currentPreviewImage = ref({})
 const currentPreviewIndex = ref(0)
 
-// 默认文案对象
-const defaultTextItem = ref({
-  id: 'default',
-  name: '文案内容',
-  text: [],
-  createTime: new Date().toISOString(),
-  updateTime: new Date().toISOString()
-})
+
 
 // 文本文案相关状态
 const textModalVisible = ref(false)
-const textModalTitle = ref('编辑文案段落')
+const textModalTitle = ref('编辑文本素材')
 const textFormState = ref({
   id: '',
   name: '',
   text: []
 })
+const textSubmitLoading = ref(false)
+const textSaveTimers = new Map() // 存储每个文本项的保存定时器
+const SAVE_DELAY = 1000 // 1秒延迟保存
 
 // 计算属性
-const filteredItems = computed(() => {
-  let items = assetItems.value
-  
-  if (searchKeyword.value) {
-    items = items.filter(item => 
-      item.name.toLowerCase().includes(searchKeyword.value.toLowerCase())
-    )
-  }
-  
-  return items
-})
 
 const filteredTextItems = computed(() => {
   let items = textItems.value
@@ -473,7 +461,7 @@ const showNextImage = () => {
 const deleteCurrentImage = async () => {
   try {
     const imageId = currentPreviewImage.value.id
-    await removeItem(imageId)
+    await deleteAssetItem(imageId,'image')
     
     // 更新预览状态
     if (imageItems.value.length === 0) {
@@ -597,15 +585,15 @@ const isPlaying = (itemId) => {
 
 // 文本文案相关方法
 const showTextModal = () => {
-  textModalTitle.value = '新增文案'
-  textFormState.id = null
-  textFormState.name = ''
-  textFormState.text = ['']
+  textModalTitle.value = '新增文本素材'
+  textFormState.value.id = null
+  textFormState.value.name = ''
+  textFormState.value.text = ['']
   textModalVisible.value = true
 }
 
 const editTextItem = (record) => {
-  textModalTitle.value = '编辑文案段落'
+  textModalTitle.value = '编辑文本素材'
   textFormState.value = {
     id: record.id,
     name: record.name,
@@ -622,7 +610,7 @@ const removeParagraph = (index) => {
   textFormState.value.text.splice(index, 1)
 }
 
-const handleTextSubmit = () => {
+const handleTextSubmit = async () => {
   const formData = textFormState.value
   
   const paragraphs = formData.text
@@ -630,18 +618,36 @@ const handleTextSubmit = () => {
     .filter(p => p !== '')
 
   if (paragraphs.length === 0) {
-    message.error('请至少添加一个段落')
+    message.error('请至少添加一个素材')
     return
   }
 
-  defaultTextItem.value = {
-    ...defaultTextItem.value,
-    text: paragraphs,
-    updateTime: new Date().toISOString()
-  }
+  textSubmitLoading.value = true
   
-  message.success('文案段落保存成功')
-  closeTextModal()
+  try {
+    // 构造批量创建的数据
+    const createData = {
+      set_id: route.params.id,
+      texts: paragraphs.map(text => ({ text })),
+      creator: '当前用户' // 可以从用户信息中获取
+    }
+    
+    const response = await createTextAsset(createData)
+    
+    if (response.code === 0) {
+      message.success(`成功创建${response.data.created_count}个文本素材`)
+      closeTextModal()
+      // 重新加载素材详情
+      await loadAssetDetail()
+    } else {
+      message.error(response.message || '创建文本素材失败')
+    }
+  } catch (error) {
+    console.error('创建文本素材失败:', error)
+    message.error('创建文本素材失败')
+  } finally {
+    textSubmitLoading.value = false
+  }
 }
 
 const closeTextModal = () => {
@@ -653,30 +659,97 @@ const closeTextModal = () => {
   }
 }
 
-const removeTextItem = async (itemId) => {
+
+// 处理文本变化
+const handleTextChange = (item) => {
+  // 清除之前的定时器
+  if (textSaveTimers.has(item.id)) {
+    clearTimeout(textSaveTimers.get(item.id))
+  }
+  
+  // 设置保存状态
+  item.saving = false
+  item.saved = false
+  
+  // 设置新的定时器
+  const timer = setTimeout(async () => {
+    await saveTextItem(item)
+  }, SAVE_DELAY)
+  
+  textSaveTimers.set(item.id, timer)
+}
+
+// 保存文本项
+const saveTextItem = async (item) => {
+  if (!item.text || !item.text.trim()) {
+    message.warning('文本内容不能为空')
+    return
+  }
+
+  item.saving = true
+  item.saved = false
+  
   try {
-    textItems.value = textItems.value.filter(item => item.id !== itemId)
-    message.success('删除成功')
+    await updateTextAsset({
+      asset_info_id: item.id,
+      text: item.text.trim()
+    })
+    
+    item.saved = true
+    
+    // 2秒后隐藏保存成功状态
+    setTimeout(() => {
+      item.saved = false
+    }, 2000)
   } catch (error) {
-    message.error('删除失败')
+    console.error('保存文本失败:', error)
+    message.error('保存文本失败')
+  } finally {
+    item.saving = false
   }
 }
 
+const handleAddImageItems = () => {
+  message.info('图片素材新增功能暂未开放')
+}
+
+const handleAddVideoItems = () => {
+  message.info('视频素材新增功能暂未开放')
+}
+
+const handleAddAudioItems = () => {
+  message.info('音频素材新增功能暂未开放')
+}
 // 加载素材详情
 const loadAssetDetail = async () => {
   try {
-    const assetId = route.params.id
-    const response = await getAssetCollectionDetail(assetId)
+    console.log('开始加载素材详情，ID:', route.params.id)
+    const response = await getAssetCollectionDetail(route.params.id)
+    
+    console.log('API响应:', response)
     
     if (response.code === 0) {
       const data = response.data
       
-      assetDetail.value = {
-        id: data.id,
-        name: data.set_name,
-        description: '',
-        creator: data.creator,
-        createTime: data.create_time
+      // 更灵活的数据赋值，兼容不同的字段名
+      if (data.asset_detail || data) {
+        const detail = data.asset_detail || data
+        assetDetail.value = {
+          name: detail.name || detail.set_name || '',
+          description: detail.description || '',
+          creator: detail.creator || detail.creator_name || '',
+          createTime: detail.createTime || detail.create_time || detail.created_at || ''
+        }
+        console.log('更新后的 assetDetail:', assetDetail.value)
+      } else {
+        console.warn('API返回的数据结构异常:', data)
+        // 尝试直接从 data 中获取
+        assetDetail.value = {
+          name: data.name || data.set_name || '',
+          description: data.description || '',
+          creator: data.creator || data.creator_name || '',
+          createTime: data.createTime || data.create_time || data.created_at || ''
+        }
       }
       
       imageItems.value = data.images
@@ -694,13 +767,17 @@ const loadAssetDetail = async () => {
           index: item.index
         }))
       
+      // 处理文本数据，添加保存状态
       textItems.value = (data.texts || []).map(item => ({
         id: item.id,
         resource_id: item.resource_id,
         name: `文本素材_${item.index}`,
         text: item.resource_detail.text,
         createTime: item.resource_detail.create_time,
-        index: item.index
+        index: item.index,
+        // 添加保存状态
+        saving: false,
+        saved: false
       }))
       
       videoItems.value = data.videos.map(item => ({
@@ -723,13 +800,13 @@ const loadAssetDetail = async () => {
         index: item.index
       }))
       
-      assetItems.value = [...imageItems.value, ...videoItems.value, ...audioItems.value]
-      
     } else {
+      console.error('API返回错误:', response)
       message.error(response.message || '获取素材集详情失败')
     }
   } catch (error) {
     console.error('加载素材集详情失败:', error)
+    console.error('错误详情:', error.response)
     message.error('加载素材集详情失败')
   }
 }
@@ -739,63 +816,34 @@ const goBack = () => {
   router.back()
 }
 
-const editAsset = () => {
-  message.info('编辑功能待实现')
-}
-
-const handleAddItems = () => {
-  message.success('素材添加成功')
-  showAddModal.value = false
-  selectedItems.value = []
-}
-
-const handleSearch = () => {
-  // 搜索逻辑已经通过计算属性实现
-}
-
-const handleUpload = (file, type) => {
-  const isLt10M = file.size / 1024 / 1024 < 10
-  if (!isLt10M) {
-    message.error('文件大小不能超过 10MB!')
-    return false
-  }
-
-  message.loading('上传中...', 1)
-  
-  setTimeout(() => {
-    const newItem = {
-      id: Date.now(),
-      name: file.name,
-      type: type,
-      url: URL.createObjectURL(file),
-      size: file.size
-    }
-    
-    if (type === 'image') {
-      imageItems.value.unshift(newItem)
-    } else if (type === 'video') {
-      videoItems.value.unshift(newItem)
-    } else if (type === 'audio') {
-      audioItems.value.unshift(newItem)
-    }
-    
-    assetItems.value.unshift(newItem)
-    message.success('上传成功!')
-  }, 1000)
-  
-  return false
-}
-
-const removeItem = async (itemId) => {
+// 统一的删除方法
+const deleteAssetItem = async (itemId, assetType) => {
   try {
-    // 从各个数组中删除
-    imageItems.value = imageItems.value.filter(item => item.id !== itemId)
-    videoItems.value = videoItems.value.filter(item => item.id !== itemId)
-    audioItems.value = audioItems.value.filter(item => item.id !== itemId)
-    assetItems.value = assetItems.value.filter(item => item.id !== itemId)
+    // 调用 API 删除素材
+    const response = await deleteAssetInfo(itemId)
     
-    message.success('删除成功')
+    if (response.code === 0) {
+      // 根据素材类型从对应数组中移除
+      switch (assetType) {
+        case 'image':
+          imageItems.value = imageItems.value.filter(item => item.id !== itemId)
+          break
+        case 'video':
+          videoItems.value = videoItems.value.filter(item => item.id !== itemId)
+          break
+        case 'audio':
+          audioItems.value = audioItems.value.filter(item => item.id !== itemId)
+          break
+        case 'text':
+          textItems.value = textItems.value.filter(item => item.id !== itemId)
+          break
+      }
+      message.success('删除成功')
+    } else {
+      message.error(response.message || '删除失败')
+    }
   } catch (error) {
+    console.error('删除素材失败:', error)
     message.error('删除失败')
   }
 }
@@ -806,13 +854,7 @@ const formatTime = (time) => {
   return dayjs(time).format('YYYY-MM-DD HH:mm:ss')
 }
 
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
+
 
 // 生命周期
 onMounted(() => {
@@ -821,6 +863,12 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // 清理所有文本保存定时器
+  textSaveTimers.forEach(timer => {
+    clearTimeout(timer)
+  })
+  textSaveTimers.clear()
+  
   document.removeEventListener('keydown', handleKeydown)
   if (currentPlayingAudio.value) {
     currentPlayingAudio.value.pause()
@@ -1134,7 +1182,7 @@ onUnmounted(() => {
 
 .text-item-actions {
   display: flex;
-  gap: 8px;
+  align-items: center;
 }
 
 .text-content {
@@ -1162,6 +1210,34 @@ onUnmounted(() => {
 .text-item-meta {
   font-size: 12px;
   color: #8c8c8c;
+}
+
+.text-input {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  transition: all 0.3s;
+}
+
+.text-input:hover {
+  border-color: #40a9ff;
+}
+
+.text-input:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.text-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #666;
+  margin-left: 8px;
+}
+
+.text-status.success {
+  color: #52c41a;
 }
 
 .paragraph-container {
