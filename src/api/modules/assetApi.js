@@ -109,9 +109,9 @@ export const updateTextAsset = async (data) => {
 
 
 //  获取素材元素的详情，包括图片，音频，视频
-// /video/detail/{video_id}/
-// /image/{id}/
-// /voice/{id}/
+// GET /api/asset/resource/detail/?resource_type=image&resource_id=xxx
+// GET /api/asset/resource/detail/?resource_type=video&resource_id=xxx
+// GET /api/asset/resource/detail/?resource_type=audio&resource_id=xxx
 export const getAssetItemDetail = async (type, id, options = {})  => {
   // type: image, audio, video
   // options.skipGlobalErrorHandler: 是否跳过全局错误处理
@@ -120,33 +120,24 @@ export const getAssetItemDetail = async (type, id, options = {})  => {
   try {
     let response;
     
+    // 验证资源类型
+    if (!['image', 'audio', 'video'].includes(type)) {
+      throw new Error('素材类型错误');
+    }
+    
+    const params = {
+      resource_type: type,
+      resource_id: id
+    };
+    
     if (skipGlobalErrorHandler) {
       // 直接使用axios实例，跳过全局错误处理
       const axiosInstance = (await import('../config/axiosConfig.js')).default;
-      
-      if (type === 'image') {
-        response = await axiosInstance.get(`/image/${id}/`);
-      } else if (type === 'audio') {
-        response = await axiosInstance.get(`/voice/${id}/`);  
-      } else if (type === 'video') {
-        response = await axiosInstance.get(`/video/detail/${id}/`);
-      } else {
-        throw new Error('素材类型错误');
-      }
-      
+      response = await axiosInstance.get('/asset/resource/detail/', { params });
       return response.data;
     } else {
       // 使用原有的request方法
-      if (type === 'image') {
-        response = await request.get(`/image/${id}/`);
-      } else if (type === 'audio') {
-        response = await request.get(`/voice/${id}/`);  
-      } else if (type === 'video') {
-        response = await request.get(`/video/detail/${id}/`);
-      } else {
-        throw new Error('素材类型错误');
-      }
-      
+      response = await request.get('/asset/resource/detail/', { params });
       return response;
     }
   } catch (error) {

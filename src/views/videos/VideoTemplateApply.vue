@@ -84,9 +84,9 @@
                               <a-tag 
                                 v-if="field.multiple" 
                                 v-for="item in formData[field.name]" 
-                                :key="item.id" 
+                                :key="item.resource_id" 
                                 closable 
-                                @close="removeServerSelectionItem(field.name, item.id)"
+                                @close="removeServerSelectionItem(field.name, item.resource_id)"
                               >
                                 {{ item.name }}
                               </a-tag>
@@ -172,14 +172,14 @@
                                     </div>
                                     <div v-else class="selected-items">
                                       <a-tag v-if="!innerField.multiple" closable @close="clearServerSelection(groupInstance, innerField.name)">
-                                        {{ groupInstance[innerField.name].name }}
+                                        {{ groupInstance[innerField.name]?.name || '未知素材' }}
                                       </a-tag>
                                       <a-tag 
                                         v-if="innerField.multiple" 
                                         v-for="item in groupInstance[innerField.name]" 
-                                        :key="item.id" 
+                                        :key="item.resource_id" 
                                         closable 
-                                        @close="removeServerSelectionItem(groupInstance, innerField.name, item.id)"
+                                        @close="removeServerSelectionItem(groupInstance, innerField.name, item.resource_id)"
                                       >
                                         {{ item.name }}
                                       </a-tag>
@@ -257,14 +257,14 @@
                                  </div>
                                  <div v-else class="selected-items">
                                    <a-tag v-if="!innerField.multiple" closable @close="clearServerSelection(formData[field.name], innerField.name)">
-                                     {{ formData[field.name][innerField.name].name }}
+                                     {{ formData[field.name][innerField.name]?.name || '未知素材' }}
                                    </a-tag>
                                    <a-tag 
                                      v-if="innerField.multiple" 
                                      v-for="item in formData[field.name][innerField.name]" 
-                                     :key="item.id" 
+                                     :key="item.resource_id" 
                                      closable 
-                                     @close="removeServerSelectionItem(formData[field.name], innerField.name, item.id)"
+                                     @close="removeServerSelectionItem(formData[field.name], innerField.name, item.resource_id)"
                                    >
                                      {{ item.name }}
                                    </a-tag>
@@ -456,9 +456,37 @@ const enrichServerSelectFields = async () => {
             resourceType: field.options.resourceType
           })
         } else if (field.type === 'group' && field.fields) {
-          collectServerFields(field.fields, parentPath ? `${parentPath}.${field.name}` : field.name)
+          // 对于group字段，需要检查实际的formData结构
+          const groupPath = parentPath ? `${parentPath}.${field.name}` : field.name
+          const groupData = getNestedValue(formData, groupPath)
+          
+          console.log(`处理group字段 ${field.name}:`, {
+            replicable: field.replicable,
+            groupData: groupData,
+            isArray: Array.isArray(groupData)
+          })
+          
+          if (field.replicable && Array.isArray(groupData)) {
+            // 可复制的group，遍历每个实例
+            console.log(`可复制group ${field.name} 有 ${groupData.length} 个实例`)
+            groupData.forEach((_, index) => {
+              console.log(`处理group实例 ${index}:`, `${groupPath}.${index}`)
+              collectServerFields(field.fields, `${groupPath}.${index}`)
+            })
+          } else if (!field.replicable && groupData && typeof groupData === 'object') {
+            // 不可复制的group
+            console.log(`处理不可复制group ${field.name}`)
+            collectServerFields(field.fields, groupPath)
+          }
         }
       })
+    }
+    
+    // 辅助函数：获取嵌套对象的值
+    const getNestedValue = (obj, path) => {
+      return path.split('.').reduce((current, key) => {
+        return current && current[key] !== undefined ? current[key] : undefined
+      }, obj)
     }
     
     collectServerFields(formDefinition.value)
@@ -492,38 +520,51 @@ const enrichFieldData = async (field, path, resourceType) => {
     
     if (!fieldValue) return
     
-    console.log(`处理字段 ${path}:`, fieldValue, '资源类型:', resourceType)
+    console.log(`处理字段 ${path}:`, fieldValue, '资源类型:', resourceType, '是否多选:', field.multiple)
     
     if (field.multiple && Array.isArray(fieldValue)) {
       // 多选字段
+      console.log(`处理多选字段 ${path}，当前值:`, fieldValue)
       const enrichedItems = []
       for (const item of fieldValue) {
-        if (typeof item === 'object' && item.id && !item.name) {
+        console.log(`处理多选项:`, item, '类型:', typeof item)
+        if (typeof item === 'object' && (item.resource_id || item.id) && !item.name) {
           // 只有ID没有name，需要获取详细信息
+          const itemId = item.resource_id || item.id
+          console.log(`获取素材详情，ID: ${itemId}`)
           try {
-            const detail = await getAssetItemDetail(resourceType, item.id, { skipGlobalErrorHandler: true })
+            const detail = await getAssetItemDetail(resourceType, itemId, { skipGlobalErrorHandler: true })
+            console.log(`素材 ${itemId} 详情:`, detail)
             if (detail && detail.code === 0 && detail.data) {
-              enrichedItems.push({
-                id: item.id,
-                name: detail.data.name || detail.data.title || `${resourceType}_${item.id}`
-              })
+              const enrichedItem = {
+                resource_id: itemId,
+                id: itemId, // 保持向后兼容
+                name: detail.data.name || detail.data.title || `${resourceType}_${itemId}`
+              }
+              console.log(`素材 ${itemId} 丰富后:`, enrichedItem)
+              enrichedItems.push(enrichedItem)
             } else {
               // 接口返回异常，跳过该项（相当于清空）
-              console.warn(`素材 ${item.id} 详情获取失败，已从表单中移除`)
+              console.warn(`素材 ${itemId} 详情获取失败，已从表单中移除`)
             }
           } catch (error) {
             // 接口调用异常（如404），跳过该项（相当于清空）
-            console.warn(`素材 ${item.id} 详情获取异常，已从表单中移除:`, error.message)
+            console.warn(`素材 ${itemId} 详情获取异常，已从表单中移除:`, error.message)
           }
         } else if (typeof item === 'string' || typeof item === 'number') {
           // 纯ID值，需要获取详细信息
+          console.log(`处理纯ID值: ${item}`)
           try {
             const detail = await getAssetItemDetail(resourceType, item, { skipGlobalErrorHandler: true })
+            console.log(`纯ID ${item} 详情:`, detail)
             if (detail && detail.code === 0 && detail.data) {
-              enrichedItems.push({
-                id: item,
+              const enrichedItem = {
+                resource_id: item,
+                id: item, // 保持向后兼容
                 name: detail.data.name || detail.data.title || `${resourceType}_${item}`
-              })
+              }
+              console.log(`纯ID ${item} 丰富后:`, enrichedItem)
+              enrichedItems.push(enrichedItem)
             } else {
               // 接口返回异常，跳过该项（相当于清空）
               console.warn(`素材 ${item} 详情获取失败，已从表单中移除`)
@@ -533,40 +574,55 @@ const enrichFieldData = async (field, path, resourceType) => {
             console.warn(`素材 ${item} 详情获取异常，已从表单中移除:`, error.message)
           }
         } else {
+          // 已经有完整信息的项目，直接保留
+          console.log(`保留已有完整信息的项目:`, item)
           enrichedItems.push(item)
         }
       }
+      console.log(`多选字段 ${path} 处理完成，原始:`, fieldValue, '处理后:', enrichedItems)
       currentData[fieldName] = enrichedItems
     } else {
       // 单选字段
-      if (typeof fieldValue === 'object' && fieldValue.id && !fieldValue.name) {
+      console.log(`处理单选字段 ${path}，当前值:`, fieldValue)
+      if (typeof fieldValue === 'object' && (fieldValue.resource_id || fieldValue.id) && !fieldValue.name) {
         // 只有ID没有name，需要获取详细信息
+        const itemId = fieldValue.resource_id || fieldValue.id
+        console.log(`获取单选素材详情，ID: ${itemId}`)
         try {
-          const detail = await getAssetItemDetail(resourceType, fieldValue.id, { skipGlobalErrorHandler: true })
+          const detail = await getAssetItemDetail(resourceType, itemId, { skipGlobalErrorHandler: true })
+          console.log(`单选素材 ${itemId} 详情:`, detail)
           if (detail && detail.code === 0 && detail.data) {
-            currentData[fieldName] = {
-              id: fieldValue.id,
-              name: detail.data.name || detail.data.title || `${resourceType}_${fieldValue.id}`
+            const enrichedItem = {
+              resource_id: itemId,
+              id: itemId, // 保持向后兼容
+              name: detail.data.name || detail.data.title || `${resourceType}_${itemId}`
             }
+            console.log(`单选素材 ${itemId} 丰富后:`, enrichedItem)
+            currentData[fieldName] = enrichedItem
           } else {
             // 接口返回异常，清空该字段
             currentData[fieldName] = field.multiple ? [] : null
-            console.warn(`素材 ${fieldValue.id} 详情获取失败，已清空表单字段 ${path}`)
+            console.warn(`素材 ${itemId} 详情获取失败，已清空表单字段 ${path}`)
           }
         } catch (error) {
           // 接口调用异常（如404），清空该字段
           currentData[fieldName] = field.multiple ? [] : null
-          console.warn(`素材 ${fieldValue.id} 详情获取异常，已清空表单字段 ${path}:`, error.message)
+          console.warn(`素材 ${itemId} 详情获取异常，已清空表单字段 ${path}:`, error.message)
         }
       } else if (typeof fieldValue === 'string' || typeof fieldValue === 'number') {
         // 纯ID值，需要获取详细信息
+        console.log(`处理单选纯ID值: ${fieldValue}`)
         try {
           const detail = await getAssetItemDetail(resourceType, fieldValue, { skipGlobalErrorHandler: true })
+          console.log('获取素材详情:', detail)
           if (detail && detail.code === 0 && detail.data) {
-            currentData[fieldName] = {
-              id: fieldValue,
+            const enrichedItem = {
+              resource_id: fieldValue,
+              id: fieldValue, // 保持向后兼容
               name: detail.data.name || detail.data.title || `${resourceType}_${fieldValue}`
             }
+            console.log(`单选纯ID ${fieldValue} 丰富后:`, enrichedItem)
+            currentData[fieldName] = enrichedItem
           } else {
             // 接口返回异常，清空该字段
             currentData[fieldName] = field.multiple ? [] : null
@@ -922,12 +978,12 @@ const clearServerSelection = (context, fieldName) => {
     }
 };
 
-const removeServerSelectionItem = (context, fieldName, itemId) => {
+const removeServerSelectionItem = (context, fieldName, itemResourceId) => {
     const isGroup = typeof context === 'object' && context !== null;
     const currentSelection = isGroup ? context[fieldName] : formData[fieldName];
     
     if (Array.isArray(currentSelection)) {
-        const newSelection = currentSelection.filter(item => item.id !== itemId);
+        const newSelection = currentSelection.filter(item => item.resource_id !== itemResourceId);
         if (isGroup) {
             context[fieldName] = newSelection;
         } else {
@@ -953,9 +1009,9 @@ const buildFinalParams = (rawFormData) => {
         // Handle server selections
         if (fieldDefinition.type === 'select' && fieldDefinition.options.source === 'server') {
             if (fieldDefinition.multiple) {
-                return Array.isArray(value) ? value.map(item => item.id) : []; // Send back IDs
+                return Array.isArray(value) ? value.map(item => item.resource_id) : []; // Send back resource_ids
             }
-            return value ? value.id : null; // Send back ID
+            return value ? value.resource_id : null; // Send back resource_id
         }
 
         return value;
@@ -1099,7 +1155,7 @@ const handleDrop = (event, fieldName) => {
     let duplicateCount = 0;
     
     itemsToAdd.forEach(item => {
-      const exists = currentValue.some(existingItem => existingItem.id === item.id);
+      const exists = currentValue.some(existingItem => existingItem.resource_id === item.resource_id);
       if (!exists) {
         newItems.push(item);
       } else {
@@ -1161,7 +1217,7 @@ const handleDropInGroup = (event, groupInstance, fieldName) => {
     let duplicateCount = 0;
     
     itemsToAdd.forEach(item => {
-      const exists = currentValue.some(existingItem => existingItem.id === item.id);
+      const exists = currentValue.some(existingItem => existingItem.resource_id === item.resource_id);
       if (!exists) {
         newItems.push(item);
       } else {
