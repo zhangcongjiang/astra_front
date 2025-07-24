@@ -339,6 +339,7 @@ import {
 } from '@ant-design/icons-vue'
 // Import your API functions and the new modal component
 import { uploadFile, createVideoTask, fetchRemoteData, getVideoDraftDetail,getVideoTemplates } from '@/api/modules/videoApi.js' 
+import { getAssetItemDetail } from '@/api/modules/assetApi.js'
 import ResourceSelectorModal from './ResourceSelectorModal.vue';
 
 const route = useRoute()
@@ -435,6 +436,153 @@ const loadFromCache = () => {
   } catch (error) {
     console.error('从缓存加载表单数据失败:', error)
     return false
+  }
+}
+
+// 获取server类型select字段的详细信息
+const enrichServerSelectFields = async () => {
+  try {
+    console.log('开始获取server类型select字段的详细信息...')
+    
+    // 遍历表单定义，找到所有server类型的select字段
+    const serverFields = []
+    
+    const collectServerFields = (fields, parentPath = '') => {
+      fields.forEach(field => {
+        if (field.type === 'select' && field.options?.source === 'server') {
+          serverFields.push({
+            field,
+            path: parentPath ? `${parentPath}.${field.name}` : field.name,
+            resourceType: field.options.resourceType
+          })
+        } else if (field.type === 'group' && field.fields) {
+          collectServerFields(field.fields, parentPath ? `${parentPath}.${field.name}` : field.name)
+        }
+      })
+    }
+    
+    collectServerFields(formDefinition.value)
+    console.log('找到的server类型字段:', serverFields)
+    
+    // 为每个server字段获取详细信息
+    for (const { field, path, resourceType } of serverFields) {
+      await enrichFieldData(field, path, resourceType)
+    }
+    
+    console.log('server类型select字段详细信息获取完成')
+  } catch (error) {
+    console.error('获取server类型select字段详细信息失败:', error)
+  }
+}
+
+// 为单个字段获取详细信息
+const enrichFieldData = async (field, path, resourceType) => {
+  try {
+    const pathParts = path.split('.')
+    let currentData = formData
+    
+    // 导航到字段数据
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      if (!currentData[pathParts[i]]) return
+      currentData = currentData[pathParts[i]]
+    }
+    
+    const fieldName = pathParts[pathParts.length - 1]
+    const fieldValue = currentData[fieldName]
+    
+    if (!fieldValue) return
+    
+    console.log(`处理字段 ${path}:`, fieldValue, '资源类型:', resourceType)
+    
+    if (field.multiple && Array.isArray(fieldValue)) {
+      // 多选字段
+      const enrichedItems = []
+      for (const item of fieldValue) {
+        if (typeof item === 'object' && item.id && !item.name) {
+          // 只有ID没有name，需要获取详细信息
+          try {
+            const detail = await getAssetItemDetail(resourceType, item.id, { skipGlobalErrorHandler: true })
+            if (detail && detail.code === 0 && detail.data) {
+              enrichedItems.push({
+                id: item.id,
+                name: detail.data.name || detail.data.title || `${resourceType}_${item.id}`
+              })
+            } else {
+              // 接口返回异常，跳过该项（相当于清空）
+              console.warn(`素材 ${item.id} 详情获取失败，已从表单中移除`)
+            }
+          } catch (error) {
+            // 接口调用异常（如404），跳过该项（相当于清空）
+            console.warn(`素材 ${item.id} 详情获取异常，已从表单中移除:`, error.message)
+          }
+        } else if (typeof item === 'string' || typeof item === 'number') {
+          // 纯ID值，需要获取详细信息
+          try {
+            const detail = await getAssetItemDetail(resourceType, item, { skipGlobalErrorHandler: true })
+            if (detail && detail.code === 0 && detail.data) {
+              enrichedItems.push({
+                id: item,
+                name: detail.data.name || detail.data.title || `${resourceType}_${item}`
+              })
+            } else {
+              // 接口返回异常，跳过该项（相当于清空）
+              console.warn(`素材 ${item} 详情获取失败，已从表单中移除`)
+            }
+          } catch (error) {
+            // 接口调用异常（如404），跳过该项（相当于清空）
+            console.warn(`素材 ${item} 详情获取异常，已从表单中移除:`, error.message)
+          }
+        } else {
+          enrichedItems.push(item)
+        }
+      }
+      currentData[fieldName] = enrichedItems
+    } else {
+      // 单选字段
+      if (typeof fieldValue === 'object' && fieldValue.id && !fieldValue.name) {
+        // 只有ID没有name，需要获取详细信息
+        try {
+          const detail = await getAssetItemDetail(resourceType, fieldValue.id, { skipGlobalErrorHandler: true })
+          if (detail && detail.code === 0 && detail.data) {
+            currentData[fieldName] = {
+              id: fieldValue.id,
+              name: detail.data.name || detail.data.title || `${resourceType}_${fieldValue.id}`
+            }
+          } else {
+            // 接口返回异常，清空该字段
+            currentData[fieldName] = field.multiple ? [] : null
+            console.warn(`素材 ${fieldValue.id} 详情获取失败，已清空表单字段 ${path}`)
+          }
+        } catch (error) {
+          // 接口调用异常（如404），清空该字段
+          currentData[fieldName] = field.multiple ? [] : null
+          console.warn(`素材 ${fieldValue.id} 详情获取异常，已清空表单字段 ${path}:`, error.message)
+        }
+      } else if (typeof fieldValue === 'string' || typeof fieldValue === 'number') {
+        // 纯ID值，需要获取详细信息
+        try {
+          const detail = await getAssetItemDetail(resourceType, fieldValue, { skipGlobalErrorHandler: true })
+          if (detail && detail.code === 0 && detail.data) {
+            currentData[fieldName] = {
+              id: fieldValue,
+              name: detail.data.name || detail.data.title || `${resourceType}_${fieldValue}`
+            }
+          } else {
+            // 接口返回异常，清空该字段
+            currentData[fieldName] = field.multiple ? [] : null
+            console.warn(`素材 ${fieldValue} 详情获取失败，已清空表单字段 ${path}`)
+          }
+        } catch (error) {
+          // 接口调用异常（如404），清空该字段
+          currentData[fieldName] = field.multiple ? [] : null
+          console.warn(`素材 ${fieldValue} 详情获取异常，已清空表单字段 ${path}:`, error.message)
+        }
+      }
+    }
+    
+    console.log(`字段 ${path} 处理完成:`, currentData[fieldName])
+  } catch (error) {
+    console.error(`处理字段 ${path} 失败:`, error)
   }
 }
 
@@ -562,11 +710,48 @@ const loadTemplateData = async () => {
         console.log('加载模板数据成功:', templateData);
         Object.assign(template, templateData);
         
-        // 先初始化表单结构（设置默认值）
-        await initializeForm(false);
+        // 数据加载逻辑重构
+        let hasCacheData = false;
+        let hasServerData = false;
         
-        // 然后根据状态加载数据（缓存或API数据会覆盖默认值）
-        await loadFormData();
+        console.log('开始数据加载流程，isEditMode:', isEditMode.value, 'draftId:', draftId.value);
+        
+        if (isEditMode.value) {
+            // 编辑状态：优先从缓存加载，无缓存则从接口加载
+            console.log('编辑模式：尝试从缓存加载数据');
+            hasCacheData = loadFromCache();
+            console.log('缓存加载结果:', hasCacheData);
+        } else {
+            // 新建状态：尝试从缓存加载（可能是之前未提交的数据）
+            console.log('新建模式：尝试从缓存加载数据');
+            hasCacheData = loadFromCache();
+            console.log('缓存加载结果:', hasCacheData);
+        }
+        
+        console.log('数据加载完成，hasCacheData:', hasCacheData);
+        console.log('准备初始化表单，clearExisting:', !hasCacheData);
+        
+        // 先初始化表单结构（如果有缓存数据，不清空现有数据；否则设置默认值）
+        await initializeForm(!hasCacheData);
+        
+        console.log('表单初始化完成，当前formData:', JSON.parse(JSON.stringify(formData)));
+        
+        // 如果编辑模式且没有缓存数据，现在从服务器加载草稿数据
+        if (isEditMode.value && !hasCacheData) {
+            console.log('缓存中无数据，从服务器加载草稿数据');
+            hasServerData = await loadDraftDataFromServer();
+            console.log('服务器数据加载结果:', hasServerData);
+        }
+        
+        // 获取server类型select字段的详细信息
+        await enrichServerSelectFields();
+        
+        // 如果是从服务器加载的数据，现在才进行缓存（确保表单结构完整）
+        if (hasServerData) {
+            console.log('缓存服务器加载的数据');
+            saveToCache();
+        }
+        
     } catch (error) {
         message.error(error.message || '加载模板数据失败');
         router.push('/templates');
@@ -575,46 +760,44 @@ const loadTemplateData = async () => {
     }
 };
 
-// 根据状态加载表单数据
-const loadFormData = async () => {
-  if (isEditMode.value) {
-    // 编辑状态：优先从缓存加载，无缓存则从接口加载
-    const hasCache = loadFromCache()
-    if (!hasCache) {
-      await loadDraftDataFromServer()
-    }
-  } else {
-    // 新建状态：尝试从缓存加载（可能是之前未提交的数据）
-    const hasCache = loadFromCache()
-    if (!hasCache) {
-      console.log('新建状态，使用默认表单数据')
-    }
-  }
-}
-
 // 从服务器加载草稿数据
 const loadDraftDataFromServer = async () => {
     try {
+        console.log('开始加载草稿数据，draftId:', draftId.value);
         const response = await getVideoDraftDetail(draftId.value);
+        console.log('草稿数据接口响应:', response);
+        
         if (response.code === 0 && response.data) {
             const draftData = response.data.data || {};
+            console.log('提取的草稿数据:', draftData);
+            console.log('当前formData状态:', JSON.parse(JSON.stringify(formData)));
             
             // 预填充表单数据
+            let loadedFieldsCount = 0;
             for (const key in draftData) {
                 if (formData.hasOwnProperty(key)) {
+                    console.log(`设置字段 ${key}:`, draftData[key]);
                     formData[key] = draftData[key];
+                    loadedFieldsCount++;
+                } else {
+                    console.warn(`字段 ${key} 在formData中不存在，跳过`);
                 }
             }
             
+            console.log(`成功加载 ${loadedFieldsCount} 个字段到表单`);
+            console.log('加载后的formData状态:', JSON.parse(JSON.stringify(formData)));
+            
             message.success('草稿数据已加载');
-            // 加载后立即缓存
-            saveToCache()
+            return true; // 成功加载数据
         } else {
+            console.warn('草稿数据响应无效:', response);
             message.warning('草稿数据加载失败，将使用默认配置');
+            return false;
         }
     } catch (error) {
         console.error('加载草稿数据失败:', error);
         message.warning('草稿数据加载失败，将使用默认配置');
+        return false;
     }
 };
 

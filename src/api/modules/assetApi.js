@@ -116,21 +116,42 @@ export const updateAssetOrder = async (collectionId, orderData) => {
 // /video/detail/{video_id}/
 // /image/{id}/
 // /voice/{id}/
-export const getAssetItemDetail = async (type, id)  => {
+export const getAssetItemDetail = async (type, id, options = {})  => {
   // type: image, audio, video
+  // options.skipGlobalErrorHandler: 是否跳过全局错误处理
+  const { skipGlobalErrorHandler = false } = options;
+  
   try {
-    if (type === 'image') {
-      const response = await request.get(`/image/${id}/`);
-      return response;
-    } else if (type === 'audio') {
-      const response = await request.get(`/voice/${id}/`);  
-      return response;
-    } else if (type === 'video') {
-      const response = await request.get(`/video/detail/${id}/`);
-      return response;
+    let response;
+    
+    if (skipGlobalErrorHandler) {
+      // 直接使用axios实例，跳过全局错误处理
+      const axiosInstance = (await import('../config/axiosConfig.js')).default;
+      
+      if (type === 'image') {
+        response = await axiosInstance.get(`/image/${id}/`);
+      } else if (type === 'audio') {
+        response = await axiosInstance.get(`/voice/${id}/`);  
+      } else if (type === 'video') {
+        response = await axiosInstance.get(`/video/detail/${id}/`);
+      } else {
+        throw new Error('素材类型错误');
+      }
+      
+      return response.data;
     } else {
-      console.error('素材类型错误');
-      throw new Error('素材类型错误');
+      // 使用原有的request方法
+      if (type === 'image') {
+        response = await request.get(`/image/${id}/`);
+      } else if (type === 'audio') {
+        response = await request.get(`/voice/${id}/`);  
+      } else if (type === 'video') {
+        response = await request.get(`/video/detail/${id}/`);
+      } else {
+        throw new Error('素材类型错误');
+      }
+      
+      return response;
     }
   } catch (error) {
     console.error('获取素材元素详情失败:', error);
