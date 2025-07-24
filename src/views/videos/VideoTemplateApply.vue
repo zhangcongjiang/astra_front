@@ -78,18 +78,41 @@
                               <p>拖拽{{ getResourceTypeLabel(field.options.resourceType) }}到此处</p>
                             </div>
                             <div v-else class="selected-items">
-                              <a-tag v-if="!field.multiple" closable @close="clearServerSelection(field.name)">
-                                {{ formData[field.name].name }}
-                              </a-tag>
-                              <a-tag 
+                              <!-- 单选字段 -->
+                              <div v-if="!field.multiple" class="selected-item-wrapper">
+                                <!-- 图片类型显示缩略图 -->
+                                <div v-if="field.options.resourceType === 'image'" class="image-thumbnail-tag">
+                                  <img :src="getResourceUrl(formData[field.name])" :alt="formData[field.name].name" class="thumbnail-image" />
+                                  <!-- <span class="image-name">{{ formData[field.name].name }}</span> -->
+                                  <button class="remove-btn" @click="clearServerSelection(field.name)">×</button>
+                                </div>
+                                <!-- 非图片类型显示标签 -->
+                                <a-tag v-else closable @close="clearServerSelection(field.name)">
+                                  {{ formData[field.name].name }}
+                                </a-tag>
+                              </div>
+                              <!-- 多选字段 -->
+                              <div 
                                 v-if="field.multiple" 
                                 v-for="item in formData[field.name]" 
                                 :key="item.resource_id" 
-                                closable 
-                                @close="removeServerSelectionItem(field.name, item.resource_id)"
+                                class="selected-item-wrapper"
                               >
-                                {{ item.name }}
-                              </a-tag>
+                                <!-- 图片类型显示缩略图 -->
+                                <div v-if="field.options.resourceType === 'image'" class="image-thumbnail-tag">
+                                  <img :src="getResourceUrl(item)" :alt="item.name" class="thumbnail-image" />
+                                  <!-- <span class="image-name">{{ item.name }}</span> -->
+                                  <button class="remove-btn" @click="removeServerSelectionItem(field.name, item.resource_id)">×</button>
+                                </div>
+                                <!-- 非图片类型显示标签 -->
+                                <a-tag 
+                                  v-else
+                                  closable 
+                                  @close="removeServerSelectionItem(field.name, item.resource_id)"
+                                >
+                                  {{ item.name }}
+                                </a-tag>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -171,18 +194,41 @@
                                       <p>拖拽{{ getResourceTypeLabel(innerField.options.resourceType) }}到此处</p>
                                     </div>
                                     <div v-else class="selected-items">
-                                      <a-tag v-if="!innerField.multiple" closable @close="clearServerSelection(groupInstance, innerField.name)">
-                                        {{ groupInstance[innerField.name]?.name || '未知素材' }}
-                                      </a-tag>
-                                      <a-tag 
+                                      <!-- 单选字段 -->
+                                      <div v-if="!innerField.multiple" class="selected-item-wrapper">
+                                        <!-- 图片类型显示缩略图 -->
+                                        <div v-if="innerField.options.resourceType === 'image'" class="image-thumbnail-tag">
+                                          <img :src="getResourceUrl(groupInstance[innerField.name])" :alt="groupInstance[innerField.name]?.name" class="thumbnail-image" />
+                                          <!-- <span class="image-name">{{ groupInstance[innerField.name]?.name || '未知素材' }}</span> -->
+                                          <button class="remove-btn" @click="clearServerSelection(groupInstance, innerField.name)">×</button>
+                                        </div>
+                                        <!-- 非图片类型显示标签 -->
+                                        <a-tag v-else closable @close="clearServerSelection(groupInstance, innerField.name)">
+                                          {{ groupInstance[innerField.name]?.name || '未知素材' }}
+                                        </a-tag>
+                                      </div>
+                                      <!-- 多选字段 -->
+                                      <div 
                                         v-if="innerField.multiple" 
                                         v-for="item in groupInstance[innerField.name]" 
                                         :key="item.resource_id" 
-                                        closable 
-                                        @close="removeServerSelectionItem(groupInstance, innerField.name, item.resource_id)"
+                                        class="selected-item-wrapper"
                                       >
-                                        {{ item.name }}
-                                      </a-tag>
+                                        <!-- 图片类型显示缩略图 -->
+                                        <div v-if="innerField.options.resourceType === 'image'" class="image-thumbnail-tag">
+                                          <img :src="getResourceUrl(item)" :alt="item.name" class="thumbnail-image" />
+                                          <!-- <span class="image-name">{{ item.name }}</span> -->
+                                          <button class="remove-btn" @click="removeServerSelectionItem(groupInstance, innerField.name, item.resource_id)">×</button>
+                                        </div>
+                                        <!-- 非图片类型显示标签 -->
+                                        <a-tag 
+                                          v-else
+                                          closable 
+                                          @close="removeServerSelectionItem(groupInstance, innerField.name, item.resource_id)"
+                                        >
+                                          {{ item.name }}
+                                        </a-tag>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -259,15 +305,27 @@
                                    <a-tag v-if="!innerField.multiple" closable @close="clearServerSelection(formData[field.name], innerField.name)">
                                      {{ formData[field.name][innerField.name]?.name || '未知素材' }}
                                    </a-tag>
-                                   <a-tag 
+                                   <div 
                                      v-if="innerField.multiple" 
                                      v-for="item in formData[field.name][innerField.name]" 
                                      :key="item.resource_id" 
-                                     closable 
-                                     @close="removeServerSelectionItem(formData[field.name], innerField.name, item.resource_id)"
+                                     class="selected-item-wrapper"
                                    >
-                                     {{ item.name }}
-                                   </a-tag>
+                                     <!-- 图片类型显示缩略图 -->
+                                     <div v-if="innerField.options.resourceType === 'image'" class="image-thumbnail-tag">
+                                       <img :src="getResourceUrl(item)" :alt="item.name" class="thumbnail-image" />
+                                       <span class="image-name">{{ item.name }}</span>
+                                       <button class="remove-btn" @click="removeServerSelectionItem(formData[field.name], innerField.name, item.resource_id)">×</button>
+                                     </div>
+                                     <!-- 非图片类型显示标签 -->
+                                     <a-tag 
+                                       v-else
+                                       closable 
+                                       @close="removeServerSelectionItem(formData[field.name], innerField.name, item.resource_id)"
+                                     >
+                                       {{ item.name }}
+                                     </a-tag>
+                                   </div>
                                  </div>
                                </div>
                              </div>
@@ -539,7 +597,12 @@ const enrichFieldData = async (field, path, resourceType) => {
               const enrichedItem = {
                 resource_id: itemId,
                 id: itemId, // 保持向后兼容
-                name: detail.data.name || detail.data.title || `${resourceType}_${itemId}`
+                name: detail.data.name || detail.data.title || `${resourceType}_${itemId}`,
+                type: resourceType, // 添加类型字段
+                // 根据类型添加对应的文件名字段
+                ...(resourceType === 'image' && detail.data.img_name && { img_name: detail.data.img_name }),
+                ...(resourceType === 'video' && detail.data.video_name && { video_name: detail.data.video_name }),
+                ...(resourceType === 'audio' && detail.data.sound_name && { sound_name: detail.data.sound_name })
               }
               console.log(`素材 ${itemId} 丰富后:`, enrichedItem)
               enrichedItems.push(enrichedItem)
@@ -561,7 +624,12 @@ const enrichFieldData = async (field, path, resourceType) => {
               const enrichedItem = {
                 resource_id: item,
                 id: item, // 保持向后兼容
-                name: detail.data.name || detail.data.title || `${resourceType}_${item}`
+                name: detail.data.name || detail.data.title || `${resourceType}_${item}`,
+                type: resourceType, // 添加类型字段
+                // 根据类型添加对应的文件名字段
+                ...(resourceType === 'image' && detail.data.img_name && { img_name: detail.data.img_name }),
+                ...(resourceType === 'video' && detail.data.video_name && { video_name: detail.data.video_name }),
+                ...(resourceType === 'audio' && detail.data.sound_name && { sound_name: detail.data.sound_name })
               }
               console.log(`纯ID ${item} 丰富后:`, enrichedItem)
               enrichedItems.push(enrichedItem)
@@ -595,7 +663,12 @@ const enrichFieldData = async (field, path, resourceType) => {
             const enrichedItem = {
               resource_id: itemId,
               id: itemId, // 保持向后兼容
-              name: detail.data.name || detail.data.title || `${resourceType}_${itemId}`
+              name: detail.data.name || detail.data.title || `${resourceType}_${itemId}`,
+              type: resourceType, // 添加类型字段
+              // 根据类型添加对应的文件名字段
+              ...(resourceType === 'image' && detail.data.img_name && { img_name: detail.data.img_name }),
+              ...(resourceType === 'video' && detail.data.video_name && { video_name: detail.data.video_name }),
+              ...(resourceType === 'audio' && detail.data.sound_name && { sound_name: detail.data.sound_name })
             }
             console.log(`单选素材 ${itemId} 丰富后:`, enrichedItem)
             currentData[fieldName] = enrichedItem
@@ -1340,6 +1413,90 @@ const handleTextDropInGroup = (event, groupInstance, fieldName) => {
   message.success(`已填充 ${count} 个文本素材到字段`)
 }
 
+// 获取资源URL的函数
+const getResourceUrl = (item) => {
+  console.log('=== getResourceUrl 调试信息 ===');
+  console.log('传入的 item:', item);
+  console.log('item 的所有属性:', Object.keys(item || {}));
+  console.log('item.type:', item?.type);
+  console.log('item.resource_type:', item?.resource_type);
+  console.log('item.img_name:', item?.img_name);
+  console.log('item.video_name:', item?.video_name);
+  console.log('item.sound_name:', item?.sound_name);
+  console.log('item.name:', item?.name);
+  
+  if (!item) {
+    console.log('item 为空，返回空字符串');
+    return '';
+  }
+
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8089';
+  const staticBaseUrl = baseUrl.replace('/api', '');
+  
+  console.log('baseUrl:', baseUrl);
+  console.log('staticBaseUrl:', staticBaseUrl);
+  
+  // 尝试从多个可能的字段获取类型
+  const type = item.type || item.resource_type;
+  console.log('确定的 type:', type);
+  
+  // 处理文本类型
+  if (type === 'text') {
+    console.log('文本类型，返回空字符串');
+    return ''; // 文本不需要URL
+  }
+  
+  // 根据数据结构构建URL
+  if (type === 'image') {
+    const fileName = item.img_name || item.name;
+    console.log('图片类型，fileName:', fileName);
+    if (fileName) {
+      const fullUrl = `${staticBaseUrl}/media/images/${fileName}`;
+      console.log('生成的图片URL:', fullUrl);
+      return fullUrl;
+    }
+  } else if (type === 'video') {
+    const fileName = item.video_name || item.name;
+    console.log('视频类型，fileName:', fileName);
+    if (fileName) {
+      const fullUrl = `${staticBaseUrl}/media/video/${fileName}`;
+      console.log('生成的视频URL:', fullUrl);
+      return fullUrl;
+    }
+  } else if (type === 'audio') {
+    const fileName = item.sound_name || item.name;
+    console.log('音频类型，fileName:', fileName);
+    if (fileName) {
+      const fullUrl = `${staticBaseUrl}/media/sound/${fileName}`;
+      console.log('生成的音频URL:', fullUrl);
+      return fullUrl;
+    }
+  }
+  
+  // 如果没有明确的类型，尝试根据文件名推断
+  if (!type && item.name) {
+    console.log('没有明确类型，尝试根据文件名推断:', item.name);
+    const fileName = item.name.toLowerCase();
+    if (fileName.includes('.jpg') || fileName.includes('.jpeg') || fileName.includes('.png') || fileName.includes('.gif') || fileName.includes('.webp')) {
+      const fullUrl = `${staticBaseUrl}/media/images/${item.name}`;
+      console.log('根据文件名推断为图片，生成URL:', fullUrl);
+      return fullUrl;
+    } else if (fileName.includes('.mp4') || fileName.includes('.avi') || fileName.includes('.mov') || fileName.includes('.webm')) {
+      const fullUrl = `${staticBaseUrl}/media/video/${item.name}`;
+      console.log('根据文件名推断为视频，生成URL:', fullUrl);
+      return fullUrl;
+    } else if (fileName.includes('.mp3') || fileName.includes('.wav') || fileName.includes('.ogg') || fileName.includes('.m4a')) {
+      const fullUrl = `${staticBaseUrl}/media/sound/${item.name}`;
+      console.log('根据文件名推断为音频，生成URL:', fullUrl);
+      return fullUrl;
+    }
+  }
+  
+  console.log('无法确定类型或文件名，返回占位图');
+  console.log('=== getResourceUrl 调试信息结束 ===');
+  return 'https://via.placeholder.com/150';
+};
+
 </script>
 
 
@@ -1496,6 +1653,79 @@ const handleTextDropInGroup = (event, groupInstance, fieldName) => {
 
 .selected-tag .remove-btn:hover {
   color: #ff4d4f;
+}
+
+/* 图片缩略图样式 */
+.selected-item-wrapper {
+  display: inline-block;
+  margin: 4px;
+}
+
+.image-thumbnail-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  max-width: 200px;
+}
+
+.image-thumbnail-tag:hover {
+  border-color: #40a9ff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+}
+
+.thumbnail-image {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+
+.image-name {
+  font-size: 12px;
+  color: #666;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.remove-btn {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.remove-btn:hover {
+  background-color: #ff4d4f;
+  color: #fff;
+}
+
+.selected-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
 }
 </style>
 
