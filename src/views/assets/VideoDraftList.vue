@@ -236,7 +236,7 @@ const transformDraftData = (backendData) => {
   return backendData.map(item => {
     // 从 data 字段中提取 title
     const dataContent = item.data || {}
-    const title = dataContent.title || `未命名草稿 ${item.id.slice(0, 8)}`
+    const title = item.title || `未命名草稿 ${item.id.slice(0, 8)}`
     
     return {
       id: item.id, // 保留ID用于操作，但不在表格中显示
