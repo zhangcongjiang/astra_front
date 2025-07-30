@@ -3,12 +3,26 @@
       <!-- 搜索区域 -->
       <div class="search-area">
         <a-form layout="inline" :model="searchForm">
-          <a-form-item label="模板名称">
+          <a-form-item label="视频标题">
             <a-input 
-              v-model:value="searchForm.templateName" 
-              placeholder="输入模板名称" 
+              v-model:value="searchForm.title" 
+              placeholder="输入标题关键词" 
               @pressEnter="handleSearch" 
             />
+          </a-form-item>
+          <a-form-item label="视频模板">
+            <a-select 
+              v-model:value="searchForm.template_id" 
+              placeholder="请选择视频模板" 
+              style="width: 200px;"
+              allowClear 
+              :loading="loadingTemplates"
+            >
+              <a-select-option value="">全部</a-select-option>
+              <a-select-option v-for="template in videoTemplates" :key="template.template_id" :value="template.template_id">
+                {{ template.name }}
+              </a-select-option>
+            </a-select>
           </a-form-item>
           <a-form-item label="创建者">
             <a-input 
@@ -106,18 +120,23 @@ import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import Pagination from '@/components/Pagination.vue'
-import { getVideoDraftList, deleteVideoDraft } from '@/api/modules/videoApi'
+import { getVideoDraftList, deleteVideoDraft, getVideoTemplates } from '@/api/modules/videoApi'
 
 const router = useRouter()
 
 // 搜索表单
 const searchForm = reactive({
-  templateName: '',
+  title: '',  // 基于名称的模糊查询
   creator: '',
+  template_id: null,  // 视频模板ID
   dateRange: [],
   startTime: null,
   endTime: null
 })
+
+// 新增：视频模板列表
+const videoTemplates = ref([])
+const loadingTemplates = ref(false)
 
 // 表格列定义
 const columns = [
@@ -177,10 +196,10 @@ const pagination = reactive({
 const filteredData = computed(() => {
   let result = [...data.value]
 
-  // 模板名称过滤（前端过滤）
-  if (searchForm.templateName) {
+  // 标题过滤（前端过滤）
+  if (searchForm.title) {
     result = result.filter(item =>
-      item.templateName && item.templateName.toLowerCase().includes(searchForm.templateName.toLowerCase())
+      item.title && item.title.toLowerCase().includes(searchForm.title.toLowerCase())
     )
   }
 
@@ -205,7 +224,7 @@ const filteredData = computed(() => {
 // 当前页数据（直接使用后端返回的数据）
 const currentPageData = computed(() => {
   // 如果有前端搜索条件，使用过滤后的数据
-  if (searchForm.templateName || searchForm.creator || (searchForm.startTime && searchForm.endTime)) {
+  if (searchForm.title || searchForm.creator || (searchForm.startTime && searchForm.endTime)) {
     return filteredData.value
   }
   // 否则直接使用后端返回的数据
@@ -250,8 +269,9 @@ const handleDateChange = (dates) => {
 
 // 重置搜索
 const resetSearch = () => {
-  searchForm.templateName = ''
+  searchForm.title = ''
   searchForm.creator = ''
+  searchForm.template_id = null
   searchForm.dateRange = []
   searchForm.startTime = null
   searchForm.endTime = null
@@ -328,9 +348,14 @@ const fetchData = async () => {
       pageSize: pagination.pageSize
     }
     
-    // 添加搜索条件
-    if (searchForm.templateName) {
-      params.template_name = searchForm.templateName
+    // 添加标题模糊查询
+    if (searchForm.title) {
+      params.title = searchForm.title
+    }
+    
+    // 添加模板ID查询
+    if (searchForm.template_id) {
+      params.template_id = searchForm.template_id
     }
     
     // 添加创建者搜索
@@ -359,7 +384,25 @@ const fetchData = async () => {
   }
 }
 
+// 获取视频模板列表
+const fetchVideoTemplates = async () => {
+  try {
+    loadingTemplates.value = true
+    const response = await getVideoTemplates()
+    if (response.code === 0 && response.data && response.data.results) {
+      videoTemplates.value = response.data.results || []
+    } else {
+      console.error('获取视频模板失败:', response.message)
+    }
+  } catch (error) {
+    console.error('获取视频模板失败:', error)
+  } finally {
+    loadingTemplates.value = false
+  }
+}
+
 onMounted(() => {
+  fetchVideoTemplates()  // 新增
   fetchData()
 })
 </script>
