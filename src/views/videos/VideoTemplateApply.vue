@@ -26,6 +26,22 @@
             ref="formRef"
             @finish="onFormFinish"
           >
+            <!-- 固定的视频标题字段 -->
+            <a-form-item 
+              label="视频标题" 
+              name="title" 
+              :rules="[{ required: true, message: '请输入视频标题' }]"
+            >
+              <a-input 
+                v-model:value="formData.title" 
+                placeholder="请输入视频标题"
+                @dragover.prevent="handleTextDragOver"
+                @dragleave.prevent="handleTextDragLeave"
+                @drop.prevent="handleTextDrop($event, 'title')"
+                :class="{ 'text-drop-active': isTextDragOver }"
+              />
+            </a-form-item>
+
             <!-- Loop through top-level form fields and groups -->
             <template v-for="field in formDefinition" :key="field.name">
               
@@ -410,7 +426,11 @@ const applying = ref(false)
 const showSuccessModal = ref(false)
 const formRef = ref(null)
 const formData = reactive({})
-const formDefinition = computed(() => template.params?.form || [])
+// 过滤掉formDefinition中的title字段，因为我们有固定的title字段
+const formDefinition = computed(() => {
+  const originalForm = template.params?.form || []
+  return originalForm.filter(field => field.name !== 'title')
+})
 
 // 状态判断
 const draftId = computed(() => route.query.draftId)
@@ -946,6 +966,11 @@ const initializeForm = async (clearExisting = true) => {
 
   // Set template_id for submission
   formData.template_id = template.id;
+  
+  // 初始化固定的title字段
+  if (!('title' in formData)) {
+    formData.title = '';
+  }
 
   for (const field of formDefinition.value) {
     // Only set default values if the field doesn't already have a value (from cache)
