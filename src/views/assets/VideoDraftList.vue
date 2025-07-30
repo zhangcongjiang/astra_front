@@ -234,8 +234,6 @@ const currentPageData = computed(() => {
 // 处理后端数据格式转换
 const transformDraftData = (backendData) => {
   return backendData.map(item => {
-    // 从 data 字段中提取 title
-    const dataContent = item.data || {}
     const title = item.title || `未命名草稿 ${item.id.slice(0, 8)}`
     
     return {
