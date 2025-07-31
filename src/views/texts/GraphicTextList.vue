@@ -170,7 +170,7 @@
         <a-form-item label="平台来源" required>
           <a-radio-group v-model:value="urlImportForm.origin">
             <a-radio value="toutiao">今日头条</a-radio>
-            <a-radio value="baidu">百度</a-radio>
+            <a-radio value="gongzhonghao">微信公众号</a-radio>
             <a-radio value="hupu">虎扑</a-radio>
             <a-radio value="xiaohongshu">小红书</a-radio>
           </a-radio-group>
