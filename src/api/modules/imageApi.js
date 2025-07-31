@@ -21,14 +21,6 @@ export const getImageDetail = async (id) => {
   }
 };
 
-export const getImageSummary = (id, config = {}) => {
-  return request({
-    method: 'get',
-    url: `/image/${id}/summary/`,
-    responseType: 'blob', // 确保返回的是 Blob
-    ...config
-  });
-};
 
 export const getImageContent = (id, config = {}) => {
   return request({

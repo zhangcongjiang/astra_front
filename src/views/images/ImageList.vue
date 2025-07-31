@@ -35,12 +35,40 @@
 
     <!-- 操作按钮 -->
     <div class="action-area">
-      <a-upload v-model:file-list="fileList" :multiple="true" :show-upload-list="false" :before-upload="beforeUpload"
-        :customRequest="handleUpload">
-        <a-button type="primary">
-          <upload-outlined /> 上传图片
+      <!-- 批量选择模式切换 - 放在最左边 -->
+      <a-button 
+        :type="batchMode ? 'primary' : 'default'" 
+        @click="toggleBatchMode"
+      >
+        {{ batchMode ? '退出批量' : '批量选择' }}
+      </a-button>
+      
+      <!-- 批量操作按钮组 - 在批量模式下显示 -->
+      <div class="batch-actions" v-if="batchMode">
+        <a-button type="default" @click="toggleSelectAll">
+          {{ isAllSelected ? '取消全选' : '全选' }}
         </a-button>
-      </a-upload>
+        <a-button 
+          type="danger" 
+          @click="showBatchDeleteConfirm" 
+          :disabled="selectedImages.length === 0"
+        >
+          <delete-outlined /> 批量删除{{ selectedImages.length > 0 ? ` (${selectedImages.length})` : '' }}
+        </a-button>
+        <a-button @click="clearSelection" v-if="selectedImages.length > 0">
+          取消选择
+        </a-button>
+      </div>
+      
+      <!-- 上传按钮 - 放在右边 -->
+      <div class="upload-section">
+        <a-upload v-model:file-list="fileList" :multiple="true" :show-upload-list="false" :before-upload="beforeUpload"
+          :customRequest="handleUpload">
+          <a-button type="primary">
+            <upload-outlined /> 上传图片
+          </a-button>
+        </a-upload>
+      </div>
     </div>
 
     <!-- 图片列表 - 响应式5列布局 -->
@@ -48,7 +76,12 @@
       <a-row :gutter="[16, 16]">
         <a-col v-for="(image, index) in currentPageImages" :key="image.id" :xs="24" :sm="12" :md="8" :lg="6" :xl="4.8"
           class="image-col">
-          <a-card hoverable class="image-card" @click="openPreview(image, index)">
+          <a-card hoverable class="image-card" :class="{ 'selected': selectedImages.includes(image.id) }" @click="handleCardClick(image, index)">
+            <!-- 批量选择模式下的选择框 -->
+            <div v-if="batchMode" class="selection-overlay" @click.stop="toggleImageSelection(image.id)">
+              <a-checkbox :checked="selectedImages.includes(image.id)" />
+            </div>
+            
             <template #cover>
               <div class="cover-container" :style="{ height: imageHeight + 'px' }">
                 <!-- 加载中状态 -->
@@ -180,7 +213,7 @@ import {
 } from '@ant-design/icons-vue';
 
 // API 导入
-import { getImageList, getImageSummary, getImageContent, getImageDetail, deleteImages, uploadImages, bindTags } from '@/api/modules/imageApi';
+import { getImageList, getImageContent, getImageDetail, deleteImages, uploadImages, bindTags } from '@/api/modules/imageApi';
 import { getTagsByCategory } from '@/api/modules/tagApi';
 import { getAssetCollectionList, addItemToAsset } from '@/api/modules/assetApi';
 
@@ -194,6 +227,17 @@ const selectedImage = ref(null);
 const assetCollections = ref([]);
 const selectedAssetId = ref(null);
 const loadingAssets = ref(false);
+
+// 批量选择相关状态
+const batchMode = ref(false);
+const selectedImages = ref([]);
+
+// 批量选择计算属性
+const isAllSelected = computed(() => {
+  return currentPageImages.value.length > 0 && 
+         selectedImages.value.length === currentPageImages.value.length &&
+         currentPageImages.value.every(image => selectedImages.value.includes(image.id));
+});
 
 
 // 格式化日期函数
@@ -734,6 +778,91 @@ const handleCancelAddToAsset = () => {
   selectedAssetId.value = null;
 };
 
+// 批量选择功能
+const toggleBatchMode = () => {
+  batchMode.value = !batchMode.value;
+  if (!batchMode.value) {
+    clearSelection();
+  }
+};
+
+// 处理卡片点击事件
+const handleCardClick = (image, index) => {
+  if (batchMode.value) {
+    toggleImageSelection(image.id);
+  } else {
+    openPreview(image, index);
+  }
+};
+
+const toggleImageSelection = (imageId) => {
+  const index = selectedImages.value.indexOf(imageId);
+  if (index > -1) {
+    selectedImages.value.splice(index, 1);
+  } else {
+    selectedImages.value.push(imageId);
+  }
+};
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedImages.value = [];
+  } else {
+    selectedImages.value = currentPageImages.value.map(image => image.id);
+  }
+};
+
+const clearSelection = () => {
+  selectedImages.value = [];
+};
+
+// 批量删除功能
+const showBatchDeleteConfirm = () => {
+  if (selectedImages.value.length === 0) {
+    message.warning('请先选择要删除的图片');
+    return;
+  }
+  
+  Modal.confirm({
+    title: '确认批量删除',
+    content: `确定要删除选中的 ${selectedImages.value.length} 张图片吗？此操作不可恢复。`,
+    okText: '确认删除',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: handleBatchDelete,
+  });
+};
+
+const handleBatchDelete = async () => {
+  try {
+    await deleteImages(selectedImages.value);
+    
+    // 从本地数据中移除已删除的图片
+    selectedImages.value.forEach(imageId => {
+      const index = imageData.value.findIndex(img => img.id === imageId);
+      if (index !== -1) {
+        // 释放图片的Blob URL
+        if (imageData.value[index].url && imageData.value[index].url.startsWith('blob:')) {
+          URL.revokeObjectURL(imageData.value[index].url);
+        }
+        imageData.value.splice(index, 1);
+      }
+    });
+    
+    message.success(`成功删除 ${selectedImages.value.length} 张图片`);
+    clearSelection();
+    
+    // 如果当前页没有数据了，跳转到上一页
+    if (currentPageImages.value.length === 0 && pagination.value.current > 1) {
+      pagination.value.current--;
+      fetchImageList();
+    }
+  } catch (error) {
+    console.error('批量删除图片失败:', error);
+    message.error('批量删除图片失败');
+  }
+};
+
 // 修改标签数据获取方式
 const tagCategories = ref([]);
 
@@ -802,10 +931,7 @@ const fetchTagCategories = async () => {
   margin-top: 16px;
 }
 
-.action-area {
-  margin-bottom: 20px;
-  text-align: right;
-}
+
 
 .image-grid {
   flex: 1;
@@ -1052,5 +1178,69 @@ const fetchTagCategories = async () => {
 .action-text {
   font-size: 12px;
   margin-top: 4px;
+}
+
+/* 批量选择样式 */
+.action-area {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+}
+
+.upload-section {
+  margin-left: auto;
+}
+
+.image-card {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.image-card.selected {
+  border: 2px solid #1890ff;
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+}
+
+.selection-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.selection-overlay:hover {
+  background: rgba(255, 255, 255, 1);
+}
+
+@media (max-width: 768px) {
+  .action-area {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .batch-actions {
+    margin-left: 0;
+    margin-top: 8px;
+    justify-content: center;
+  }
+  
+  .upload-section {
+    margin-left: 0;
+    margin-top: 8px;
+    text-align: center;
+  }
 }
 </style>
