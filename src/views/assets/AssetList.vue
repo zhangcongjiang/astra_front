@@ -105,7 +105,7 @@
 <script setup>
 import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { 
   PlusOutlined, 
   EditOutlined, 
@@ -211,15 +211,31 @@ const editAsset = (asset) => {
   showCreateModal.value = true
 }
 
-const deleteAsset = async (id) => {
-  try {
-    await deleteAssetCollection(id)
-    message.success('删除成功')
-    loadAssetList()
-  } catch (error) {
-    console.error('删除失败:', error)
-    message.error('删除失败')
-  }
+const deleteAsset = (id) => {
+  // 找到要删除的素材集信息
+  const asset = assetList.value.find(item => item.id === id)
+  const assetName = asset ? asset.name : '该素材集'
+  
+  Modal.confirm({
+    title: '确认删除',
+    content: `确定要删除素材集 "${assetName}" 吗？删除后将无法恢复。`,
+    okText: '确认删除',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await deleteAssetCollection(id)
+        message.success('删除成功')
+        loadAssetList()
+      } catch (error) {
+        console.error('删除失败:', error)
+        message.error('删除失败')
+      }
+    },
+    onCancel() {
+      // 用户取消删除，不需要做任何操作
+    },
+  })
 }
 
 const handleCreateAsset = async () => {
