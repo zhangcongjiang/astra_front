@@ -34,7 +34,8 @@
       <a-button type="primary" @click="handleCreate" :icon="h(PlusOutlined)">
         创建图文
       </a-button>
-      <a-button type="primary" @click="handleImport">导入图文</a-button>
+      <a-button type="primary" @click="handleImport">本地导入</a-button>
+      <a-button type="primary" @click="handleUrlImport">URL导入</a-button>
     </div>
 
     <div class="table-container">
@@ -88,9 +89,10 @@
     </div>
     
     <!-- 导入图文对话框 -->
+    <!-- 本地导入图文对话框 -->
     <a-modal
       v-model:open="importModalVisible"
-      title="导入图文"
+      title="本地导入图文"
       :width="600"
       @ok="confirmImport"
       @cancel="cancelImport"
@@ -116,7 +118,8 @@
               
               <div class="upload-content">
                 <div v-if="!importForm.file" class="upload-hint">
-                  <a-icon type="cloud-upload" style="font-size: 48px; color: #999; margin-bottom: 16px;" />
+                  <!-- 将 a-icon 替换为正确的图标 -->
+                  <div style="font-size: 48px; color: #999; margin-bottom: 16px;">📁</div>
                   <p>将 Markdown 文件拖拽到这里</p>
                   <p style="color: #999;">或者</p>
                   <a-button type="primary" @click="() => $refs.fileInput.click()">
@@ -128,7 +131,8 @@
                 </div>
                 
                 <div v-else class="file-selected">
-                  <a-icon type="file-text" style="font-size: 24px; color: #1890ff; margin-right: 8px;" />
+                  <!-- 将 a-icon 替换为正确的图标 -->
+                  <div style="font-size: 24px; color: #1890ff; margin-right: 8px;">📄</div>
                   <span>{{ importForm.file.name }}</span>
                   <a-button 
                     type="link" 
@@ -151,6 +155,35 @@
         </a-form-item>
       </a-form>
     </a-modal>
+    
+    <!-- URL导入图文对话框 -->
+    <a-modal
+      v-model:open="urlImportModalVisible"
+      title="URL导入图文"
+      :width="600"
+      @ok="confirmUrlImport"
+      @cancel="cancelUrlImport"
+      okText="确认导入"
+      cancelText="取消">
+      
+      <a-form :model="urlImportForm" layout="vertical">
+        <a-form-item label="平台来源" required>
+          <a-radio-group v-model:value="urlImportForm.origin">
+            <a-radio value="toutiao">今日头条</a-radio>
+            <a-radio value="baidu">百度</a-radio>
+            <a-radio value="hupu">虎扑</a-radio>
+            <a-radio value="xiaohongshu">小红书</a-radio>
+          </a-radio-group>
+        </a-form-item>
+        
+        <a-form-item label="网络地址" required>
+          <a-input 
+            v-model:value="urlImportForm.url" 
+            placeholder="请输入对应平台的内容链接" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+    
   </div>
 </template>
 
@@ -166,7 +199,8 @@ import {
   getTextList, 
   deleteText, 
   downloadText, 
-  uploadMarkdown 
+  uploadMarkdown,
+  importFromUrl  // 新增URL导入API
 } from '@/api/modules/textApi';
 
 const router = useRouter();
@@ -412,93 +446,183 @@ const handlePublish = async (record) => {
 // 添加导入相关的响应式数据
 const importForm = reactive({
   title: '',
-  file: null
+  file: null,
+  url: ''  // 新增URL字段
 });
 const importModalVisible = ref(false);
+const importType = ref('file');  // 新增导入类型：'file' 或 'url'
+const urlPreview = reactive({  // 新增URL预览数据
+  loading: false,
+  title: '',
+  content: ''
+});
 
 // 导入图文 - 修改为显示自定义对话框
 const handleImport = () => {
   importForm.title = '';
   importForm.file = null;
+  importForm.url = '';  // 重置URL
+  importType.value = 'file';  // 默认选择文件导入
+  urlPreview.loading = false;  // 重置预览状态
+  urlPreview.title = '';
+  urlPreview.content = '';
   importModalVisible.value = true;
 };
 
-// 文件选择处理 - 修改为设置到表单中
-const handleFileSelect = (e) => {
-  const file = e.target.files[0];
-  if (file) {
-    // 验证文件类型
-    const allowedTypes = ['.md', '.markdown'];
-    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-    
-    if (!allowedTypes.includes(fileExtension)) {
-      message.error('只支持 Markdown 文件格式（.md, .markdown）');
-      return;
-    }
-    
-    importForm.file = file;
-    // 如果标题为空，使用文件名作为默认标题
-    if (!importForm.title) {
-      importForm.title = file.name.replace(/\.[^/.]+$/, '');
-    }
-  }
+// URL导入表单数据
+const urlImportForm = reactive({
+  url: '',
+  origin: 'toutiao'  // 默认选择今日头条
+});
+const urlImportModalVisible = ref(false);
+
+// URL导入方法
+const handleUrlImport = () => {
+  urlImportModalVisible.value = true;
 };
 
-// 文件拖拽处理 - 修改为设置到表单中
-const handleFileDrop = (e) => {
-  e.preventDefault();
-  const file = e.dataTransfer.files[0];
-  if (file) {
-    // 验证文件类型
-    const allowedTypes = ['.md', '.markdown'];
-    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-    
-    if (!allowedTypes.includes(fileExtension)) {
-      message.error('只支持 Markdown 文件格式（.md, .markdown）');
-      return;
-    }
-    
-    importForm.file = file;
-    // 如果标题为空，使用文件名作为默认标题
-    if (!importForm.title) {
-      importForm.title = file.name.replace(/\.[^/.]+$/, '');
-    }
-  }
-};
-
-// 确认导入
-const confirmImport = async () => {
-  if (!importForm.file) {
-    message.error('请选择要导入的文件');
+// 确认URL导入
+const confirmUrlImport = async () => {
+  if (!urlImportForm.origin) {
+    message.error('请选择平台来源');
     return;
   }
   
+  if (!urlImportForm.url.trim()) {
+    message.error('请输入网络地址');
+    return;
+  }
+  
+  try {
+    message.loading({ content: '正在从网络导入...', key: 'urlImport', duration: 0 });
+    
+    const res = await importFromUrl(urlImportForm.url.trim(), urlImportForm.origin);
+    if (res.code !== 0) {
+      throw new Error(res.msg);
+    }
+    
+    message.success({ content: '导入成功', key: 'urlImport' });
+    urlImportModalVisible.value = false;
+    fetchData();
+  } catch (error) {
+    console.error('URL导入失败:', error);
+    message.error({ content: error.message || 'URL导入失败', key: 'urlImport' });
+  }
+};
+
+// 取消URL导入
+const cancelUrlImport = () => {
+  urlImportModalVisible.value = false;
+  urlImportForm.url = '';
+  urlImportForm.origin = 'toutiao';  // 重置为默认值
+};
+
+// 新增：导入类型切换处理
+const handleImportTypeChange = (activeKey) => {
+  importType.value = activeKey;
+  // 切换时清空相关数据
+  if (activeKey === 'file') {
+    importForm.url = '';
+    urlPreview.loading = false;
+    urlPreview.title = '';
+    urlPreview.content = '';
+  } else {
+    importForm.file = null;
+  }
+};
+
+// 新增：URL输入失焦处理
+const handleUrlBlur = async () => {
+  if (!importForm.url.trim()) {
+    urlPreview.loading = false;
+    urlPreview.title = '';
+    urlPreview.content = '';
+    return;
+  }
+  
+  try {
+    urlPreview.loading = true;
+    const response = await previewUrl(importForm.url.trim());
+    
+    if (response && response.data) {
+      urlPreview.title = response.data.title || '';
+      urlPreview.content = response.data.content || '';
+      
+      // 如果标题为空，使用预览的标题
+      if (!importForm.title && urlPreview.title) {
+        importForm.title = urlPreview.title;
+      }
+    }
+  } catch (error) {
+    console.error('获取URL预览失败:', error);
+    message.warning('无法获取URL内容预览，但仍可尝试导入');
+    urlPreview.title = '';
+    urlPreview.content = '';
+  } finally {
+    urlPreview.loading = false;
+  }
+};
+
+// 修改确认导入方法
+const confirmImport = async () => {
   if (!importForm.title.trim()) {
     message.error('请输入图文标题');
     return;
   }
   
-  try {
-    message.loading({ content: '正在导入...', key: 'import', duration: 0 });
+  if (importType.value === 'file') {
+    // 文件导入逻辑
+    if (!importForm.file) {
+      message.error('请选择要导入的文件');
+      return;
+    }
     
-    await uploadMarkdown(importForm.file, importForm.title.trim(), (progress) => {
-      console.log('上传进度:', progress);
-    });
+    try {
+      message.loading({ content: '正在导入...', key: 'import', duration: 0 });
+      
+      await uploadMarkdown(importForm.file, importForm.title.trim(), (progress) => {
+        console.log('上传进度:', progress);
+      });
+      
+      message.success({ content: '导入成功', key: 'import' });
+      importModalVisible.value = false;
+      fetchData();
+    } catch (error) {
+      console.error('导入失败:', error);
+      message.error({ content: error.message || '导入失败', key: 'import' });
+    }
+  } else {
+    // URL导入逻辑
+    if (!importForm.url.trim()) {
+      message.error('请输入要导入的网络地址');
+      return;
+    }
     
-    message.success({ content: '导入成功', key: 'import' });
-    importModalVisible.value = false;
-    fetchData();
-  } catch (error) {
-    console.error('导入失败:', error);
-    message.error({ content: error.message || '导入失败', key: 'import' });
+    try {
+      message.loading({ content: '正在从网络导入...', key: 'import', duration: 0 });
+      
+      await importFromUrl(importForm.url.trim(), importForm.title.trim());
+      
+      message.success({ content: '导入成功', key: 'import' });
+      importModalVisible.value = false;
+      fetchData();
+    } catch (error) {
+      console.error('URL导入失败:', error);
+      message.error({ content: error.message || 'URL导入失败', key: 'import' });
+    }
   }
 };
 
-// 取消导入
+// 修改取消导入方法
 const cancelImport = () => {
   importModalVisible.value = false;
   importForm.title = '';
   importForm.file = null;
+  importForm.url = '';  // 重置URL
+  importType.value = 'file';
+  urlPreview.loading = false;
+  urlPreview.title = '';
+  urlPreview.content = '';
 };
 
 // 移除原来的 uploadFile 函数，因为已经被 confirmImport 替代
@@ -676,5 +800,28 @@ onMounted(() => {
 .file-selected span {
   color: #1890ff;
   font-weight: 500;
+}
+
+.url-preview {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 12px;
+  background-color: #fafafa;
+}
+
+.preview-title {
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: #262626;
+}
+
+.preview-content {
+  color: #595959;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.ant-tabs-content {
+  padding-top: 16px;
 }
 </style>

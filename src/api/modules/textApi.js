@@ -133,3 +133,23 @@ export const saveText = async (text_id, title, content) => {
     }
 
 };
+
+/**
+ * 从URL导入图文
+ * @param {string} url - 要导入的网络地址
+ * @param {string} origin - 平台来源（toutiao/baidu/hupu/xiaohongshu）
+ * @returns {Promise} API响应
+ */
+export const importFromUrl = async (url, origin) => {
+    try {
+        const response = await request.post('/text/import-url/', {
+            url: url,
+            origin: origin
+        });
+        return response;
+    } catch (error) {
+        console.error('URL导入失败:', error);
+        throw error;
+    }
+};
+
