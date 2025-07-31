@@ -117,21 +117,14 @@ export const uploadMarkdown = (file, title, onProgress) => {
 };
 
 
-export const saveText = async (text_id, title, content) => {
+export const saveText = async (textData) => {
     try {
-        const response = await request.post(`/text/save/`,
-            {
-                text_id: text_id,
-                title: title,
-                content: content
-            }
-        );
+        const response = await request.post(`/text/save/`, textData);
         return response;
     } catch (error) {
         console.error(`保存文件失败:`, error);
         throw error;
     }
-
 };
 
 /**
