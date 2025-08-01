@@ -12,8 +12,14 @@
             <a-select-option value="unpublished">未发布</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="创建时间">
-          <a-range-picker v-model:value="searchForm.dateRange" format="YYYY-MM-DD" :placeholder="['开始时间', '结束时间']" />
+
+        <a-form-item label="来源">
+        <a-select v-model:value="searchForm.origin" placeholder="选择来源" style="width: 120px" allowClear>
+        <a-select-option :value="undefined">全部</a-select-option>
+        <a-select-option v-for="origin in originOptions" :key="origin" :value="origin">
+        {{ origin }}
+        </a-select-option>
+        </a-select>
         </a-form-item>
         <a-form-item label="所属账号">
           <a-select v-model:value="searchForm.account" placeholder="选择账号" style="width: 120px" allowClear>
@@ -22,6 +28,9 @@
               {{ account }}
             </a-select-option>
           </a-select>
+        </a-form-item>
+        <a-form-item label="创建时间">
+          <a-range-picker v-model:value="searchForm.dateRange" format="YYYY-MM-DD" :placeholder="['开始时间', '结束时间']" />
         </a-form-item>
         <a-form-item>
           <a-button type="primary" @click="handleSearch">查询</a-button>
@@ -168,10 +177,10 @@
       <a-form :model="urlImportForm" layout="vertical">
         <a-form-item label="平台来源" required>
           <a-radio-group v-model:value="urlImportForm.origin">
-            <a-radio value="toutiao">今日头条</a-radio>
-            <a-radio value="gongzhonghao">微信公众号</a-radio>
-            <a-radio value="hupu">虎扑</a-radio>
-            <a-radio value="qichezhijia">汽车之家</a-radio>
+            <a-radio value="今日头条">今日头条</a-radio>
+            <a-radio value="微信公众号">微信公众号</a-radio>
+            <a-radio value="虎扑">虎扑</a-radio>
+            <a-radio value="汽车之家">汽车之家</a-radio>
           </a-radio-group>
         </a-form-item>
         
@@ -213,13 +222,23 @@ const pagination = reactive({
   showQuickJumper: true,
   showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
 });
+// 在 script setup 中定义来源选项
+const originOptions = [
+'用户创建',
+'本地导入', 
+'今日头条',
+'微信公众号',
+'虎扑',
+'汽车之家'
+];
 
 // 搜索表单
 const searchForm = reactive({
   name: '',
   dateRange: [],
   status: undefined,
-  account: undefined
+  account: undefined,
+  origin: undefined  // 新增来源筛选
 });
 
 // 图文数据
@@ -270,7 +289,8 @@ const fetchData = async () => {
       content: item.content || '',
       status: item.status || 'unpublished',
       createTime: item.create_time || item.createTime || new Date().toISOString(),
-      account: item.account || '默认账号'
+      account: item.account || '默认账号',
+      origin: item.origin || '未知来源'  // 新增来源字段
     }));
     
     // 如果没有设置总数，使用数组长度
@@ -300,6 +320,10 @@ const filteredData = computed(() => {
 
   if (searchForm.status !== undefined) {
     result = result.filter(item => item.status === searchForm.status);
+  }
+
+  if (searchForm.origin !== undefined) {
+    result = result.filter(item => item.origin === searchForm.origin);
   }
 
   if (searchForm.dateRange && searchForm.dateRange.length === 2) {
@@ -335,7 +359,7 @@ const columns = [
   {
     title: '序号',
     dataIndex: 'index',
-    width: '80px',
+    width: '50px',
     align: 'center',
     customRender: ({ index }) => (pagination.current - 1) * pagination.pageSize + index + 1,
   },
@@ -347,23 +371,34 @@ const columns = [
     ellipsis: true,
   },
   {
+    title: '来源',
+    dataIndex: 'origin',
+    key: 'origin',
+    width: '120px',
+    align: 'center',
+    ellipsis: true
+  },
+  {
     title: '状态',
     dataIndex: 'status',
     key: 'status',
+    align: 'center',
     width: '100px',
   },
   {
     title: '创建时间',
     dataIndex: 'createTime',
     key: 'createTime',
-    width: '180px',
+    width: '120px',
+    align: 'center',
     customRender: ({ text }) => dayjs(text).format('YYYY-MM-DD HH:mm'),
   },
   {
     title: '所属账号',
     dataIndex: 'account',
     key: 'account',
-    width: '150px',
+    align: 'center',
+    width: '120px',
     ellipsis: true
   },
   {
@@ -632,6 +667,7 @@ const handleCreate = () => {
 // 搜索
 const handleSearch = () => {
   pagination.current = 1;
+  fetchData();
 };
 
 // 重置搜索
@@ -640,6 +676,7 @@ const resetSearch = () => {
   searchForm.dateRange = [];
   searchForm.status = undefined;
   searchForm.account = undefined;
+  searchForm.origin = undefined;  // 重置来源筛选
   handleSearch();
 };
 
