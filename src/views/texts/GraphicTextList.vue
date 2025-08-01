@@ -49,7 +49,6 @@
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'title'">
             <div class="title-content">
-              <a-avatar v-if="record.cover" :src="record.cover" shape="square" size="large" class="cover-image" />
               <span class="title-text">{{ record.title }}</span>
             </div>
           </template>
@@ -271,7 +270,6 @@ const fetchData = async () => {
       content: item.content || '',
       status: item.status || 'unpublished',
       createTime: item.create_time || item.createTime || new Date().toISOString(),
-      cover: item.cover || `https://picsum.photos/100/100?random=${item.id}`,
       account: item.account || '默认账号'
     }));
     
@@ -678,11 +676,6 @@ onMounted(() => {
 .title-content {
   display: flex;
   align-items: center;
-}
-
-.cover-image {
-  margin-right: 12px;
-  border-radius: 4px;
 }
 
 .title-text {
