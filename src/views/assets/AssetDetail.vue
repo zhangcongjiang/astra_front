@@ -737,7 +737,7 @@ const loadAssetDetail = async () => {
         assetDetail.value = {
           name: detail.name || detail.set_name || '',
           description: detail.description || '',
-          creator: detail.creator || detail.creator_name || '',
+          creator: detail.username || '',
           createTime: detail.createTime || detail.create_time || detail.created_at || ''
         }
         console.log('更新后的 assetDetail:', assetDetail.value)

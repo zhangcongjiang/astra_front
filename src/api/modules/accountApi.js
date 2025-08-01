@@ -12,6 +12,16 @@ export const getSystemSettings = async (params) => {
     }
 };
 
+export const getUsers = async () => {
+    try {
+        const response = await request.get(`/account/users/`);
+        return response;
+    } catch (error) {
+        console.error(`查询用户列表失败:`, error);
+        throw error;
+    }
+};
+
 // 创建素材集
 export const updateSystemSettings = async (data) => {
     try {

@@ -10,13 +10,12 @@
           <a-range-picker v-model:value="basicForm.dateRange" :show-time="{ format: 'HH:mm' }" format="YYYY-MM-DD HH:mm"
             :placeholder="['开始时间', '结束时间']" @change="handleDateChange" />
         </a-form-item>
-        <a-form-item label="创建者">
-          <a-select v-model:value="basicForm.creator" placeholder="选择创建者" style="width: 120px" allowClear>
-            <a-select-option :value="undefined">全部</a-select-option>
-            <a-select-option v-for="creator in uniqueCreators" :key="creator" :value="creator">
-              {{ creator }}
-            </a-select-option>
-          </a-select>
+        <a-form-item label="所属账号">
+          <UserSelect 
+            v-model="basicForm.creator" 
+            placeholder="选择所属账号" 
+            width="120px"
+          />
         </a-form-item>
         <a-form-item label="生成状态">
           <a-select v-model:value="basicForm.result" placeholder="选择状态" style="width: 120px" allowClear>
@@ -51,6 +50,7 @@ import { NDataTable, NCard, NButton, NProgress, NTag, useDialog, useMessage } fr
 import Pagination from '@/components/Pagination.vue';
 import { getVideoList,deleteVideo } from '@/api/modules/videoApi.js';
 import dayjs from 'dayjs';
+import UserSelect from '@/components/UserSelect.vue'
 
 
 // 加载状态
@@ -76,13 +76,7 @@ const basicForm = reactive({
   result: undefined
 });
 
-// 获取唯一创建者列表
-const uniqueCreators = computed(() => {
-  const creators = new Set(videoList.value.map(item => item.creator));
-  return Array.from(creators);
-});
 
-// 加载视频列表数据
 const loadVideoList = async () => {
   try {
     loading.value = true;
@@ -189,10 +183,11 @@ const columns = [
     width: 200
   },
   {
-    title: '创建者',
-    key: 'creator',
+    title: '所属账号',  
+    key: 'username', 
     width: 100,
-    align: 'center'
+    align: 'center',
+    render: (row) => row.username || '未知用户'  // 显示username字段
   },
   {
     title: '状态',

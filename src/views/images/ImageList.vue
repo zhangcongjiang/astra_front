@@ -12,8 +12,8 @@
       <!-- 基础查询表单 -->
       <div class="basic-search" v-if="searchType === 'basic'">
         <a-form layout="inline" :model="basicForm">
-          <a-form-item label="上传者">
-            <a-input v-model:value="basicForm.uploader" placeholder="输入上传者名称" @pressEnter="handleSearch" />
+          <a-form-item label="用户">
+            <UserSelect v-model:value="basicForm.uploader" placeholder="选择用户" style="width: 200px" />
           </a-form-item>
           <a-form-item label="创建时间">
             <a-range-picker v-model:value="basicForm.dateRange" :show-time="{ format: 'HH:mm' }"
@@ -147,7 +147,7 @@
           <div class="preview-meta">
             <div class="preview-title">{{ currentPreviewImage.name }}</div>
             <div class="preview-info">
-              <!-- <span>上传者: {{ currentPreviewImage.uploader }}</span> -->
+              <span>上传者: {{ currentPreviewImage.uploader }}</span>
               <span>上传时间: {{ formatDate(currentPreviewImage.uploadTime) }}</span>
             </div>
             <div class="preview-tags">
@@ -220,6 +220,7 @@ import { getAssetCollectionList, addItemToAsset } from '@/api/modules/assetApi';
 // 组件导入
 import Pagination from '@/components/Pagination.vue';
 import TagSearch from '@/components/TagSearch.vue';
+import UserSelect from '@/components/UserSelect.vue';
 
 // 添加响应式数据
 const addToAssetVisible = ref(false);
@@ -315,7 +316,7 @@ const fetchImageList = async () => {
     const params = {
       page: pagination.value.current,
       pageSize: pagination.value.pageSize,
-      creator: basicForm.uploader,
+      creator: basicForm.uploader, // 这里传递的是用户ID
       start_datetime: basicForm.startTime ? dayjs(basicForm.startTime).format('YYYY-MM-DDTHH:mm:ss') : null,
       end_datetime: basicForm.endTime ? dayjs(basicForm.endTime).format('YYYY-MM-DDTHH:mm:ss') : null,
     };
@@ -338,7 +339,7 @@ const fetchImageList = async () => {
         id: item.id,
         name: item.img_name,
         url: null, // 初始为空，懒加载
-        uploader: item.creator || '未知',
+        uploader: item.username || item.creator || '未知', // 优先使用username字段
         uploadTime: item.create_time,
         tags: item.tags || [],
         loading: true // 添加加载状态

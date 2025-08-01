@@ -14,20 +14,20 @@
         </a-form-item>
 
         <a-form-item label="来源">
-        <a-select v-model:value="searchForm.origin" placeholder="选择来源" style="width: 120px" allowClear>
-        <a-select-option :value="undefined">全部</a-select-option>
-        <a-select-option v-for="origin in originOptions" :key="origin" :value="origin">
-        {{ origin }}
-        </a-select-option>
-        </a-select>
-        </a-form-item>
-        <a-form-item label="所属账号">
-          <a-select v-model:value="searchForm.account" placeholder="选择账号" style="width: 120px" allowClear>
+          <a-select v-model:value="searchForm.origin" placeholder="选择来源" style="width: 120px" allowClear>
             <a-select-option :value="undefined">全部</a-select-option>
-            <a-select-option v-for="account in uniqueAccounts" :key="account" :value="account">
-              {{ account }}
+            <a-select-option v-for="origin in originOptions" :key="origin" :value="origin">
+              {{ origin }}
             </a-select-option>
           </a-select>
+        </a-form-item>
+        
+        <a-form-item label="所属账号">
+          <UserSelect 
+            v-model="searchForm.account" 
+            placeholder="选择账号" 
+            width="120px"
+          />
         </a-form-item>
         <a-form-item label="创建时间">
           <a-range-picker v-model:value="searchForm.dateRange" format="YYYY-MM-DD" :placeholder="['开始时间', '结束时间']" />
@@ -202,6 +202,7 @@ import { message, Modal } from 'ant-design-vue';
 import { PlusOutlined } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
 import Pagination from '@/components/Pagination.vue';
+import UserSelect from '@/components/UserSelect.vue'; // 添加这行导入
 // 导入图文相关的API
 import { 
   getTextList, 
@@ -249,37 +250,48 @@ const loading = ref(false);
 const fetchData = async () => {
   try {
     loading.value = true;
-    const response = await getTextList();
     
-    console.log('API响应数据:', response); // 添加调试日志
+    // 构建查询参数
+    const params = {
+      page: pagination.current,
+      page_size: pagination.pageSize
+    };
     
-    // 处理不同的响应数据结构
+    // 添加搜索条件
+    if (searchForm.name) {
+      params.title = searchForm.name;
+    }
+    
+    if (searchForm.account) {
+      // 注意：这里需要传递用户ID，不是用户名
+      // 如果UserSelect组件返回的是用户名，需要转换为用户ID
+      params.creator = searchForm.account; // 需要根据实际情况调整
+    }
+    
+    if (searchForm.status !== undefined) {
+      params.publish = searchForm.status === 'published';
+    }
+    
+    if (searchForm.origin !== undefined) {
+      params.origin = searchForm.origin;
+    }
+    
+    if (searchForm.dateRange && searchForm.dateRange.length === 2) {
+      const [start, end] = searchForm.dateRange;
+      params.start_time = start.format('YYYY-MM-DDTHH:mm:ss');
+      params.end_time = end.format('YYYY-MM-DDTHH:mm:ss');
+    }
+    
+    const response = await getTextList(params);
+    
+    console.log('API响应数据:', response);
+    
+    // 处理响应数据
     let dataList = [];
     
-    if (response) {
-      // 情况1: 直接返回数组
-      if (Array.isArray(response)) {
-        dataList = response;
-      }
-      // 情况2: response.data 是数组
-      else if (response.data && Array.isArray(response.data)) {
-        dataList = response.data;
-      }
-      // 情况3: response.data.results 是数组（分页数据）
-      else if (response.data && response.data.results && Array.isArray(response.data.results)) {
-        dataList = response.data.results;
-        pagination.total = response.data.total || response.data.count || dataList.length;
-      }
-      // 情况4: response.results 是数组
-      else if (response.results && Array.isArray(response.results)) {
-        dataList = response.results;
-        pagination.total = response.total || response.count || dataList.length;
-      }
-      // 情况5: 其他可能的数据结构
-      else {
-        console.warn('未知的数据结构:', response);
-        dataList = [];
-      }
+    if (response && response.data && response.data.results) {
+      dataList = response.data.results;
+      pagination.total = response.data.count || dataList.length;
     }
     
     // 转换数据格式
@@ -287,16 +299,11 @@ const fetchData = async () => {
       id: item.id,
       title: item.title || '无标题',
       content: item.content || '',
-      status: item.status || 'unpublished',
-      createTime: item.create_time || item.createTime || new Date().toISOString(),
-      account: item.account || '默认账号',
-      origin: item.origin || '未知来源'  // 新增来源字段
+      status: item.publish ? 'published' : 'unpublished',
+      createTime: item.create_time || new Date().toISOString(),
+      account: item.username,
+      origin: item.origin || '未知来源'
     }));
-    
-    // 如果没有设置总数，使用数组长度
-    if (!pagination.total) {
-      pagination.total = textList.value.length;
-    }
     
   } catch (error) {
     console.error('获取图文列表失败:', error);
@@ -345,14 +352,15 @@ const filteredData = computed(() => {
 const currentPageData = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize;
   const end = start + pagination.pageSize;
-  return filteredData.value.slice(start, end);
+  return textList.value.slice(start, end);
 });
 
 // 唯一账号列表
-const uniqueAccounts = computed(() => {
-  const accounts = new Set(textList.value.map(item => item.account));
-  return Array.from(accounts);
-});
+// 移除 uniqueAccounts 计算属性，因为现在使用 UserSelect 组件
+// const uniqueAccounts = computed(() => {
+//   const accounts = new Set(textList.value.map(item => item.account));
+//   return Array.from(accounts);
+// });
 
 // 表格列配置
 const columns = [

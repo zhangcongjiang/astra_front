@@ -23,6 +23,9 @@
           <a-form-item label="歌手">
             <a-input v-model:value="basicForm.artist" placeholder="输入歌手名称" @pressEnter="handleSearch" />
           </a-form-item>
+          <a-form-item label="上传者">
+            <UserSelect v-model:value="basicForm.creator" placeholder="选择上传者" style="width: 200px" />
+          </a-form-item>
           <a-form-item label="音频类型">
             <a-select v-model:value="basicForm.category" placeholder="选择音频类型" style="width: 120px">
               <a-select-option value="">全部</a-select-option>
@@ -229,6 +232,7 @@ import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import TagSearch from '@/components/TagSearch.vue'
 import Pagination from '@/components/Pagination.vue'
+import UserSelect from '@/components/UserSelect.vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   uploadSound,
@@ -256,7 +260,8 @@ const templateId = computed(() => route.query?.templateId || '')
 const basicForm = reactive({
   name: '',
   artist: '',
-  category: '', // 新增音频类型筛选
+  creator: '', // 新增上传者字段
+  category: '',
   dateRange: [],
   startTime: null,
   endTime: null
@@ -317,6 +322,7 @@ const fetchMusicList = async (params = {}) => {
     if (searchType.value === 'basic') {
       if (basicForm.name) baseParams.name = basicForm.name;
       if (basicForm.artist) baseParams.singer = basicForm.artist;
+      if (basicForm.creator) baseParams.creator = basicForm.creator;
       if (basicForm.category) baseParams.category = basicForm.category;
       if (basicForm.startTime) baseParams.start_time = dayjs(basicForm.startTime).format('YYYY-MM-DD HH:mm:ss');
       if (basicForm.endTime) baseParams.end_time = dayjs(basicForm.endTime).format('YYYY-MM-DD HH:mm:ss');
@@ -338,6 +344,7 @@ const fetchMusicList = async (params = {}) => {
           name: item.name,
           category: item.category,
           artist: item.singer || '',
+          creator: item.username  || '未知',
           duration: item.spec?.duration || 0,
           uploadTime: item.create_time,
           audioUrl: item.sound_path,
@@ -433,6 +440,13 @@ const columns = [
     dataIndex: 'artist',
     key: 'artist',
     width: 150,
+    align: 'center',
+  },
+  {
+    title: '上传者',
+    dataIndex: 'creator',
+    key: 'creator',
+    width: 120,
     align: 'center',
   },
   {
@@ -687,20 +701,16 @@ const handleDateChange = (dates) => {
   }
 };
 
-// 重置基础查询
+// 重置基础搜索
 const resetBasicSearch = () => {
   basicForm.name = '';
   basicForm.artist = '';
+  basicForm.creator = ''; // 新增重置上传者字段
   basicForm.category = '';
   basicForm.dateRange = [];
   basicForm.startTime = null;
   basicForm.endTime = null;
-
-  // 重置页码为1
-  pagination.current = 1;
-
-  // 调用获取音乐列表
-  fetchMusicList();
+  handleSearch();
 };
 
 // 在 script setup 顶部添加

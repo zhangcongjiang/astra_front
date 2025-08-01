@@ -17,9 +17,8 @@
                             <a-input v-model:value="basicForm.name" placeholder="请输入视频名称" style="width: 200px;"
                                 @pressEnter="handleSearch" />
                         </a-form-item>
-                        <a-form-item label="创建人">
-                            <a-input v-model:value="basicForm.creator" placeholder="请输入创建人" style="width: 150px;"
-                                @pressEnter="handleSearch" />
+                        <a-form-item label="上传者">
+                            <UserSelect v-model:value="basicForm.creator" placeholder="选择上传者" style="width: 200px" />
                         </a-form-item>
                         <a-form-item label="方向">
                             <a-select v-model:value="basicForm.orientation" placeholder="请选择方向" style="width: 120px;"
@@ -98,8 +97,8 @@
 
                                     <div class="meta-row">
                                         <div class="meta-item">
-                                            <span class="label">创建人:</span>
-                                            <span class="value">{{ item.creator || '-' }}</span>
+                                            <span class="label">上传者:</span>
+                                            <span class="value">{{ item.uploader || item.creator || '-' }}</span>
                                         </div>
                                         <div class="meta-item">
                                             <span class="label">创建时间:</span>
@@ -117,7 +116,6 @@
 
                                 <div class="card-actions">
                                     <a-space>
-                    
                                         <a-button type="text" size="small" @click="showTagModal(item)">
                                             <TagOutlined /> 标签
                                         </a-button>
@@ -247,6 +245,7 @@ import { message, Modal } from 'ant-design-vue';
 import dayjs from 'dayjs';
 import TagSearch from '@/components/TagSearch.vue';
 import Pagination from '@/components/Pagination.vue';
+import UserSelect from '@/components/UserSelect.vue';
 import {
     getVideoAssetList,
     deleteVideoAsset,
@@ -369,35 +368,41 @@ const getTagNames = (tags) => {
 };
 
 // 获取数据
+// 获取视频列表
 const fetchData = async () => {
-    loading.value = true;
     try {
-        let params = {
+        loading.value = true;
+        const params = {
             page: pagination.current,
             page_size: pagination.pageSize
         };
 
+        // 基础查询参数
         if (searchType.value === 'basic') {
             if (basicForm.name) params.name = basicForm.name;
-            if (basicForm.creator) params.creator = basicForm.creator;
+            if (basicForm.creator) params.creator = basicForm.creator; // 传递用户ID
             if (basicForm.orientation) params.orientation = basicForm.orientation;
             if (basicForm.dateRange && basicForm.dateRange.length === 2) {
                 params.start_time = dayjs(basicForm.dateRange[0]).format('YYYY-MM-DD HH:mm:ss');
                 params.end_time = dayjs(basicForm.dateRange[1]).format('YYYY-MM-DD HH:mm:ss');
             }
-        } else if (searchType.value === 'tag') {
-            if (selectedTags.value.length > 0) {
-                params.tag_ids = selectedTags.value.join(',');
-            }
+        }
+
+        // 标签查询参数
+        if (searchType.value === 'tag' && selectedTags.value.length > 0) {
+            params.tags = selectedTags.value.join(',');
         }
 
         const response = await getVideoAssetList(params);
         if (response?.code === 0) {
+            // 映射数据，添加uploader字段
             data.value = response.data.results.map(item => ({
                 ...item,
-                tags: item.tags || []
+                uploader: item.username || item.creator || '未知' // 优先使用username字段
             }));
-            pagination.total = response.data.count;
+            pagination.total = response.data.count || 0;
+        } else {
+            message.error(response?.message || '获取视频列表失败');
         }
     } catch (error) {
         console.error('获取视频列表失败:', error);
@@ -420,10 +425,10 @@ const handlePaginationChange = (page, pageSize) => {
     fetchData();
 };
 
-// 重置基础查询
+// 重置基础搜索
 const resetBasicSearch = () => {
     basicForm.name = '';
-    basicForm.creator = '';
+    basicForm.creator = ''; // 重置上传者字段
     basicForm.orientation = '';
     basicForm.dateRange = null;
     handleSearch();

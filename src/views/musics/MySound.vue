@@ -17,11 +17,11 @@
             @pressEnter="handleSearch" 
           />
         </a-form-item>
-        <a-form-item label="创建人">
-          <a-input 
-            v-model:value="searchForm.creator" 
-            placeholder="输入创建人" 
-            @pressEnter="handleSearch" 
+        <a-form-item label="所属账号">  <!-- 将"创建人"改为"用户" -->
+          <UserSelect 
+            v-model="searchForm.creator" 
+            placeholder="选择所属账号" 
+            width="120px"
           />
         </a-form-item>
         <a-form-item label="创建时间">
@@ -76,8 +76,8 @@
             <a-tag color="blue">{{ record.video_id || '无关联视频' }}</a-tag>
           </template>
 
-          <template v-if="column.key === 'creator'">
-            <span>{{ record.creator }}</span>
+          <template v-if="column.key === 'username'">
+            {{ record.username || '未知' }}
           </template>
 
           <template v-if="column.key === 'create_time'">
@@ -140,6 +140,7 @@ import {
 import { message } from 'ant-design-vue';
 import dayjs from 'dayjs';
 import Pagination from '@/components/Pagination.vue';
+import UserSelect from '@/components/UserSelect.vue';  // 添加这行
 import { getTtsList, ttsPlay } from '@/api/modules/voiceApi';
 
 // 搜索表单
@@ -199,8 +200,8 @@ const columns = [
     align: 'center'
   },
   {
-    title: '创建人',
-    key: 'creator',
+    title: '所属账号',  // 将"创建人"改为"用户"
+    key: 'username',  // 改为username
     width: 100,
     align: 'center'
   },

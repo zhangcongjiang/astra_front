@@ -10,9 +10,9 @@ import formatParams from "@/utils/formatParams";
  * 获取文本列表
  * @returns {Promise} API响应
  */
-export const getTextList = async () => {
+export const getTextList = async (params) => {
     try {
-        const response = await request.get(`/text/list/`);
+        const response = await request.get(`/text/list/`,formatParams(params));
         return response;
     } catch (error) {
         console.error(`获取图文列表失败:`, error);

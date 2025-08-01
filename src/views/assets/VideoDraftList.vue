@@ -25,10 +25,11 @@
             </a-select>
           </a-form-item>
           <a-form-item label="创建者">
-            <a-input 
-              v-model:value="searchForm.creator" 
-              placeholder="输入创建者" 
-              @pressEnter="handleSearch" 
+            <UserSelect
+              v-model:value="searchForm.creator"
+              placeholder="选择创建者"
+              style="width: 200px;"
+              allowClear
             />
           </a-form-item>
           <a-form-item label="创建时间">
@@ -120,6 +121,7 @@ import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import Pagination from '@/components/Pagination.vue'
+import UserSelect from '@/components/UserSelect.vue'
 import { getVideoDraftList, deleteVideoDraft, getVideoTemplates } from '@/api/modules/videoApi'
 
 const router = useRouter()
@@ -127,7 +129,7 @@ const router = useRouter()
 // 搜索表单
 const searchForm = reactive({
   title: '',  // 基于名称的模糊查询
-  creator: '',
+  creator: null,  // 改为 null，配合 UserSelect 组件
   template_id: null,  // 视频模板ID
   dateRange: [],
   startTime: null,
@@ -203,11 +205,16 @@ const filteredData = computed(() => {
     )
   }
 
-  // 创建者过滤（前端过滤）
+  // 创建者过滤（前端过滤）- 适配 UserSelect 组件
   if (searchForm.creator) {
-    result = result.filter(item =>
-      item.creator && item.creator.toLowerCase().includes(searchForm.creator.toLowerCase())
-    )
+    result = result.filter(item => {
+      // 如果 creator 是用户ID，需要匹配原始数据中的 creator_id 或 creator
+      return item.originalData && (
+        item.originalData.creator_id === searchForm.creator ||
+        item.originalData.creator === searchForm.creator ||
+        item.creator.toLowerCase().includes(String(searchForm.creator).toLowerCase())
+      )
+    })
   }
 
   // 时间范围过滤（前端过滤）
@@ -223,13 +230,11 @@ const filteredData = computed(() => {
 
 // 当前页数据（直接使用后端返回的数据）
 const currentPageData = computed(() => {
-  // 如果有前端搜索条件，使用过滤后的数据
-  if (searchForm.title || searchForm.creator || (searchForm.startTime && searchForm.endTime)) {
-    return filteredData.value
-  }
-  // 否则直接使用后端返回的数据
+  // 直接使用后端返回的数据，不再进行前端过滤
   return data.value
 })
+
+
 
 // 处理后端数据格式转换
 const transformDraftData = (backendData) => {
@@ -240,7 +245,7 @@ const transformDraftData = (backendData) => {
       id: item.id, // 保留ID用于操作，但不在表格中显示
       title: title,
       templateName: item.template_name || '未知模板',
-      creator: item.creator || '未知',
+      creator: item.username || item.creator || '未知', // 优先显示用户名
       createTime: dayjs(item.create_time).format('YYYY-MM-DD HH:mm'),
       updateTime: dayjs(item.update_time).format('YYYY-MM-DD HH:mm'),
       originalData: item // 保存原始数据以备后用
@@ -268,7 +273,7 @@ const handleDateChange = (dates) => {
 // 重置搜索
 const resetSearch = () => {
   searchForm.title = ''
-  searchForm.creator = ''
+  searchForm.creator = null  // 改为 null
   searchForm.template_id = null
   searchForm.dateRange = []
   searchForm.startTime = null
@@ -335,33 +340,42 @@ const handleDelete = (record) => {
   })
 }
 
-// 获取数据
+// 修改 fetchData 方法，确保所有搜索条件都传递给后端
 const fetchData = async () => {
   try {
     loading.value = true
     
-    // 构建查询参数
+    // 构建查询参数 - 所有条件都传递给后端
     const params = {
       page: pagination.current,
       pageSize: pagination.pageSize
     }
     
-    // 添加标题模糊查询
+    // 标题搜索
     if (searchForm.title) {
       params.title = searchForm.title
     }
     
-    // 添加模板ID查询
+    // 模板ID搜索
     if (searchForm.template_id) {
       params.template_id = searchForm.template_id
     }
     
-    // 添加创建者搜索
+    // 创建者搜索
     if (searchForm.creator) {
       params.creator = searchForm.creator
     }
     
+    // 时间范围搜索
+    if (searchForm.startTime && searchForm.endTime) {
+      params.start_time = searchForm.startTime.format('YYYY-MM-DD HH:mm:ss')
+      params.end_time = searchForm.endTime.format('YYYY-MM-DD HH:mm:ss')
+    }
+    
+    console.log('发送的查询参数:', params) // 添加调试日志
+    
     const response = await getVideoDraftList(params)
+    console.log('后端返回数据:', response) // 添加调试日志
     
     if (response.code === 0) {
       // 转换后端数据格式
@@ -381,6 +395,7 @@ const fetchData = async () => {
     loading.value = false
   }
 }
+
 
 // 获取视频模板列表
 const fetchVideoTemplates = async () => {

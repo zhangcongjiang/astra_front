@@ -1,23 +1,36 @@
 <template>
   <div class="asset-list-container">
-    <div class="header">
-      <h2>素材集管理</h2>
-      <a-button type="primary" @click="showCreateModal = true">
-        <PlusOutlined /> 创建素材集
-      </a-button>
-    </div>
-    
-    <div class="search-section">
-      <a-input-search
-        v-model:value="searchKeyword"
-        placeholder="搜索素材集名称"
-        style="width: 300px"
-        @search="handleSearch"
-      />
+    <!-- 搜索区域 -->
+    <div class="search-area">
+      <a-form layout="inline" :model="searchForm">
+        <a-form-item label="素材集名称">
+          <a-input 
+            v-model:value="searchForm.keyword" 
+            placeholder="输入素材集名称" 
+            @pressEnter="handleSearch" 
+          />
+        </a-form-item>
+        <a-form-item label="所属账号">
+          <UserSelect
+            v-model:value="searchForm.creator"
+            placeholder="选择所属账号"
+            style="width: 200px;"
+            allowClear
+          />
+        </a-form-item>
+        <a-form-item>
+          <a-button type="primary" @click="handleSearch">查询</a-button>
+          <a-button @click="resetSearch">重置</a-button>
+        </a-form-item>
+        <a-form-item style="margin-left: auto;">
+          <a-button type="primary" @click="showCreateModal = true">
+            <PlusOutlined /> 创建素材集
+          </a-button>
+        </a-form-item>
+      </a-form>
     </div>
 
     <div class="asset-grid">
-      
       <a-row :gutter="[16, 16]">
         <a-col 
           v-for="asset in assetList" 
@@ -64,7 +77,7 @@
               </template>
               <template #description>
                 <div class="card-info-row">
-                  <span class="creator">{{ asset.creator }}</span>
+                  <span class="creator">{{ asset.username || asset.creator }}</span>
                   <span class="create-time">{{ formatTime(asset.createTime) }}</span>
                 </div>
               </template>
@@ -103,93 +116,80 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
-import { 
-  PlusOutlined, 
-  EditOutlined, 
-  DeleteOutlined, 
-  FolderOutlined 
-} from '@ant-design/icons-vue'
-import dayjs from 'dayjs'
+import { PlusOutlined, FolderOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons-vue'
+import { getAssetCollectionList, createAssetCollection, updateAssetCollection, deleteAssetCollection } from '@/api/modules/assetApi'
 import Pagination from '@/components/Pagination.vue'
-// 添加API导入
-import {
-  getAssetCollectionList,
-  createAssetCollection,
-  updateAssetCollection,
-  deleteAssetCollection
-} from '@/api/modules/assetApi'
+import UserSelect from '@/components/UserSelect.vue'
+import dayjs from 'dayjs'
 
 const router = useRouter()
 
 // 响应式数据
 const assetList = ref([])
-const searchKeyword = ref('')
+const searchForm = ref({
+  keyword: '',
+  creator: null
+})
 const currentPage = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(12)
 const total = ref(0)
 const showCreateModal = ref(false)
 const editingAsset = ref(null)
-
-const assetForm = reactive({
+const assetForm = ref({
   name: '',
   description: ''
 })
 
-// 方法
+// 加载素材集列表
 const loadAssetList = async () => {
   try {
     const params = {
       page: currentPage.value,
-      pageSize: pageSize.value,
-    }
-    
-    if (searchKeyword.value.trim()) {
-      params.search = searchKeyword.value.trim()
+      page_size: pageSize.value,
+      keyword: searchForm.value.keyword || undefined,
+      creator: searchForm.value.creator || undefined
     }
     
     const response = await getAssetCollectionList(params)
     
-    // 检查不同的响应结构可能性
-    let data
-    if (response.data) {
-      data = response.data
-    } else if (response.results) {
-      data = response
-    } else {
-      data = response
-    }
-    
-    console.log('处理后的数据:', data)
-    
-    if (data && data.results) {
-      // 映射后端数据到前端格式
-      const mappedData = data.results.map(item => ({
+    // 适配实际的后端数据结构
+    if (response && (response.code === 200 || response.results)) {
+      const items = response.results || response.data?.items || []
+      const totalCount = response.count || response.data?.total || 0
+      
+      assetList.value = items.map(item => ({
         id: item.id,
         name: item.set_name,
         itemCount: item.asset_count,
         creator: item.creator,
+        username: item.username, // 优先显示 username
         createTime: item.create_time,
-        cover: item.cover_img // 修改为 cover，与模板中的字段名一致
+        cover: item.cover_img,
+        description: item.description
       }))
-      
-      assetList.value = mappedData
-      total.value = data.count
-      
-      // 强制触发更新
-      nextTick(() => {
-        console.log('DOM 更新完成')
-      })
+      total.value = totalCount
     }
   } catch (error) {
-    console.error('加载素材集列表失败:', error)
-    message.error('加载素材集列表失败')
+    console.error('获取素材集列表失败:', error)
+    message.error('获取素材集列表失败')
   }
 }
 
+// 搜索
 const handleSearch = () => {
+  currentPage.value = 1
+  loadAssetList()
+}
+
+// 重置搜索
+const resetSearch = () => {
+  searchForm.value = {
+    keyword: '',
+    creator: null
+  }
   currentPage.value = 1
   loadAssetList()
 }
@@ -286,24 +286,22 @@ onMounted(() => {
 
 <style scoped>
 .asset-list-container {
-  padding: 24px;
-}
-
-.header {
+  padding: 20px;
+  height: 100%;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  flex-direction: column;
 }
 
-.header h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
+.search-area {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.search-section {
-  margin-bottom: 24px;
+.search-area .ant-form-item {
+  margin-bottom: 16px;
 }
 
 .asset-grid {
