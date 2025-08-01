@@ -1243,4 +1243,20 @@ const fetchTagCategories = async () => {
     text-align: center;
   }
 }
+
+.cover-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background-color: #f5f5f5;
+}
+
+.cover-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+}
 </style>
