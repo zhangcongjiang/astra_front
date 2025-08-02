@@ -23,8 +23,8 @@
           <a-form-item label="歌手">
             <a-input v-model:value="basicForm.artist" placeholder="输入歌手名称" @pressEnter="handleSearch" />
           </a-form-item>
-          <a-form-item label="上传者">
-            <UserSelect v-model:value="basicForm.creator" placeholder="选择上传者" style="width: 200px" />
+          <a-form-item label="用户">
+            <UserSelect v-model:value="basicForm.creator" placeholder="选择用户" style="width: 200px" />
           </a-form-item>
           <a-form-item label="音频类型">
             <a-select v-model:value="basicForm.category" placeholder="选择音频类型" style="width: 120px">
@@ -260,7 +260,7 @@ const templateId = computed(() => route.query?.templateId || '')
 const basicForm = reactive({
   name: '',
   artist: '',
-  creator: '', // 新增上传者字段
+  creator: '', // 新增用户字段
   category: '',
   dateRange: [],
   startTime: null,
@@ -443,7 +443,7 @@ const columns = [
     align: 'center',
   },
   {
-    title: '上传者',
+    title: '用户',
     dataIndex: 'creator',
     key: 'creator',
     width: 120,
@@ -705,7 +705,7 @@ const handleDateChange = (dates) => {
 const resetBasicSearch = () => {
   basicForm.name = '';
   basicForm.artist = '';
-  basicForm.creator = ''; // 新增重置上传者字段
+  basicForm.creator = ''; // 新增重置用户字段
   basicForm.category = '';
   basicForm.dateRange = [];
   basicForm.startTime = null;

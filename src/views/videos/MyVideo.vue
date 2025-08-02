@@ -10,10 +10,10 @@
           <a-range-picker v-model:value="basicForm.dateRange" :show-time="{ format: 'HH:mm' }" format="YYYY-MM-DD HH:mm"
             :placeholder="['开始时间', '结束时间']" @change="handleDateChange" />
         </a-form-item>
-        <a-form-item label="所属账号">
+        <a-form-item label="用户">
           <UserSelect 
             v-model="basicForm.creator" 
-            placeholder="选择所属账号" 
+            placeholder="选择用户" 
             width="120px"
           />
         </a-form-item>
@@ -183,7 +183,7 @@ const columns = [
     width: 200
   },
   {
-    title: '所属账号',  
+    title: '用户',  
     key: 'username', 
     width: 100,
     align: 'center',

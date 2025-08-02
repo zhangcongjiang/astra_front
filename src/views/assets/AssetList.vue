@@ -10,10 +10,10 @@
             @pressEnter="handleSearch" 
           />
         </a-form-item>
-        <a-form-item label="所属账号">
+        <a-form-item label="用户">
           <UserSelect
             v-model:value="searchForm.creator"
-            placeholder="选择所属账号"
+            placeholder="选择用户"
             style="width: 200px;"
             allowClear
           />

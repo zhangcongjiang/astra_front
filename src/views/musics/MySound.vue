@@ -17,10 +17,10 @@
             @pressEnter="handleSearch" 
           />
         </a-form-item>
-        <a-form-item label="所属账号">  <!-- 将"创建人"改为"用户" -->
+        <a-form-item label="用户">  <!-- 将"创建人"改为"用户" -->
           <UserSelect 
             v-model="searchForm.creator" 
-            placeholder="选择所属账号" 
+            placeholder="选择用户" 
             width="120px"
           />
         </a-form-item>
@@ -200,7 +200,7 @@ const columns = [
     align: 'center'
   },
   {
-    title: '所属账号',  // 将"创建人"改为"用户"
+    title: '用户',  // 将"创建人"改为"用户"
     key: 'username',  // 改为username
     width: 100,
     align: 'center'

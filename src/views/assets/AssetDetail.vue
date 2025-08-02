@@ -8,7 +8,7 @@
         <h2>{{ assetDetail.name }}</h2>
         <p class="description">{{ assetDetail.description }}</p>
         <div class="meta-info">
-          <span>创建者: {{ assetDetail.creator }}</span>
+          <span>用户: {{ assetDetail.creator }}</span>
           <span>创建时间: {{ formatTime(assetDetail.createTime) }}</span>
           <span>素材数量: {{ totalItemsCount }}</span>
         </div>

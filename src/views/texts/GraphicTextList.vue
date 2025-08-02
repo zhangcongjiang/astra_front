@@ -22,7 +22,7 @@
           </a-select>
         </a-form-item>
         
-        <a-form-item label="所属账号">
+        <a-form-item label="用户">
           <UserSelect 
             v-model="searchForm.account" 
             placeholder="选择账号" 
@@ -402,7 +402,7 @@ const columns = [
     customRender: ({ text }) => dayjs(text).format('YYYY-MM-DD HH:mm'),
   },
   {
-    title: '所属账号',
+    title: '用户',
     dataIndex: 'account',
     key: 'account',
     align: 'center',

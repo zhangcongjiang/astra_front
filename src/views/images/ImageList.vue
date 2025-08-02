@@ -147,7 +147,7 @@
           <div class="preview-meta">
             <div class="preview-title">{{ currentPreviewImage.name }}</div>
             <div class="preview-info">
-              <span>上传者: {{ currentPreviewImage.uploader }}</span>
+              <span>用户: {{ currentPreviewImage.uploader }}</span>
               <span>上传时间: {{ formatDate(currentPreviewImage.uploadTime) }}</span>
             </div>
             <div class="preview-tags">

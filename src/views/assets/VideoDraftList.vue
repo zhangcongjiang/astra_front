@@ -24,10 +24,10 @@
               </a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="创建者">
+          <a-form-item label="用户">
             <UserSelect
               v-model:value="searchForm.creator"
-              placeholder="选择创建者"
+              placeholder="选择用户"
               style="width: 200px;"
               allowClear
             />
@@ -161,7 +161,7 @@ const columns = [
     width: 150
   },
   {
-    title: '创建者',
+    title: '用户',
     key: 'creator',
     dataIndex: 'creator',
     width: 120
@@ -205,7 +205,7 @@ const filteredData = computed(() => {
     )
   }
 
-  // 创建者过滤（前端过滤）- 适配 UserSelect 组件
+  // 用户过滤（前端过滤）- 适配 UserSelect 组件
   if (searchForm.creator) {
     result = result.filter(item => {
       // 如果 creator 是用户ID，需要匹配原始数据中的 creator_id 或 creator
@@ -361,7 +361,7 @@ const fetchData = async () => {
       params.template_id = searchForm.template_id
     }
     
-    // 创建者搜索
+    // 用户搜索
     if (searchForm.creator) {
       params.creator = searchForm.creator
     }

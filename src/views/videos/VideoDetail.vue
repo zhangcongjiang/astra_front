@@ -19,7 +19,7 @@
           <n-descriptions-item label="标题">
             <n-text strong>{{ videoDetail.title }}</n-text>
           </n-descriptions-item>
-          <n-descriptions-item label="创建者">
+          <n-descriptions-item label="用户">
             <n-tag type="info">{{ videoDetail.creator }}</n-tag>
           </n-descriptions-item>
           <n-descriptions-item label="生成状态">

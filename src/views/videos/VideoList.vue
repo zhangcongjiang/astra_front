@@ -17,8 +17,8 @@
                             <a-input v-model:value="basicForm.name" placeholder="请输入视频名称" style="width: 200px;"
                                 @pressEnter="handleSearch" />
                         </a-form-item>
-                        <a-form-item label="上传者">
-                            <UserSelect v-model:value="basicForm.creator" placeholder="选择上传者" style="width: 200px" />
+                        <a-form-item label="用户">
+                            <UserSelect v-model:value="basicForm.creator" placeholder="选择用户" style="width: 200px" />
                         </a-form-item>
                         <a-form-item label="方向">
                             <a-select v-model:value="basicForm.orientation" placeholder="请选择方向" style="width: 120px;"
@@ -97,7 +97,7 @@
 
                                     <div class="meta-row">
                                         <div class="meta-item">
-                                            <span class="label">上传者:</span>
+                                            <span class="label">用户:</span>
                                             <span class="value">{{ item.uploader || item.creator || '-' }}</span>
                                         </div>
                                         <div class="meta-item">
@@ -428,7 +428,7 @@ const handlePaginationChange = (page, pageSize) => {
 // 重置基础搜索
 const resetBasicSearch = () => {
     basicForm.name = '';
-    basicForm.creator = ''; // 重置上传者字段
+    basicForm.creator = ''; // 重置用户字段
     basicForm.orientation = '';
     basicForm.dateRange = null;
     handleSearch();
