@@ -89,8 +89,7 @@
     </a-spin>
 
     <!-- 生成成功对话框 -->
-    <a-modal
-      v-model:visible="showSuccessModal"
+    <a-modal v-model:open="showSuccessModal">
       title="视频生成成功"
       centered
       :footer="null"

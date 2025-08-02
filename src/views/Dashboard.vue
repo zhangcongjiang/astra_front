@@ -1,238 +1,370 @@
 <template>
   <div class="dashboard-container">
-    <!-- 欢迎区域 -->
-    <div class="welcome-section">
-      <h1>欢迎回来！</h1>
-      <p>这里是您的创作控制中心，快速开始您的工作</p>
-    </div>
-
-    <!-- 快捷操作区域 -->
-    <div class="quick-actions">
-      <h2>快捷操作</h2>
-      <div class="action-grid">
-        <el-card 
-          v-for="action in quickActions" 
-          :key="action.id" 
-          shadow="hover" 
-          class="action-card"
-          @click="handleQuickAction(action.path)"
-        >
-          <div class="action-content">
-            <el-icon :size="32" :color="action.color">
-              <component :is="action.icon" />
-            </el-icon>
-            <span>{{ action.name }}</span>
+    <!-- 顶部欢迎区域 -->
+    <div class="welcome-banner">
+      <div class="welcome-content">
+        <div class="welcome-layout">
+          <!-- 左侧头像 -->
+          <div class="welcome-avatar">
+            <div class="avatar-circle">
+              <span class="wave-emoji">👋</span>
+            </div>
           </div>
-        </el-card>
+          
+          <!-- 右侧文字内容 -->
+          <div class="welcome-text">
+            <h1>欢迎回来！</h1>
+            <p>{{ getCurrentTimeGreeting() }}，开始您的创作之旅</p>
+            <div class="welcome-decoration">
+              <div class="decoration-line"></div>
+              <div class="decoration-dot"></div>
+              <div class="decoration-line"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- 数据统计区域 -->
-    <div class="stats-section">
-      <h2>数据概览</h2>
-      <div class="stats-grid">
-        <el-card 
-          v-for="stat in stats" 
-          :key="stat.id" 
-          shadow="hover" 
-          class="stat-card"
-        >
-          <div class="stat-content">
-            <div class="stat-icon" :style="{ backgroundColor: stat.bgColor }">
-              <el-icon :size="24" color="white">
-                <component :is="stat.icon" />
-              </el-icon>
+    <!-- 主要内容区域 -->
+    <div class="main-content">
+      <!-- 数据概览卡片 -->
+      <div class="overview-section">
+        <h2><BarChartOutlined /> 数据概览</h2>
+        <div class="stats-grid">
+          <a-card 
+            v-for="stat in stats" 
+            :key="stat.id" 
+            class="stat-card"
+            :hoverable="true"
+            @click="navigateToModule(stat.path)"
+          >
+            <div class="stat-content">
+              <div class="stat-icon" :style="{ backgroundColor: stat.color }">
+                <component :is="stat.icon" :style="{ fontSize: '24px', color: 'white' }" />
+              </div>
+              <div class="stat-info">
+                <div class="stat-value">{{ stat.value }}</div>
+                <div class="stat-label">{{ stat.label }}</div>
+              </div>
             </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ stat.value }}</div>
-              <div class="stat-label">{{ stat.label }}</div>
-            </div>
-          </div>
-        </el-card>
+          </a-card>
+        </div>
       </div>
-    </div>
 
-    <!-- 最近活动 -->
-    <div class="recent-activity">
-      <h2>最近活动</h2>
-      <el-timeline>
-        <el-timeline-item
-          v-for="(activity, index) in activities"
-          :key="index"
-          :timestamp="activity.time"
-          :color="activity.color"
-          placement="top"
-        >
-          <el-card>
-            <div class="activity-content">
-              <el-icon :size="20" :color="activity.color">
-                <component :is="activity.icon" />
-              </el-icon>
-              <span>{{ activity.content }}</span>
+      <!-- 快捷操作区域 -->
+      <div class="quick-actions-section">
+        <h2><ThunderboltOutlined /> 快捷操作</h2>
+        <div class="actions-grid">
+          <a-card 
+            v-for="action in quickActions" 
+            :key="action.id" 
+            class="action-card"
+            :hoverable="true"
+            @click="handleQuickAction(action.path)"
+          >
+            <div class="action-content">
+              <div class="action-icon" :style="{ color: action.color }">
+                <component :is="action.icon" :style="{ fontSize: '32px' }" />
+              </div>
+              <div class="action-text">
+                <div class="action-title">{{ action.name }}</div>
+                <div class="action-desc">{{ action.description }}</div>
+              </div>
             </div>
-          </el-card>
-        </el-timeline-item>
-      </el-timeline>
+          </a-card>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+
 import {
-  Picture,
-  Headset,
-  VideoCamera,
-  MagicStick,
-  DataLine,
-  User,
-  Setting,
-  Clock,
-  DocumentAdd,
-  Collection,
-  VideoPlay
-} from '@element-plus/icons-vue'
+  BarChartOutlined,
+  ThunderboltOutlined,
+  PictureOutlined,
+  SoundOutlined,
+  VideoCameraOutlined,
+  FileTextOutlined,
+  ToolOutlined,
+  FolderOutlined,
+  EditOutlined
+} from '@ant-design/icons-vue'
 
 const router = useRouter()
 
-// 快捷操作
-const quickActions = ref([
-  { id: 1, name: '新建图片', icon: Picture, color: '#67C23A', path: '/images' },
-  { id: 2, name: '添加音乐', icon: Headset, color: '#409EFF', path: '/musics' },
-  { id: 3, name: '创建视频', icon: VideoCamera, color: '#E6A23C', path: '/templates' },
-  { id: 4, name: '特效制作', icon: MagicStick, color: '#F56C6C', path: '/effects' },
-  { id: 5, name: '数据可视化', icon: DataLine, color: '#909399', path: '/data-visuals' },
-  { id: 6, name: '个人中心', icon: User, color: '#9C27B0', path: '/my-videos' }
-])
-
-// 统计数据
+// 数据统计
 const stats = ref([
-  { id: 1, label: '图片数量', value: '128', icon: Collection, bgColor: '#67C23A' },
-  { id: 2, label: '音频数量', value: '56', icon: Headset, bgColor: '#409EFF' },
-  { id: 3, label: '视频模板', value: '24', icon: VideoPlay, bgColor: '#E6A23C' },
-  { id: 4, label: '我的作品', value: '18', icon: DocumentAdd, bgColor: '#F56C6C' }
-])
-
-// 最近活动
-const activities = ref([
   { 
-    time: '2023-11-15 14:30', 
-    content: '创建了新的视频作品《秋日回忆》', 
-    icon: VideoCamera, 
-    color: '#409EFF' 
+    id: 1, 
+    label: '素材集', 
+    value: '128', 
+    icon: FolderOutlined, 
+    color: '#1890ff',
+    path: '/assets'
   },
   { 
-    time: '2023-11-14 10:15', 
-    content: '上传了5张背景图片', 
-    icon: Picture, 
-    color: '#67C23A' 
+    id: 2, 
+    label: '视频草稿', 
+    value: '56', 
+    icon: EditOutlined, 
+    color: '#52c41a',
+    path: '/assets/video-drafts'
   },
   { 
-    time: '2023-11-13 16:45', 
-    content: '修改了系统音频设置', 
-    icon: Setting, 
-    color: '#909399' 
+    id: 3, 
+    label: '图片素材', 
+    value: '324', 
+    icon: PictureOutlined, 
+    color: '#faad14',
+    path: '/images'
   },
   { 
-    time: '2023-11-12 09:20', 
-    content: '添加了3首背景音乐', 
-    icon: Headset, 
-    color: '#409EFF' 
+    id: 4, 
+    label: '音频素材', 
+    value: '89', 
+    icon: SoundOutlined, 
+    color: '#722ed1',
+    path: '/musics'
+  },
+  { 
+    id: 5, 
+    label: '视频模板', 
+    value: '42', 
+    icon: VideoCameraOutlined, 
+    color: '#eb2f96',
+    path: '/videos'
+  },
+  { 
+    id: 6, 
+    label: '文本素材', 
+    value: '167', 
+    icon: FileTextOutlined, 
+    color: '#13c2c2',
+    path: '/texts'
   }
 ])
 
+// 快捷操作
+const quickActions = ref([
+  {
+    id: 1,
+    name: '新建图片',
+    description: '创建新的图片素材',
+    icon: PictureOutlined,
+    color: '#1890ff',
+    path: '/images/create'
+  },
+  {
+    id: 2,
+    name: '添加音乐',
+    description: '上传音频文件',
+    icon: SoundOutlined,
+    color: '#52c41a',
+    path: '/musics/upload'
+  },
+  {
+    id: 3,
+    name: '创建视频',
+    description: '制作新视频',
+    icon: VideoCameraOutlined,
+    color: '#faad14',
+    path: '/videos/create'
+  },
+  {
+    id: 4,
+    name: '文本编辑',
+    description: '编写文案内容',
+    icon: FileTextOutlined,
+    color: '#722ed1',
+    path: '/texts/create'
+  },
+  {
+    id: 5,
+    name: '数据可视化',
+    description: '创建图表和报告',
+    icon: BarChartOutlined,
+    color: '#eb2f96',
+    path: '/datavisual'
+  },
+  {
+    id: 6,
+    name: '工具箱',
+    description: '使用实用工具',
+    icon: ToolOutlined,
+    color: '#13c2c2',
+    path: '/tools'
+  }
+])
+
+// 方法
+const getCurrentTimeGreeting = () => {
+  const hour = new Date().getHours()
+  if (hour < 12) return '早上好'
+  if (hour < 18) return '下午好'
+  return '晚上好'
+}
+
 const handleQuickAction = (path) => {
+  router.push(path)
+}
+
+const navigateToModule = (path) => {
   router.push(path)
 }
 </script>
 
 <style scoped>
 .dashboard-container {
-  padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
+  min-height: 100vh;
+  background: #ffffff;
+  padding: 0;
 }
 
-.welcome-section {
-  margin-bottom: 30px;
-}
-
-.welcome-section h1 {
-  font-size: 28px;
-  color: #2c3e50;
-  margin-bottom: 8px;
-}
-
-.welcome-section p {
-  font-size: 16px;
-  color: #7f8c8d;
-}
-
-.quick-actions,
-.stats-section,
-.recent-activity {
-  margin-bottom: 30px;
-}
-
-h2 {
-  font-size: 20px;
-  color: #2c3e50;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #eee;
-}
-
-.action-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
-}
-
-.action-card {
-  cursor: pointer;
-  transition: transform 0.3s;
-}
-
-.action-card:hover {
-  transform: translateY(-5px);
-}
-
-.action-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.welcome-banner {
+  background: #ffffff;
+  position: relative;
+  overflow: hidden;
   padding: 20px 0;
+  border-bottom: 1px solid #f0f0f0;
 }
 
-.action-content span {
-  margin-top: 10px;
-  font-size: 16px;
+.welcome-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.welcome-layout {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  animation: fadeInUp 0.8s ease-out;
+}
+
+.welcome-avatar {
+  flex-shrink: 0;
+}
+
+.avatar-circle {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+  animation: pulse 2s infinite;
+}
+
+.wave-emoji {
+  font-size: 32px;
+  animation: wave 1s ease-in-out infinite;
+}
+
+.welcome-text {
+  flex: 1;
+  text-align: left;
+}
+
+.welcome-text h1 {
+  color: #1f2937;
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
+}
+
+.welcome-text p {
+  color: #6b7280;
+  font-size: 18px;
+  margin: 0 0 16px 0;
+  font-weight: 400;
+}
+
+.welcome-decoration {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.decoration-line {
+  width: 30px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #667eea, transparent);
+  border-radius: 1px;
+}
+
+.decoration-dot {
+  width: 6px;
+  height: 6px;
+  background: #667eea;
+  border-radius: 50%;
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+.main-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 24px 40px 24px;
+}
+
+.overview-section,
+.quick-actions-section {
+  margin-bottom: 24px;
+}
+
+.overview-section h2,
+.quick-actions-section h2 {
+  color: #1f2937;
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 20px;
+  margin-bottom: 24px;
 }
 
 .stat-card {
-  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
 }
 
 .stat-content {
   display: flex;
   align-items: center;
+  gap: 16px;
 }
 
 .stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 15px;
+  flex-shrink: 0;
 }
 
 .stat-info {
@@ -240,22 +372,145 @@ h2 {
 }
 
 .stat-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: #2c3e50;
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1;
 }
 
 .stat-label {
   font-size: 14px;
-  color: #7f8c8d;
+  color: #6b7280;
+  margin: 4px 0;
 }
 
-.activity-content {
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.action-card {
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.action-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.action-content {
   display: flex;
   align-items: center;
+  gap: 16px;
 }
 
-.activity-content span {
-  margin-left: 10px;
+.action-icon {
+  flex-shrink: 0;
+}
+
+.action-text {
+  flex: 1;
+}
+
+.action-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.action-desc {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* 动画效果 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes wave {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-10deg);
+  }
+  75% {
+    transform: rotate(10deg);
+  }
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+  }
+  to {
+    box-shadow: 0 0 15px rgba(102, 126, 234, 0.6);
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .welcome-banner {
+    padding: 16px 0;
+  }
+  
+  .welcome-layout {
+    gap: 16px;
+  }
+  
+  .avatar-circle {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .wave-emoji {
+    font-size: 24px;
+  }
+  
+  .welcome-text h1 {
+    font-size: 24px;
+  }
+  
+  .welcome-text p {
+    font-size: 16px;
+  }
+  
+  .main-content {
+    padding: 16px 16px 24px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .welcome-layout {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+  
+  .welcome-text {
+    text-align: center;
+  }
 }
 </style>

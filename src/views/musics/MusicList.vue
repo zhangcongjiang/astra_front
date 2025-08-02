@@ -65,7 +65,7 @@
     </div>
 
     <!-- 上传音乐模态框 -->
-    <a-modal v-model:visible="uploadModalVisible" title="上传音乐" width="800px" :maskClosable="false"
+    <a-modal v-model:open="uploadModalVisible" title="上传音乐" width="800px" :maskClosable="false"
       @ok="handleUploadSubmit" @cancel="closeUploadModal">
       <a-form :model="uploadForm" :label-col="{ span: 4 }" :wrapper-col="{ span: 20 }" ref="uploadFormRef">
         <a-form-item label="音乐名称" name="name" :rules="[{ required: true, message: '请输入音乐名称' }]">
@@ -162,7 +162,7 @@
       @change="handlePaginationChange" />
 
     <!-- 音乐编辑模态框 -->
-    <a-modal v-model:visible="editModalVisible" :title="currentMusic ? '编辑音乐信息' : '添加音乐'" width="800px"
+    <a-modal v-model:open="editModalVisible" :title="currentMusic ? '编辑音乐信息' : '添加音乐'" width="800px"
       :maskClosable="false" @ok="handleEditSubmit" @cancel="closeEditModal">
       <a-form :model="musicForm" :label-col="{ span: 4 }" :wrapper-col="{ span: 20 }" ref="musicFormRef">
         <a-form-item label="音乐名称" name="name" :rules="[{ required: true, message: '请输入音乐名称' }]">
@@ -194,7 +194,7 @@
 
     <!-- 加入素材集模态框 -->
     <a-modal
-      v-model:visible="addToAssetVisible"
+      v-model:open="addToAssetVisible"
       title="加入素材集"
       @ok="handleAddToAsset"
       @cancel="() => { addToAssetVisible = false; selectedAssetId = null; }"

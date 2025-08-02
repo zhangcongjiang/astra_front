@@ -134,7 +134,7 @@
       @change="handlePaginationChange" />
 
     <!-- 图片预览模态框 -->
-    <a-modal v-model:visible="previewVisible" :footer="null" width="auto"
+    <a-modal v-model:open="previewVisible" :footer="null" width="auto"
       :bodyStyle="{ padding: 0, textAlign: 'center', maxWidth: '90vw' }" centered @cancel="closePreview"
       class="image-preview-modal">
       <div class="preview-container">
@@ -163,7 +163,7 @@
     </a-modal>
 
     <!-- 标签编辑模态框 -->
-    <a-modal v-model:visible="tagModalVisible" title="编辑图片标签" @ok="handleTagSubmit" @cancel="closeTagModal"
+    <a-modal v-model:open="tagModalVisible" title="编辑图片标签" @ok="handleTagSubmit" @cancel="closeTagModal"
       width="800px">
       <TagSearch :tags="tagCategories" :show-actions="false" :allow-image-tagging="true"
         :image-tags="tagForm.currentTags" @add-image-tag="addImageTag" @remove-image-tag="removeImageTag" />
@@ -171,7 +171,7 @@
 
     <!-- 加入素材集模态框 -->
     <a-modal
-      v-model:visible="addToAssetVisible"
+      v-model:open="addToAssetVisible"
       title="加入素材集"
       @ok="handleAddToAsset"
       @cancel="handleCancelAddToAsset"

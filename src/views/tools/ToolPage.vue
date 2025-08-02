@@ -28,7 +28,7 @@
       </div>
     </div>
 
-    <a-modal v-model:visible="modalVisible" :title="modalTitle" @ok="handleSubmit" :confirm-loading="submitting">
+    <a-modal v-model:open="modalVisible" :title="modalTitle" @ok="handleSubmit" :confirm-loading="submitting">
       <a-form :model="toolForm" :label-col="{ span: 4 }">
         <a-form-item label="工具名称" required>
           <a-input v-model:value="toolForm.name" />

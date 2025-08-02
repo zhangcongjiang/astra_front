@@ -384,7 +384,7 @@
       />
     </a-spin>
 
-    <a-modal v-model:visible="showSuccessModal" title="视频生成任务已提交" :footer="null" centered >
+    <a-modal v-model:open="showSuccessModal" title="视频生成任务已提交" :footer="null" centered >
       <div class="success-modal">
         <CheckCircleOutlined class="success-icon" />
         <h3>任务创建成功！</h3>
