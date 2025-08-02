@@ -1,6 +1,15 @@
 <template>
   <div class="asset-detail-container">
-    <div class="header">
+    <!-- 添加全局loading效果 -->
+    <div v-if="pageLoading" class="page-loading">
+      <a-spin size="large" tip="加载中...">
+        <div class="loading-content"></div>
+      </a-spin>
+    </div>
+    
+    <!-- 原有内容，只在非loading状态下显示 -->
+    <div v-else>
+      <div class="header">
       <a-button @click="goBack" style="margin-right: 16px">
         <ArrowLeftOutlined /> 返回
       </a-button>
@@ -244,9 +253,8 @@
 
       </div>
     </div>
-
-
-
+    </div> <!-- 添加这个结束标签来闭合第11行的 <div v-else> -->
+    
     <!-- 文本文案编辑模态框 -->
     <a-modal
       v-model:open="textModalVisible"
@@ -377,6 +385,7 @@ const assetDetail = ref({
   creator: '',
   createTime: ''
 })
+const pageLoading = ref(true)
 const assetItems = ref([])
 const textItems = ref([])
 const searchKeyword = ref('')
@@ -723,6 +732,7 @@ const handleAddAudioItems = () => {
 // 加载素材详情
 const loadAssetDetail = async () => {
   try {
+    pageLoading.value = true
     console.log('开始加载素材详情，ID:', route.params.id)
     const response = await getAssetCollectionDetail(route.params.id)
     
@@ -808,6 +818,8 @@ const loadAssetDetail = async () => {
     console.error('加载素材集详情失败:', error)
     console.error('错误详情:', error.response)
     message.error('加载素材集详情失败')
+  } finally {
+    pageLoading.value = false
   }
 }
 
@@ -1356,6 +1368,22 @@ onUnmounted(() => {
   background: rgba(0, 0, 0, 0.3);
   color: rgba(255, 255, 255, 0.5);
   cursor: not-allowed;
+}
+
+/* 页面loading样式 */
+.page-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  background: #f5f5f5;
+}
+
+.loading-content {
+  width: 200px;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
 }
 
 /* 响应式设计 */
