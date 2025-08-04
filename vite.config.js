@@ -24,20 +24,19 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:8089',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        // 不重写路径，保留 /api 前缀
+        // rewrite: (path) => path.replace(/^\/api/, ''),
         logLevel: 'debug',
-        cookieDomainRewrite: 'localhost',
         configure: (proxy, options) => {
           // 处理预检请求和正常请求的CORS头信息
           proxy.on('proxyRes', (proxyRes, req, res) => {
-            // 设置CORS相关的响应头
-            proxyRes.headers['Access-Control-Allow-Origin'] = '*';
+            // 设置CORS相关的响应头 - 修复：当允许凭据时不能使用通配符
+            const origin = req.headers.origin || 'http://localhost:5173';
+            proxyRes.headers['Access-Control-Allow-Origin'] = origin;
             proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
             proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, X-CSRF-Token';
             proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
             proxyRes.headers['Access-Control-Max-Age'] = '86400';
-            // 如果是预检请求，直接返回204状态码
-
           });
         },
         onProxyReq: (proxyReq, req, res) => {
