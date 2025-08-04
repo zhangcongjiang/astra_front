@@ -120,6 +120,12 @@ const router = createRouter({
                     props: { category: 'image' }
                 },
                 {
+                    path: 'image-search',
+                    name: 'image-search',
+                    component: () => import('@/views/tools/ImageSearch.vue'),
+                    meta: { title: '图片搜索' }
+                },
+                {
                     path: 'audio-tools',
                     name: 'audio-tools',
                     component: () => import('@/views/tools/ToolPage.vue'),

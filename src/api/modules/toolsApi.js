@@ -20,3 +20,34 @@ export const getTools = async (params) => {
         throw error;
     }
 };
+
+export const searchImages = async (params) => {
+    try {
+        const response = await request.get("/tool/image/search/", formatParams(params));
+        return response;
+    } catch (error) {
+        console.error(`搜索图片出错:`, error);
+        throw error;
+    }
+};
+
+export const imageAddress = async (data) => {
+    try {
+        const response = await request.post("/tool/image/address/", data);
+        return response;
+    } catch (error) {
+        console.error(`查找图片路径出错:`, error);
+        throw error;
+    }
+};
+
+
+export const saveImageToMaterial = async (data) => {
+    try {
+        const response = await request.post("/tool/image/add-to-asset/", data);
+        return response;
+    } catch (error) {
+        console.error(`保存素材集失败:`, error);
+        throw error;
+    }
+};

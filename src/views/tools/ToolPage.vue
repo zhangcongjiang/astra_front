@@ -2,10 +2,21 @@
   <div class="tool-page">
     <div class="tool-header">
       <h2>{{ categoryName }}工具</h2>
-      <a-button type="primary" @click="showAddModal">
-        <template #icon><plus-outlined /></template>
-        添加工具
-      </a-button>
+      <div class="header-actions">
+        <a-button 
+          v-if="category === 'image'" 
+          type="default" 
+          @click="goToImageSearch"
+          style="margin-right: 8px;"
+        >
+          <template #icon><search-outlined /></template>
+          图片搜索
+        </a-button>
+        <a-button type="primary" @click="showAddModal">
+          <template #icon><plus-outlined /></template>
+          添加工具
+        </a-button>
+      </div>
     </div>
 
     <div class="tool-grid">
@@ -55,11 +66,14 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import { PlusOutlined } from '@ant-design/icons-vue';
+import { useRouter } from 'vue-router';
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons-vue';
 import { PictureOutlined } from '@ant-design/icons-vue';
 import { message } from 'ant-design-vue';
 // 导入API
 import { uploadTool, getTools } from '@/api/modules/toolsApi';
+
+const router = useRouter();
 
 const props = defineProps({
   category: {
@@ -255,6 +269,10 @@ const openTool = (tool) => {
   } else {
     message.warning('该工具暂未配置链接');
   }
+};
+// 跳转到图片搜索页面
+const goToImageSearch = () => {
+  router.push('/image-search');
 };
 </script>
 
