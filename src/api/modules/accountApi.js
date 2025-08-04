@@ -22,6 +22,16 @@ export const getUsers = async () => {
     }
 };
 
+export const getCurrentUser = async () => {
+    try {
+        const response = await request.get(`/account/users/current/`);
+        return response;
+    } catch (error) {
+        console.error(`查询当前用户失败:`, error);
+        throw error;
+    }
+};
+
 // 创建素材集
 export const updateSystemSettings = async (data) => {
     try {

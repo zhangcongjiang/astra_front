@@ -13,7 +13,7 @@
           
           <!-- 右侧文字内容 -->
           <div class="welcome-text">
-            <h1>欢迎回来！</h1>
+            <h1>欢迎回来，{{ userInfo.username || '用户' }}！</h1>
             <p>{{ getCurrentTimeGreeting() }}，开始您的创作之旅</p>
             <div class="welcome-decoration">
               <div class="decoration-line"></div>
@@ -81,6 +81,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { getCurrentUser } from '@/api/modules/accountApi'
 
 import {
   BarChartOutlined,
@@ -96,55 +97,66 @@ import {
 
 const router = useRouter()
 
+// 用户信息
+const userInfo = ref({
+  username: '',
+  img_count: 0,
+  sound_count: 0,
+  article_count: 0,
+  video_asset_count: 0,
+  asset_count: 0,
+  video_draft_count: 0
+})
+
 // 数据统计
 const stats = ref([
   { 
     id: 1, 
-    label: '素材集', 
-    value: '128', 
-    icon: FolderOutlined, 
-    color: '#1890ff',
-    path: '/assets'
-  },
-  { 
-    id: 2, 
-    label: '视频草稿', 
-    value: '56', 
-    icon: EditOutlined, 
-    color: '#52c41a',
-    path: '/assets/video-drafts'
-  },
-  { 
-    id: 3, 
     label: '图片素材', 
-    value: '324', 
+    value: '0', 
     icon: PictureOutlined, 
     color: '#faad14',
     path: '/images'
   },
   { 
-    id: 4, 
+    id: 2, 
     label: '音频素材', 
-    value: '89', 
+    value: '0', 
     icon: SoundOutlined, 
     color: '#722ed1',
     path: '/musics'
   },
   { 
-    id: 5, 
-    label: '视频模板', 
-    value: '42', 
+    id: 3, 
+    label: '我的图文', 
+    value: '0', 
+    icon: FileTextOutlined, 
+    color: '#13c2c2',
+    path: '/texts'
+  },
+  { 
+    id: 4, 
+    label: '视频素材', 
+    value: '0', 
     icon: VideoCameraOutlined, 
     color: '#eb2f96',
     path: '/videos'
   },
   { 
+    id: 5, 
+    label: '素材集', 
+    value: '0', 
+    icon: FolderOutlined, 
+    color: '#1890ff',
+    path: '/assets'
+  },
+  { 
     id: 6, 
-    label: '文本素材', 
-    value: '167', 
-    icon: FileTextOutlined, 
-    color: '#13c2c2',
-    path: '/texts'
+    label: '视频草稿', 
+    value: '0', 
+    icon: EditOutlined, 
+    color: '#52c41a',
+    path: '/assets/video-drafts'
   }
 ])
 
@@ -152,53 +164,81 @@ const stats = ref([
 const quickActions = ref([
   {
     id: 1,
-    name: '新建图片',
-    description: '创建新的图片素材',
-    icon: PictureOutlined,
-    color: '#1890ff',
-    path: '/images/create'
+    name: '图文创作',
+    description: '创建图文内容',
+    icon: FileTextOutlined,
+    color: '#722ed1',
+    path: '/texts'
   },
   {
     id: 2,
-    name: '添加音乐',
-    description: '上传音频文件',
-    icon: SoundOutlined,
-    color: '#52c41a',
-    path: '/musics/upload'
+    name: '图片上传',
+    description: '上传图片素材',
+    icon: PictureOutlined,
+    color: '#1890ff',
+    path: '/images'
   },
   {
     id: 3,
-    name: '创建视频',
-    description: '制作新视频',
-    icon: VideoCameraOutlined,
-    color: '#faad14',
-    path: '/videos/create'
+    name: '音频上传',
+    description: '上传音频文件',
+    icon: SoundOutlined,
+    color: '#52c41a',
+    path: '/musics'
   },
   {
     id: 4,
-    name: '文本编辑',
-    description: '编写文案内容',
-    icon: FileTextOutlined,
-    color: '#722ed1',
-    path: '/texts/create'
+    name: '视频上传',
+    description: '上传视频素材',
+    icon: VideoCameraOutlined,
+    color: '#faad14',
+    path: '/videos'
   },
   {
     id: 5,
-    name: '数据可视化',
-    description: '创建图表和报告',
-    icon: BarChartOutlined,
+    name: '新建素材集',
+    description: '创建素材集合',
+    icon: FolderOutlined,
     color: '#eb2f96',
-    path: '/datavisual'
+    path: '/assets'
   },
   {
     id: 6,
-    name: '工具箱',
-    description: '使用实用工具',
-    icon: ToolOutlined,
+    name: '视频制作',
+    description: '制作视频模板',
+    icon: EditOutlined,
     color: '#13c2c2',
-    path: '/tools'
+    path: '/templates'
+  },
+  {
+    id: 7,
+    name: '任务管理',
+    description: '管理我的任务',
+    icon: ToolOutlined,
+    color: '#f5222d',
+    path: '/my-tasks'
   }
 ])
+
+// 获取用户信息
+const fetchUserInfo = async () => {
+  try {
+    const response = await getCurrentUser()
+    if (response.code === 0) {
+      userInfo.value = response.data
+      
+      // 更新统计数据
+      stats.value[0].value = response.data.img_count.toString()
+      stats.value[1].value = response.data.sound_count.toString()
+      stats.value[2].value = response.data.article_count.toString()
+      stats.value[3].value = response.data.video_asset_count.toString()
+      stats.value[4].value = response.data.asset_count.toString()
+      stats.value[5].value = response.data.video_draft_count.toString()
+    }
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+  }
+}
 
 // 方法
 const getCurrentTimeGreeting = () => {
@@ -215,6 +255,11 @@ const handleQuickAction = (path) => {
 const navigateToModule = (path) => {
   router.push(path)
 }
+
+// 页面加载时获取用户信息
+onMounted(() => {
+  fetchUserInfo()
+})
 </script>
 
 <style scoped>
