@@ -156,7 +156,7 @@ const stats = ref([
     value: '0', 
     icon: EditOutlined, 
     color: '#52c41a',
-    path: '/assets/video-drafts'
+    path: '/drafts'
   }
 ])
 
