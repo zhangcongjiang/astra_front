@@ -16,6 +16,32 @@
                         {{ item.name }}
                     </div>
                 </div>
+
+                <!-- 用户信息区域 -->
+                <div class="user-info">
+                    <a-dropdown>
+                        <div class="user-avatar">
+                            <a-avatar :size="32">
+                                <template #icon><UserOutlined /></template>
+                            </a-avatar>
+                            <span class="username">{{ authStore.username || '用户' }}</span>
+                            <DownOutlined class="dropdown-icon" />
+                        </div>
+                        <template #overlay>
+                            <a-menu>
+                                <a-menu-item key="profile" @click="goToProfile">
+                                    <UserOutlined />
+                                    个人信息
+                                </a-menu-item>
+                                <a-menu-divider />
+                                <a-menu-item key="logout" @click="handleLogout">
+                                    <LogoutOutlined />
+                                    退出登录
+                                </a-menu-item>
+                            </a-menu>
+                        </template>
+                    </a-dropdown>
+                </div>
             </div>
 
             <!-- 主体内容区 -->
@@ -41,7 +67,12 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { NMessageProvider } from 'naive-ui';
+import { useAuthStore } from '@/stores/auth';
+import { UserOutlined, DownOutlined, LogoutOutlined } from '@ant-design/icons-vue';
+import { message } from 'ant-design-vue';
+
 const router = useRouter();
+const authStore = useAuthStore();
 // 菜单数据
 const menuData = [
     {
@@ -106,10 +137,26 @@ const menuData = [
 ];
 
 const goToDashboard = () => {
-
     activeTopMenu.value = 0;
     activeLeftMenu.value = 0;
     router.push(menuData[0].children[0].path);
+};
+
+// 跳转到个人信息页面
+const goToProfile = () => {
+    router.push('/user-profile');
+};
+
+// 处理登出
+const handleLogout = async () => {
+    try {
+        await authStore.logout();
+        message.success('已成功退出登录');
+        router.push('/login');
+    } catch (error) {
+        console.error('登出失败:', error);
+        message.error('登出失败，请重试');
+    }
 };
 
 // 当前选中的一级菜单索引
@@ -249,6 +296,7 @@ onMounted(() => {
 .top-menu {
     display: flex;
     height: 100%;
+    flex: 1;
 }
 
 .top-menu-item {
@@ -338,5 +386,38 @@ onMounted(() => {
     background-color: white;
     border-radius: 5px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* 用户信息区域样式 */
+.user-info {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+}
+
+.user-avatar {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: all 0.3s;
+}
+
+.user-avatar:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.username {
+    margin-left: 8px;
+    margin-right: 4px;
+    color: white;
+    font-size: 14px;
+}
+
+.dropdown-icon {
+    font-size: 12px;
+    color: white;
+    opacity: 0.8;
 }
 </style>

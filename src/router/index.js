@@ -16,10 +16,21 @@ import VideoList from '@/views/videos/VideoList.vue'
 import AssetList from '@/views/assets/AssetList.vue'
 import VideoDraftList from '@/views/assets/VideoDraftList.vue'
 import AssetDetail from '@/views/assets/AssetDetail.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes: [
+        // 登录页面路由
+        {
+            path: '/login',
+            name: 'Login',
+            component: () => import('@/views/Login.vue'),
+            meta: { 
+                requiresGuest: true, // 只有未登录用户可以访问
+                title: '用户登录'
+            }
+        },
         {
             path: '/',
             name: 'home',
@@ -179,6 +190,12 @@ const router = createRouter({
                     meta: { title: '账号管理' }
                 },
                 {
+                    path: '/user-profile',
+                    name: 'UserProfile',
+                    component: () => import('@/views/account/UserProfile.vue'),
+                    meta: { title: '个人信息' }
+                },
+                {
                     path: '/my-tasks',
                     name: 'MyTasks',
                     component: () => import('@/views/tasks/TaskManagement.vue'),
@@ -219,6 +236,41 @@ const router = createRouter({
             ]
         }
     ]
+})
+
+// 全局前置守卫
+router.beforeEach(async (to, from, next) => {
+  const authStore = useAuthStore()
+  
+  // 如果还没有检查过认证状态，先检查一次
+  if (!authStore.user && !authStore.loading) {
+    try {
+      await authStore.checkAuth()
+    } catch (error) {
+      // 认证失败，继续执行后续逻辑
+    }
+  }
+  
+  // 如果用户未认证且访问的不是登录页
+  if (!authStore.isAuthenticated && to.path !== '/login') {
+    next('/login')
+    return
+  }
+  
+  // 如果用户已认证且访问登录页，重定向到首页
+  if (authStore.isAuthenticated && to.path === '/login') {
+    next('/')
+    return
+  }
+  
+  // 检查是否需要管理员权限
+  if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    console.error('需要管理员权限')
+    next('/')
+    return
+  }
+  
+  next()
 })
 
 export default router

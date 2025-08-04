@@ -15,13 +15,11 @@ const handleError = (error) => {
 
 export const request = async ({ method, url, params = {}, data = null, responseType = "json" }) => {
   try {
-    if (url.startsWith("/media/")) {
-      axiosInstance.defaults.baseURL = "/api";
-    }else{
-      axiosInstance.defaults.baseURL = "/api/api/";
-    }
+    // 统一使用 /api 作为 baseURL，不需要重复设置
+    // axiosInstance 已经在 axiosConfig.js 中配置了 baseURL = '/api'
+    // 注意：axiosInstance 的响应拦截器已经处理了响应，直接返回处理后的数据
     const response = await axiosInstance[method.toLowerCase()](url, method.toLowerCase() === "get" ? { params, responseType } : data);
-    return response.data;
+    return response; // 不需要 .data，因为拦截器已经处理了
   } catch (error) {
     console.error(`请求出错1:`, error);
     handleError(error);
@@ -68,7 +66,7 @@ request.upload = async (url, formData, headers = {}) => {
       headers
     });
     console.log(`上传请求成功:`, response);
-    return response.data;
+    return response; // 不需要 .data，因为拦截器已经处理了
 
   } catch (error) {
     console.error(`上传请求出错:`, error);

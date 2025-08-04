@@ -156,9 +156,9 @@ const loadAssetList = async () => {
     const response = await getAssetCollectionList(params)
     
     // 适配实际的后端数据结构
-    if (response && (response.code === 200 || response.results)) {
-      const items = response.results || response.data?.items || []
-      const totalCount = response.count || response.data?.total || 0
+    if (response && response.code === 0 && response.data) {
+      const items = response.data.results || []
+      const totalCount = response.data.count || 0
       
       assetList.value = items.map(item => ({
         id: item.id,
@@ -171,6 +171,10 @@ const loadAssetList = async () => {
         description: item.description
       }))
       total.value = totalCount
+    } else {
+      console.log('数据格式不正确或请求失败:', response)
+      assetList.value = []
+      total.value = 0
     }
   } catch (error) {
     console.error('获取素材集列表失败:', error)
