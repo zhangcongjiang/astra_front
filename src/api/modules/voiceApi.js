@@ -113,6 +113,16 @@ export const getSoundList = async (params) => {
     }
 }
 
+export const getSpeakerPaginateList = async (params) => {
+    try {
+        const response = await request.get(`/voice/speakers/paginate/`, formatParams(params));
+        return response;
+    } catch (error) {
+        console.error(`查询朗读者列表失败:`, error);
+        throw error;
+    }
+}
+
 export const soundPlay = async (soundId) => {
     try {
         const response = await request.get(`/voice/sound/play/?sound_id=${soundId}`,)

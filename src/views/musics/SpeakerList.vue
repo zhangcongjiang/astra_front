@@ -195,7 +195,7 @@ import { message } from 'ant-design-vue';
 import TagSearch from '@/components/TagSearch.vue';
 import Pagination from '@/components/Pagination.vue';
 import {
-    getSpeakerList,
+    getSpeakerPaginateList,
     updateSpeaker,
     getSpeakerSample,
     syncSpeakerAudio,
@@ -324,7 +324,7 @@ const handleTagSubmit = async () => {
     }
 };
 // 获取音色列表
-// 修改获取音色列表方法
+// 修改 fetchSpeakerList 函数
 const fetchSpeakerList = async () => {
     try {
         const params = {
@@ -339,15 +339,23 @@ const fetchSpeakerList = async () => {
             params.tag_ids = selectedTags.value.join(',');
         }
 
-        const response = await getSpeakerList(params);
+        const response = await getSpeakerPaginateList(params);
+        console.log('API响应:', response);
 
-        // 确保数据结构正确
-        voiceData.value = response.data?.list || response.data || response || [];
-        pagination.total = response.data?.total || response.total || voiceData.value.length;
+        // 修正数据提取逻辑
+        if (response && response.code === 0 && response.data) {
+            voiceData.value = response.data.results || [];
+            pagination.total = response.data.count || 0;
+        } else {
+            voiceData.value = [];
+            pagination.total = 0;
+        }
 
     } catch (error) {
         console.error('获取音色列表失败:', error);
         message.error('获取音色列表失败');
+        voiceData.value = [];
+        pagination.total = 0;
     }
 };
 
@@ -459,32 +467,38 @@ const findTagById = (tagId) => {
 };
 
 // 当前页显示的音色
+// 修改 currentPageVoices 计算属性，使用服务端分页
 const currentPageVoices = computed(() => {
-    const start = (pagination.current - 1) * pagination.pageSize;
-    const end = start + pagination.pageSize;
-    return filteredVoices.value.slice(start, end);
+// 如果使用服务端分页，直接返回 voiceData
+return voiceData.value;
 });
 
 // 过滤后的音色
+// 修改 filteredVoices 计算属性
 const filteredVoices = computed(() => {
     const filtered = voiceData.value.filter(voice => {
         if (searchType.value === 'basic') {
-            const readerMatch = (voice.reader || '').toLowerCase().includes(
+            // 修正字段名：voice.reader -> voice.name
+            const readerMatch = (voice.name || '').toLowerCase().includes(
                 (basicForm.reader || '').toLowerCase()
             );
-            // 修改性别匹配逻辑
-            const genderMatch = basicForm.gender === '不限' || voice.gender === basicForm.gender;
-            return readerMatch && genderMatch;
+            // 如果有语言和情感筛选
+            const languageMatch = !basicForm.language || voice.language === basicForm.language;
+            const emotionMatch = !basicForm.emotion || voice.emotion === basicForm.emotion;
+            
+            return readerMatch && languageMatch && emotionMatch;
         }
 
         if (searchType.value === 'tag' && selectedTags.value.length > 0) {
-            return selectedTags.value.some(tagId => voice.tags.includes(tagId));
+            // 标签匹配逻辑
+            return voice.tags && voice.tags.some(tag => 
+                selectedTags.value.includes(tag.id)
+            );
         }
 
         return true;
     });
-
-    pagination.total = filtered.length;
+    
     return filtered;
 });
 
