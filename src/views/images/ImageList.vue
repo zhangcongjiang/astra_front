@@ -213,7 +213,7 @@ import {
 } from '@ant-design/icons-vue';
 
 // API 导入
-import { getImageList, getImageContent, getImageDetail, deleteImages, uploadImages, bindTags } from '@/api/modules/imageApi';
+import { getImageList, getImageDetail, deleteImages, uploadImages, bindTags } from '@/api/modules/imageApi';
 import { getTagsByCategory } from '@/api/modules/tagApi';
 import { getAssetCollectionList, addItemToAsset } from '@/api/modules/assetApi';
 
@@ -338,17 +338,15 @@ const fetchImageList = async () => {
       const placeholders = response.data.results.map(item => ({
         id: item.id,
         name: item.img_name,
-        url: null, // 初始为空，懒加载
-        uploader: item.username || item.creator || '未知', // 优先使用username字段
+        url: `/media/images/`+item.img_name , // 直接使用API返回的URL
+        uploader: item.username  || '未知', 
         uploadTime: item.create_time,
         tags: item.tags || [],
-        loading: true // 添加加载状态
+        loading: false, // 不需要懒加载
+        loadError: false
       }));
       
       imageData.value = placeholders;
-      
-      // 逐个加载图片内容
-      loadImagesSequentially(response.data.results);
     } else {
       message.warning('获取的图片列表为空');
       imageData.value = [];
@@ -362,38 +360,7 @@ const fetchImageList = async () => {
   }
 };
 
-// 新增：逐个加载图片内容的函数
-const loadImagesSequentially = async (imageItems) => {
-  for (let i = 0; i < imageItems.length; i++) {
-    try {
-      const item = imageItems[i];
-      // 直接使用原始图片API，移除缩略图逻辑
-      const image_content = await getImageContent(item.id, {
-        responseType: 'blob'
-      });
-      
-      const url = URL.createObjectURL(image_content);
-      
-      // 找到对应的图片并更新
-      const index = imageData.value.findIndex(img => img.id === item.id);
-      if (index !== -1) {
-        imageData.value[index].url = url;
-        imageData.value[index].loading = false;
-      }
-      
-      // 可选：添加小延迟避免请求过于频繁
-      await new Promise(resolve => setTimeout(resolve, 50));
-    } catch (error) {
-      console.error(`Error loading image ${imageItems[i].id}:`, error);
-      // 更新加载失败状态
-      const index = imageData.value.findIndex(img => img.id === imageItems[i].id);
-      if (index !== -1) {
-        imageData.value[index].loading = false;
-        imageData.value[index].loadError = true;
-      }
-    }
-  }
-};
+
 const handleTagClick = (tagId) => {
   selectedTags.value = [tagId]; // 设置选中的标签
   handleSearch(); // 触发查询
