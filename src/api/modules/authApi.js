@@ -39,7 +39,7 @@ export const authAPI = {
   },
 
   // 用户登出
-  logout() {
+  async logout() {
     return instance.post('/account/logout/')
   },
 

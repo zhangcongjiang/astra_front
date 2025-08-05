@@ -31,15 +31,19 @@ export default defineConfig({
           // 处理预检请求和正常请求的CORS头信息
           proxy.on('proxyRes', (proxyRes, req, res) => {
             // 设置CORS相关的响应头 - 修复：当允许凭据时不能使用通配符
-            const origin = req.headers.origin || 'http://localhost:5173';
+            const origin = req.headers.origin || 'http://localhost:5174';
             proxyRes.headers['Access-Control-Allow-Origin'] = origin;
             proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
-            proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, X-CSRF-Token';
+            proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, X-CSRF-Token, X-CSRFToken';
             proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
             proxyRes.headers['Access-Control-Max-Age'] = '86400';
           });
         },
         onProxyReq: (proxyReq, req, res) => {
+          // 重写Origin头为后端地址，解决CSRF Origin检查问题
+          proxyReq.setHeader('Origin', 'http://127.0.0.1:8089');
+          proxyReq.setHeader('Referer', 'http://127.0.0.1:8089/');
+          
           // 手动转发必要的头信息
           if (req.headers['cookie']) {
             proxyReq.setHeader('cookie', req.headers['cookie']);
@@ -49,6 +53,9 @@ export default defineConfig({
           }
           if (req.headers['x-csrftoken']) {
             proxyReq.setHeader('x-csrftoken', req.headers['x-csrftoken']);
+          }
+          if (req.headers['x-csrf-token']) {
+            proxyReq.setHeader('x-csrf-token', req.headers['x-csrf-token']);
           }
         },
       },

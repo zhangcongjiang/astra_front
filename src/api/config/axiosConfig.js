@@ -38,7 +38,7 @@ function getCSRFToken() {
 }
 
 // 请求拦截器
-instance.interceptors.request.use(config => {
+instance.interceptors.request.use(async config => {
   // 确保请求头正确设置
   if (!config.headers['Content-Type']) {
     config.headers['Content-Type'] = 'application/json'
@@ -48,9 +48,31 @@ instance.interceptors.request.use(config => {
   const csrfToken = getCSRFToken()
   if (csrfToken) {
     config.headers['X-CSRFToken'] = csrfToken
+    config.headers['X-CSRF-Token'] = csrfToken  // 添加备用头
     console.log('添加 CSRF Token:', csrfToken)
   } else {
     console.warn('未找到 CSRF Token')
+    
+    // 对于需要CSRF保护的请求（POST, PUT, DELETE等），尝试先获取token
+    if (['post', 'put', 'delete', 'patch'].includes(config.method.toLowerCase())) {
+      try {
+        // 尝试通过一个简单的GET请求获取CSRF token
+        const response = await axios.get('/api/csrf/', { 
+          baseURL: BASE_URL,
+          withCredentials: true 
+        })
+        
+        // 重新尝试获取token
+        const newToken = getCSRFToken()
+        if (newToken) {
+          config.headers['X-CSRFToken'] = newToken
+          config.headers['X-CSRF-Token'] = newToken
+          console.log('重新获取 CSRF Token 成功:', newToken)
+        }
+      } catch (error) {
+        console.warn('无法获取 CSRF Token:', error.message)
+      }
+    }
   }
   
   // 添加调试日志
