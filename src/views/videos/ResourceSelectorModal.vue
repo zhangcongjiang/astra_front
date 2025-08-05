@@ -284,11 +284,11 @@ const fetchAssetCollections = async () => {
   collectionsLoading.value = true;
   try {
     const response = await getAssetCollectionList({ page_size: 100 });
-    // 适配API响应格式：直接使用response.results
-    if (response && response.results) {
-      assetCollections.value = response.results;
+    // 适配API响应格式：使用response.data.results
+    if (response && response.code === 0 && response.data && response.data.results) {
+      assetCollections.value = response.data.results;
     } else {
-      message.error('获取素材集列表失败');
+      message.error(response?.message || '获取素材集列表失败');
       assetCollections.value = [];
     }
   } catch (error) {
