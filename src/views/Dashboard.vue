@@ -13,7 +13,7 @@
           
           <!-- 右侧文字内容 -->
           <div class="welcome-text">
-            <h1>欢迎回来，{{ userInfo.username || '用户' }}！</h1>
+            <h1>欢迎回来，{{ userInfo.username }}</h1>
             <p>{{ getCurrentTimeGreeting() }}，开始您的创作之旅</p>
             <div class="welcome-decoration">
               <div class="decoration-line"></div>
