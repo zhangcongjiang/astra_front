@@ -120,6 +120,18 @@
         </a-col>
       </a-row>
 
+      <!-- 手动加载更多按钮 -->
+      <div v-if="searchResults.length > 0 && !noMoreData && !loadingMore" class="load-more-section">
+        <a-button 
+          type="primary" 
+          size="large" 
+          @click="loadMoreImages"
+          class="load-more-btn"
+        >
+          加载更多图片
+        </a-button>
+      </div>
+
       <!-- 加载更多指示器 -->
       <div v-if="loadingMore" class="loading-more">
         <a-spin size="large" />
@@ -136,8 +148,9 @@
     <a-modal
       v-model:open="previewVisible"
       :footer="null"
-      :width="'90vw'"
-      :style="{ top: '20px' }"
+      width="auto"
+      :bodyStyle="{ padding: 0, textAlign: 'center', maxWidth: '90vw' }"
+      centered
       class="image-preview-modal"
       @cancel="closePreview"
     >
@@ -153,36 +166,28 @@
         <!-- 图片显示区域 -->
         <div class="preview-image-wrapper">
           <img
-            :src="currentPreviewImage.url"
+            v-if="currentPreviewImage && (currentPreviewImage.url || currentPreviewImage.base64)"
+            :src="currentPreviewImage.url || currentPreviewImage.base64"
             :alt="currentPreviewImage.title || '图片预览'"
             class="preview-image"
             :style="previewImageStyle"
           />
+          <div v-else class="preview-loading">
+            <a-spin size="large" />
+            <p>图片加载中...</p>
+          </div>
         </div>
         
         <!-- 操作按钮 -->
         <div class="preview-actions">
           <a-button 
+            v-if="currentPreviewImage"
             type="primary" 
             size="large"
             :loading="currentPreviewImage.saving"
             @click="saveToMaterial(currentPreviewImage)"
           >
-            <template #icon>
-              <DownloadOutlined />
-            </template>
-            保存素材
-          </a-button>
-          
-          <a-button 
-            size="large"
-            :loading="currentPreviewImage.adding"
-            @click="addToAsset(currentPreviewImage)"
-          >
-            <template #icon>
-              <PlusOutlined />
-            </template>
-            加入素材集
+            <DownloadOutlined /> 保存到素材库
           </a-button>
         </div>
       </div>
@@ -307,14 +312,18 @@ const handleKeyDown = (e) => {
 
 // 滚动事件处理 - 实现无限滚动
 const handleScroll = () => {
-  if (loadingMore.value || noMoreData.value || !hasSearched.value) return
+  if (loadingMore.value || noMoreData.value || !hasSearched.value) {
+    return
+  }
   
   const scrollTop = window.pageYOffset || document.documentElement.scrollTop
   const windowHeight = window.innerHeight
   const documentHeight = document.documentElement.scrollHeight
   
-  // 当滚动到距离底部100px时开始加载更多
-  if (scrollTop + windowHeight >= documentHeight - 100) {
+  const distanceFromBottom = documentHeight - (scrollTop + windowHeight)
+  
+  // 当滚动到距离底部200px时开始加载更多
+  if (distanceFromBottom <= 200) {
     loadMoreImages()
   }
 }
@@ -582,26 +591,49 @@ const handleSearch = async () => {
   }
 }
 
-// 修改loadMoreImages函数（如果存在的话）
+// 修改loadMoreImages函数
 const loadMoreImages = async () => {
-  if (loadingMore.value || noMoreData.value) return
+  console.log('loadMoreImages 被调用', {
+    loadingMore: loadingMore.value,
+    noMoreData: noMoreData.value,
+    allUrlsLength: allUrls.value.length,
+    searchResultsLength: searchResults.value.length
+  })
+  
+  if (loadingMore.value || noMoreData.value || !allUrls.value.length) {
+    console.log('loadMoreImages 被阻止:', {
+      loadingMore: loadingMore.value,
+      noMoreData: noMoreData.value,
+      allUrlsLength: allUrls.value.length
+    })
+    return
+  }
   
   loadingMore.value = true
+  console.log('开始加载更多图片...')
   
   try {
     const startIndex = searchResults.value.length
-    const endIndex = Math.min(startIndex + 12, allUrls.value.length) // 每次加载12张
+    const endIndex = Math.min(startIndex + 12, allUrls.value.length)
+    
+    console.log('加载范围:', { startIndex, endIndex, totalUrls: allUrls.value.length })
     
     if (startIndex >= allUrls.value.length) {
+      console.log('已到达最后，设置 noMoreData = true')
       noMoreData.value = true
       return
     }
     
     const nextBatch = allUrls.value.slice(startIndex, endIndex)
+    console.log('准备加载的图片批次:', nextBatch.length)
+    
     await processImageUrlsWithAddress(nextBatch, searchKeyword.value)
+    
+    console.log('图片批次加载完成，当前总数:', searchResults.value.length)
     
     // 检查是否还有更多数据
     if (endIndex >= allUrls.value.length) {
+      console.log('所有图片已加载完成，设置 noMoreData = true')
       noMoreData.value = true
     }
   } catch (error) {
@@ -609,16 +641,87 @@ const loadMoreImages = async () => {
     message.error('加载更多图片失败')
   } finally {
     loadingMore.value = false
+    console.log('loadMoreImages 完成，loadingMore 设置为 false')
   }
 }
 
 // 保留这些函数定义，但删除上面的重复变量声明
 
-// 关闭预览
+// 关闭图片预览
+const openPreview = (image, index) => {
+  if (!image || (!image.base64 && !image.url)) {
+    message.warning('图片还在加载中，请稍后再试')
+    return
+  }
+  
+  currentPreviewIndex.value = index
+  currentPreviewImage.value = image
+  previewVisible.value = true
+}
+
+// 显示上一张图片
+const showPrevImage = () => {
+  if (searchResults.value.length <= 1) return
+  
+  currentPreviewIndex.value = currentPreviewIndex.value > 0 
+    ? currentPreviewIndex.value - 1 
+    : searchResults.value.length - 1
+  
+  currentPreviewImage.value = searchResults.value[currentPreviewIndex.value]
+}
+
+// 显示下一张图片
+const showNextImage = () => {
+  if (searchResults.value.length <= 1) return
+  
+  currentPreviewIndex.value = currentPreviewIndex.value < searchResults.value.length - 1 
+    ? currentPreviewIndex.value + 1 
+    : 0
+  
+  currentPreviewImage.value = searchResults.value[currentPreviewIndex.value]
+}
+
+// 关闭图片预览
 const closePreview = () => {
   previewVisible.value = false
+  currentPreviewImage.value = null
   currentPreviewIndex.value = -1
 }
+
+// 保存图片到素材库
+const saveToMaterial = async (image) => {
+  if (!image || (!image.base64 && !image.url)) {
+    message.warning('图片数据无效')
+    return
+  }
+  
+  image.saving = true
+  
+  try {
+    const imageData = {
+      url: image.url,
+      base64: image.base64,
+      keyword: image.keyword,
+      name: `搜索图片_${image.keyword}_${Date.now()}`
+    }
+    
+    const response = await saveImageToMaterial(imageData)
+    
+    if (response?.code === 0) {
+      message.success('保存成功')
+    } else {
+      message.error(response?.message || '保存失败')
+    }
+  } catch (error) {
+    console.error('保存图片失败:', error)
+    message.error('保存失败，请稍后重试')
+  } finally {
+    image.saving = false
+  }
+}
+
+// 添加当前正在添加的图片变量
+const currentAddingImage = ref(null)
 
 // 确认添加到素材集
 const confirmAddToAsset = async () => {
@@ -822,50 +925,85 @@ const loadAssetOptions = async () => {
   color: #666;
 }
 
+.load-more-section {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.load-more-btn {
+  min-width: 120px;
+}
+
 .no-more-data {
   text-align: center;
   padding: 20px 0;
 }
 
-/* 预览模态框样式 */
-.image-preview-modal {
-  top: 20px;
+/* 图片预览模态框样式 */
+.image-preview-modal :deep(.ant-modal-body) {
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-width: 90vw;
 }
 
-.image-preview-modal .ant-modal-content {
-  background: #fff;
-  border-radius: 8px;
+.image-preview-modal :deep(.ant-modal-content) {
+  background-color: transparent;
+  box-shadow: none;
 }
 
 .preview-container {
   position: relative;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 400px;
+  justify-content: center;
+}
+
+.preview-image-wrapper {
+  position: relative;
+  max-width: 90vw;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  background-color: #fff;
+  padding: 8px;
 }
 
 .preview-nav {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 10;
-  font-size: 32px;
-  color: #1890ff;
   cursor: pointer;
-  transition: all 0.3s ease;
-  background: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(0, 0, 0, 0.3);
   border-radius: 50%;
   width: 48px;
   height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-size: 24px;
+  transition: all 0.3s ease;
+  z-index: 10;
 }
 
 .preview-nav:hover {
-  color: #40a9ff;
+  color: rgba(255, 255, 255, 1);
+  background: rgba(0, 0, 0, 0.5);
   transform: translateY(-50%) scale(1.1);
 }
 
@@ -877,29 +1015,28 @@ const loadAssetOptions = async () => {
   right: 20px;
 }
 
-.preview-image-wrapper {
-  flex: 1;
+.preview-actions {
+  margin-top: 20px;
   display: flex;
-  align-items: center;
+  gap: 16px;
   justify-content: center;
-  padding: 20px;
-}
-
-.preview-image {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 12px 20px;
   border-radius: 4px;
 }
 
-.preview-actions {
+.preview-loading {
   display: flex;
-  gap: 16px;
-  padding: 20px;
-  border-top: 1px solid #f0f0f0;
-  background: #fafafa;
-  width: 100%;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  height: 200px;
+  color: #666;
+}
+
+.preview-loading p {
+  margin-top: 16px;
+  margin-bottom: 0;
 }
 
 /* 响应式设计 */
