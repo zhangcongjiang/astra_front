@@ -227,17 +227,61 @@ const fetchUserInfo = async () => {
     if (response.code === 0) {
       userInfo.value = response.data
       
-      // 更新统计数据
-      stats.value[0].value = response.data.img_count.toString()
-      stats.value[1].value = response.data.sound_count.toString()
-      stats.value[2].value = response.data.article_count.toString()
-      stats.value[3].value = response.data.video_asset_count.toString()
-      stats.value[4].value = response.data.asset_count.toString()
-      stats.value[5].value = response.data.video_draft_count.toString()
+      // 先将所有统计数据重置为0
+      stats.value.forEach(stat => {
+        stat.value = '0'
+      })
+      
+      // 目标数据
+      const targetValues = [
+        response.data.img_count,
+        response.data.sound_count,
+        response.data.article_count,
+        response.data.video_asset_count,
+        response.data.asset_count,
+        response.data.video_draft_count
+      ]
+      
+      // 启动动画
+      animateNumbers(targetValues)
     }
   } catch (error) {
     console.error('获取用户信息失败:', error)
   }
+}
+
+// 数字动画函数
+const animateNumbers = (targetValues) => {
+  const duration = 2000 // 2秒
+  const startTime = Date.now()
+  const startValues = new Array(targetValues.length).fill(0)
+  
+  const animate = () => {
+    const elapsed = Date.now() - startTime
+    const progress = Math.min(elapsed / duration, 1)
+    
+    // 使用缓动函数让动画更自然
+    const easeOutQuart = 1 - Math.pow(1 - progress, 4)
+    
+    // 更新每个统计数据
+    targetValues.forEach((target, index) => {
+      const current = Math.floor(startValues[index] + (target - startValues[index]) * easeOutQuart)
+      stats.value[index].value = current.toString()
+    })
+    
+    // 如果动画未完成，继续下一帧
+    if (progress < 1) {
+      requestAnimationFrame(animate)
+    } else {
+      // 确保最终值准确
+      targetValues.forEach((target, index) => {
+        stats.value[index].value = target.toString()
+      })
+    }
+  }
+  
+  // 开始动画
+  requestAnimationFrame(animate)
 }
 
 // 方法
