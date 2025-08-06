@@ -261,9 +261,8 @@ import {
 } from '@ant-design/icons-vue'
 
 // API 导入
-// 修改API导入部分（大约在第218行）
-import { searchImages, saveImageToMaterial, imageAddress } from '@/api/modules/toolsApi'
-import { getAssetCollectionList, addItemToAsset } from '@/api/modules/assetApi'
+import { searchImages, saveImage, saveImageToAsset, imageAddress } from '@/api/modules/toolsApi'
+import { getAssetCollectionList } from '@/api/modules/assetApi'
 
 const router = useRouter()
 
@@ -791,7 +790,7 @@ const closePreview = () => {
 
 // 保存图片到素材库
 const saveToMaterial = async (image) => {
-  if (!image || (!image.base64 && !image.url)) {
+  if (!image || !image.url) {
     message.warning('图片数据无效')
     return
   }
@@ -799,14 +798,12 @@ const saveToMaterial = async (image) => {
   image.saving = true
   
   try {
+    // 根据后端API要求，只需要传递image_url
     const imageData = {
-      url: image.url,
-      base64: image.base64,
-      keyword: image.keyword,
-      name: `搜索图片_${image.keyword}_${Date.now()}`
+      image_url: image.url
     }
     
-    const response = await saveImageToMaterial(imageData)
+    const response = await saveImage(imageData)
     
     if (response?.code === 0) {
       message.success('保存成功')
@@ -831,14 +828,30 @@ const confirmAddToAsset = async () => {
     return
   }
   
+  if (!currentAddingImage.value || !currentAddingImage.value.url) {
+    message.warning('图片数据无效')
+    return
+  }
+  
   addingToAsset.value = true
   
   try {
-    // API调用逻辑
-    message.success('已添加到素材集')
-    assetModalVisible.value = false
-    selectedAssetId.value = null
-    currentImage.value = null
+    // 调用saveImageToAsset接口，传递image.url和asset_id
+    const imageData = {
+      image_url: currentAddingImage.value.url,
+      asset_id: selectedAssetId.value
+    }
+    
+    const response = await saveImageToAsset(imageData)
+    
+    if (response?.code === 0) {
+      message.success('已添加到素材集')
+      assetModalVisible.value = false
+      selectedAssetId.value = null
+      currentAddingImage.value = null
+    } else {
+      message.error(response?.message || '添加到素材集失败')
+    }
   } catch (error) {
     console.error('添加到素材集失败:', error)
     message.error('添加到素材集失败')
@@ -851,12 +864,17 @@ const confirmAddToAsset = async () => {
 const handleCancelAddToAsset = () => {
   assetModalVisible.value = false
   selectedAssetId.value = null
-  currentImage.value = null
+  currentAddingImage.value = null
 }
 
 
 // 添加到素材集的函数
 const addToAsset = (image) => {
+  if (!image || !image.url) {
+    message.warning('图片数据无效')
+    return
+  }
+  
   currentAddingImage.value = image
   assetModalVisible.value = true
   // 加载素材集列表
@@ -867,15 +885,22 @@ const addToAsset = (image) => {
 const loadAssetOptions = async () => {
   loadingAssets.value = true
   try {
-    // 这里应该调用实际的API来获取素材集列表
-    // const response = await api.getAssetList()
-    // assetOptions.value = response.data
+    // 调用getAssetCollectionList API，page_size设置为99
+    const params = {
+      page: 1,
+      page_size: 99
+    }
     
-    // 临时使用模拟数据
-    assetOptions.value = [
-      { id: 1, name: '默认素材集' },
-      { id: 2, name: '我的收藏' }
-    ]
+    const response = await getAssetCollectionList(params)
+    
+    if (response?.code === 0 && response?.data?.results) {
+      assetOptions.value = response.data.results.map(item => ({
+        id: item.id,
+        set_name: item.set_name
+      }))
+    } else {
+      message.error('加载素材集列表失败')
+    }
   } catch (error) {
     console.error('加载素材集列表失败:', error)
     message.error('加载素材集列表失败')

@@ -42,12 +42,22 @@ export const imageAddress = async (data) => {
 };
 
 
-export const saveImageToMaterial = async (data) => {
+export const saveImageToAsset = async (data) => {
     try {
         const response = await request.post("/tool/image/add-to-asset/", data);
         return response;
     } catch (error) {
         console.error(`保存素材集失败:`, error);
+        throw error;
+    }
+};
+
+export const saveImage = async (data) => {
+    try {
+        const response = await request.post("/tool/image/save/", data);
+        return response;
+    } catch (error) {
+        console.error(`保存图片失败:`, error);
         throw error;
     }
 };
