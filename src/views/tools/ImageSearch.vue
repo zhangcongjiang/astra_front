@@ -103,7 +103,7 @@
                 <template #icon>
                   <DownloadOutlined />
                 </template>
-                保存素材
+                保存素材库
               </a-button>
               
               <a-button 
@@ -205,7 +205,7 @@
           @click="saveToMaterial(currentPreviewImage)"
           class="preview-action-btn save-btn"
         >
-          <DownloadOutlined /> 保存到素材库
+          <DownloadOutlined /> 保存素材库
         </a-button>
         
         <a-button 
