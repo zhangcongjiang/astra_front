@@ -92,12 +92,13 @@
             </div>
 
             <!-- 操作按钮 -->
-            <div style="display: flex; justify-content: space-between; margin-top: 8px;">
+            <div v-if="image.loaded && !image.loadError" class="image-actions">
               <a-button 
                 type="primary" 
                 size="small"
                 :loading="image.saving"
                 @click="saveToMaterial(image)"
+                class="action-btn save-btn"
               >
                 <template #icon>
                   <DownloadOutlined />
@@ -106,9 +107,11 @@
               </a-button>
               
               <a-button 
+                type="default"
                 size="small"
                 :loading="image.adding"
                 @click="addToAsset(image)"
+                class="action-btn asset-btn"
               >
                 <template #icon>
                   <PlusOutlined />
@@ -164,32 +167,57 @@
         </div>
         
         <!-- 图片显示区域 -->
-        <div class="preview-image-wrapper">
-          <img
-            v-if="currentPreviewImage && (currentPreviewImage.url || currentPreviewImage.base64)"
-            :src="currentPreviewImage.url || currentPreviewImage.base64"
-            :alt="currentPreviewImage.title || '图片预览'"
-            class="preview-image"
-            :style="previewImageStyle"
-          />
-          <div v-else class="preview-loading">
-            <a-spin size="large" />
-            <p>图片加载中...</p>
-          </div>
+      <div class="preview-image-wrapper">
+        <img
+          v-if="currentPreviewImage && (currentPreviewImage.url || currentPreviewImage.base64) && currentPreviewImage.loaded"
+          :src="currentPreviewImage.url || currentPreviewImage.base64"
+          :alt="currentPreviewImage.title || '图片预览'"
+          class="preview-image"
+          :style="previewImageStyle"
+        />
+        <div v-else-if="currentPreviewImage && currentPreviewImage.loading" class="preview-loading">
+          <a-spin size="large" />
+          <p>图片加载中...</p>
         </div>
+        <div v-else-if="currentPreviewImage && currentPreviewImage.loadError" class="preview-error">
+          <p>图片加载失败</p>
+        </div>
+      </div>
+      
+      <!-- 图片信息显示区域 - 只在图片加载成功时显示 -->
+      <div class="preview-info" v-if="currentPreviewImage && currentPreviewImage.loaded && !currentPreviewImage.loadError">
+        <div class="info-item">
+          <span class="info-label">尺寸：</span>
+          <span class="info-value">{{ currentPreviewImage.width }} × {{ currentPreviewImage.height }} 像素</span>
+        </div>
+        <div class="info-item" v-if="currentPreviewImage.fileSize > 0">
+          <span class="info-label">大小：</span>
+          <span class="info-value">{{ formatFileSize(currentPreviewImage.fileSize) }}</span>
+        </div>
+      </div>
+      
+      <!-- 操作按钮 - 只在图片加载成功时显示 -->
+      <div class="preview-actions" v-if="currentPreviewImage && currentPreviewImage.loaded && !currentPreviewImage.loadError">
+        <a-button 
+          type="primary" 
+          size="large"
+          :loading="currentPreviewImage.saving"
+          @click="saveToMaterial(currentPreviewImage)"
+          class="preview-action-btn save-btn"
+        >
+          <DownloadOutlined /> 保存到素材库
+        </a-button>
         
-        <!-- 操作按钮 -->
-        <div class="preview-actions">
-          <a-button 
-            v-if="currentPreviewImage"
-            type="primary" 
-            size="large"
-            :loading="currentPreviewImage.saving"
-            @click="saveToMaterial(currentPreviewImage)"
-          >
-            <DownloadOutlined /> 保存到素材库
-          </a-button>
-        </div>
+        <a-button 
+          type="default"
+          size="large"
+          :loading="currentPreviewImage.adding"
+          @click="addToAsset(currentPreviewImage)"
+          class="preview-action-btn asset-btn"
+        >
+          <PlusOutlined /> 加入素材集
+        </a-button>
+      </div>
       </div>
     </a-modal>
 
@@ -367,7 +395,10 @@ const processImageUrlsWithAddress = async (urls, keyword) => {
       loaded: false,
       loading: true,
       loadError: false,
-      retryCount: 0
+      retryCount: 0,
+      width: 0,
+      height: 0,
+      fileSize: 0
     })
     
     // 立即添加到结果中（显示加载状态）
@@ -386,6 +417,25 @@ const processImageUrlsWithAddress = async (urls, keyword) => {
   return processedImages
 }
 
+// 获取图片格式的函数
+const getImageMimeType = (url) => {
+  if (!url) return 'image/jpeg' // 默认值
+  
+  const extension = url.toLowerCase().split('.').pop()?.split('?')[0] // 移除查询参数
+  
+  const mimeTypes = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+    'bmp': 'image/bmp',
+    'svg': 'image/svg+xml'
+  }
+  
+  return mimeTypes[extension] || 'image/jpeg'
+}
+
 // 新增函数：加载单个图片数据
 // 修改loadSingleImageData函数，增加自动重试
 const loadSingleImageData = async (imageObj, index) => {
@@ -401,12 +451,20 @@ const loadSingleImageData = async (imageObj, index) => {
       
       // 更新图片对象
       imageObj.url = realUrl || imageObj.originalUrl
-      imageObj.base64 = base64Data ? `data:image/jpeg;base64,${base64Data}` : null
+      
+      // 根据原始URL确定正确的MIME类型
+      if (base64Data) {
+        const mimeType = getImageMimeType(imageObj.originalUrl)
+        imageObj.base64 = `data:${mimeType};base64,${base64Data}`
+      } else {
+        imageObj.base64 = null
+      }
       
       console.log('准备加载图片:', {
         id: imageObj.id,
         hasBase64: !!imageObj.base64,
-        url: imageObj.url
+        url: imageObj.url,
+        mimeType: base64Data ? getImageMimeType(imageObj.originalUrl) : 'N/A'
       })
       
       // 自动加载图片，带重试机制
@@ -429,6 +487,15 @@ const loadSingleImageData = async (imageObj, index) => {
   }
 }
 
+// 格式化文件大小
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '未知'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
 // 新增：带重试机制的图片加载函数
 // 修改loadImageWithRetry函数
 const loadImageWithRetry = async (imageObj, maxRetries = 3) => {
@@ -438,11 +505,21 @@ const loadImageWithRetry = async (imageObj, maxRetries = 3) => {
         const img = new Image()
         
         img.onload = () => {
+          // 获取图片尺寸信息
+          imageObj.width = img.naturalWidth
+          imageObj.height = img.naturalHeight
+          
+          // 估算文件大小（如果有base64数据）
+          if (imageObj.base64) {
+            const base64Data = imageObj.base64.split(',')[1]
+            imageObj.fileSize = Math.round((base64Data.length * 3) / 4) // base64解码后的大小
+          }
+          
           // 确保状态正确更新
           imageObj.loaded = true
           imageObj.loading = false
           imageObj.loadError = false
-          console.log(`图片加载成功 (尝试 ${attempt + 1}/${maxRetries}): ${imageObj.url}`)
+          console.log(`图片加载成功 (尺寸: ${imageObj.width}x${imageObj.height}): ${imageObj.url}`)
           resolve()
         }
         
@@ -454,15 +531,13 @@ const loadImageWithRetry = async (imageObj, maxRetries = 3) => {
         // 设置超时
         setTimeout(() => {
           reject(new Error('图片加载超时'))
-        }, 10000) // 10秒超时
+        }, 10000)
         
         // 优先使用base64，如果没有则使用url
         const imgSrc = imageObj.base64 || imageObj.url
-        console.log('开始加载图片:', imgSrc)
         img.src = imgSrc
       })
       
-      // 加载成功，跳出重试循环
       return
     } catch (error) {
       console.error(`图片加载失败 (尝试 ${attempt + 1}/${maxRetries}):`, error)
@@ -663,10 +738,23 @@ const openPreview = (image, index) => {
 const showPrevImage = () => {
   if (searchResults.value.length <= 1) return
   
-  currentPreviewIndex.value = currentPreviewIndex.value > 0 
-    ? currentPreviewIndex.value - 1 
-    : searchResults.value.length - 1
+  let nextIndex = currentPreviewIndex.value
+  let attempts = 0
+  const maxAttempts = searchResults.value.length
   
+  do {
+    nextIndex = nextIndex > 0 
+      ? nextIndex - 1 
+      : searchResults.value.length - 1
+    attempts++
+    
+    // 防止无限循环，如果所有图片都加载失败
+    if (attempts >= maxAttempts) {
+      break
+    }
+  } while (searchResults.value[nextIndex].loadError && attempts < maxAttempts)
+  
+  currentPreviewIndex.value = nextIndex
   currentPreviewImage.value = searchResults.value[currentPreviewIndex.value]
 }
 
@@ -674,10 +762,23 @@ const showPrevImage = () => {
 const showNextImage = () => {
   if (searchResults.value.length <= 1) return
   
-  currentPreviewIndex.value = currentPreviewIndex.value < searchResults.value.length - 1 
-    ? currentPreviewIndex.value + 1 
-    : 0
+  let nextIndex = currentPreviewIndex.value
+  let attempts = 0
+  const maxAttempts = searchResults.value.length
   
+  do {
+    nextIndex = nextIndex < searchResults.value.length - 1 
+      ? nextIndex + 1 
+      : 0
+    attempts++
+    
+    // 防止无限循环，如果所有图片都加载失败
+    if (attempts >= maxAttempts) {
+      break
+    }
+  } while (searchResults.value[nextIndex].loadError && attempts < maxAttempts)
+  
+  currentPreviewIndex.value = nextIndex
   currentPreviewImage.value = searchResults.value[currentPreviewIndex.value]
 }
 
@@ -867,9 +968,44 @@ const loadAssetOptions = async () => {
 }
 
 .image-actions {
-  padding: 8px;
-  text-align: center;
-  border-top: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+  gap: 8px;
+}
+
+.action-btn {
+  flex: 1;
+  height: 32px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.save-btn {
+  background: linear-gradient(135deg, #1890ff, #40a9ff);
+  border: none;
+}
+
+.save-btn:hover {
+  background: linear-gradient(135deg, #40a9ff, #69c0ff);
+}
+
+.asset-btn {
+  background: linear-gradient(135deg, #52c41a, #73d13d);
+  border: 1px solid #52c41a;
+  color: white;
+}
+
+.asset-btn:hover {
+  background: linear-gradient(135deg, #73d13d, #95de64);
+  border-color: #73d13d;
 }
 
 .loading-placeholder,
@@ -1016,13 +1152,54 @@ const loadAssetOptions = async () => {
 }
 
 .preview-actions {
-  margin-top: 20px;
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   gap: 16px;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 12px 20px;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 16px 24px;
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
+}
+
+.preview-action-btn {
+  min-width: 140px;
+  height: 40px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.preview-action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.preview-action-btn.save-btn {
+  background: linear-gradient(135deg, #1890ff, #40a9ff);
+  border: none;
+}
+
+.preview-action-btn.save-btn:hover {
+  background: linear-gradient(135deg, #40a9ff, #69c0ff);
+}
+
+.preview-action-btn.asset-btn {
+  background: linear-gradient(135deg, #52c41a, #73d13d);
+  border: 1px solid #52c41a;
+  color: white;
+}
+
+.preview-action-btn.asset-btn:hover {
+  background: linear-gradient(135deg, #73d13d, #95de64);
+  border-color: #73d13d;
 }
 
 .preview-loading {
@@ -1039,33 +1216,77 @@ const loadAssetOptions = async () => {
   margin-bottom: 0;
 }
 
+/* 在现有样式后面添加 */
+.preview-info {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  backdrop-filter: blur(4px);
+  z-index: 1001;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.info-item:last-child {
+  margin-bottom: 0;
+}
+
+.info-label {
+  font-weight: 500;
+  margin-right: 8px;
+  min-width: 40px;
+}
+
+.info-value {
+  color: #fff;
+}
+
+.preview-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #999;
+}
+
+.preview-error p {
+  margin: 0;
+  font-size: 16px;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .image-search-page {
-    padding: 16px;
-  }
-  
-  .search-header h2 {
-    font-size: 18px;
-  }
-  
-  .preview-nav {
-    font-size: 24px;
-    width: 40px;
-    height: 40px;
-  }
-  
-  .prev-btn {
-    left: 10px;
-  }
-  
-  .next-btn {
-    right: 10px;
-  }
-  
   .preview-actions {
     flex-direction: column;
     gap: 12px;
+    padding: 12px 16px;
+  }
+  
+  .preview-action-btn {
+    min-width: 120px;
+    height: 36px;
+    font-size: 13px;
+  }
+  
+  .image-actions {
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .action-btn {
+    height: 28px;
+    font-size: 12px;
   }
 }
 </style>
