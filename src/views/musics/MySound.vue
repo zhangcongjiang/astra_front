@@ -243,7 +243,7 @@ const fetchTtsList = async () => {
     loading.value = true;
     const params = {
       page: pagination.current,
-      page_size: pagination.pageSize,
+      pageSize: pagination.pageSize,
       ...searchForm
     };
     

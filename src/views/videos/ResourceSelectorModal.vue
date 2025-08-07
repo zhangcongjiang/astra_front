@@ -283,7 +283,7 @@ const hasAnyItems = computed(() => {
 const fetchAssetCollections = async () => {
   collectionsLoading.value = true;
   try {
-    const response = await getAssetCollectionList({ page_size: 100 });
+    const response = await getAssetCollectionList({ pageSize: 100 });
     // 适配API响应格式：使用response.data.results
     if (response && response.code === 0 && response.data && response.data.results) {
       assetCollections.value = response.data.results;
@@ -306,7 +306,7 @@ const fetchCollectionItems = async (collectionId) => {
   
   loading.value = true;
   try {
-    const response = await getAssetCollectionDetail(collectionId, { page_size: 1000 });
+    const response = await getAssetCollectionDetail(collectionId, { pageSize: 1000 });
     // 适配API响应格式：使用response.data
     if (response && response.code === 0 && response.data) {
       const data = response.data;

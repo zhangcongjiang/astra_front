@@ -315,7 +315,7 @@ const fetchMusicList = async (params = {}) => {
     // 基础参数
     const baseParams = {
       page: pagination.current,
-      page_size: pagination.pageSize
+      pageSize: pagination.pageSize
     };
 
     // 根据搜索类型添加不同参数

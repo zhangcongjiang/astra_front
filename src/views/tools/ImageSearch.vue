@@ -885,10 +885,10 @@ const addToAsset = (image) => {
 const loadAssetOptions = async () => {
   loadingAssets.value = true
   try {
-    // 调用getAssetCollectionList API，page_size设置为99
+    // 调用getAssetCollectionList API，pageSize设置为99
     const params = {
       page: 1,
-      page_size: 99
+      pageSize: 99
     }
     
     const response = await getAssetCollectionList(params)

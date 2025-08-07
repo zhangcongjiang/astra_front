@@ -106,7 +106,7 @@ export const fetchRemoteData = async (url) => {
 
 /**
  * 获取视频模板列表。
- * @param {object} params - 查询参数，例如 { page: 1, page_size: 10, name: '', orientation: '', tag_id: '' }。
+ * @param {object} params - 查询参数，例如 { page: 1, pageSize: 10, name: '', orientation: '', tag_id: '' }。
  * @returns {Promise<object>} - 返回模板列表数据。
  */
 export const getVideoTemplates = async (params = {}) => {
@@ -181,7 +181,7 @@ export const uploadVideoAsset = async (data) => {
 
 /**
  * 获取视频素材列表
- * @param {object} params - 查询参数，例如 { page: 1, page_size: 10, name: '' }
+ * @param {object} params - 查询参数，例如 { page: 1, pageSize: 10, name: '' }
  * @returns {Promise<object>} - 返回视频素材列表数据
  */
 export const getVideoAssetList = async (params = {}) => {

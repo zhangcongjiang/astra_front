@@ -51,7 +51,12 @@
         </div>
 
         <div class="action-area">
-            <a-button type="primary" @click="syncAudio" style="float: right;">
+            <a-button 
+                type="primary" 
+                @click="syncAudio" 
+                :loading="syncLoading"
+                style="float: right;"
+            >
                 <sync-outlined /> 同步音频
             </a-button>
         </div>
@@ -132,9 +137,16 @@
             </a-table>
 
             <!-- 将试听模态框移到表格外部 -->
-            <a-modal v-model:visible="previewModalVisible" title="试听选项" width="600px" :footer="null"
+            <a-modal v-model:visible="previewModalVisible" title="" width="600px" :footer="null"
                 :maskClosable="false">
                 <a-card :bordered="false">
+                    <!-- 修改朗读者信息显示 -->
+                    <div class="speaker-info" style="margin-bottom: 16px; padding: 12px; background: #f5f5f5; border-radius: 6px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 16px; font-weight: 600; color: #1890ff;">试听：{{ currentPreviewRecord?.name || '未选择' }}</span>
+                        </div>
+                    </div>
+                    
                     <a-form layout="vertical">
                         <a-form-item label="试听文本">
                             <a-textarea v-model:value="previewText" :rows="4" placeholder="请输入试听文本" />
@@ -142,7 +154,6 @@
 
                         <div class="preview-options">
                             <div class="option-description">
-
                                 <a-button type="primary" @click="previewVoice(currentPreviewRecord, true)"
                                     :loading="previewLoading">
                                     <play-circle-outlined /> 试听音色
@@ -153,7 +164,6 @@
                             </div>
 
                             <div class="option-description">
-
                                 <a-button @click="previewVoice(currentPreviewRecord, false)" :loading="previewLoading">
                                     <play-circle-outlined /> 试听文本
                                 </a-button>
@@ -329,7 +339,7 @@ const fetchSpeakerList = async () => {
     try {
         const params = {
             page: pagination.current,
-            page_size: pagination.pageSize,
+            pageSize: pagination.pageSize,
             name: basicForm.reader,
             language: basicForm.language || undefined,
             emotion: basicForm.emotion || undefined
@@ -377,7 +387,9 @@ const handlePaginationChange = ({ current, pageSize }) => {
 const previewModalVisible = ref(false);
 const previewText = ref('欢迎使用语音合成系统，这是一个默认的试听文本。');
 const currentPreviewRecord = ref(null);
+// 在其他ref变量附近添加（大约在第380行附近）
 const previewLoading = ref(false);
+const syncLoading = ref(false); // 新增同步音频的loading状态
 
 const showPreviewModal = (record) => {
     currentPreviewRecord.value = record;
@@ -400,16 +412,14 @@ const previewVoice = async (record, isDefault = true) => {
         // 检查响应结构并获取 file_path
         if (response && response.data && response.data.file_path) {
             const filePath = response.data.file_path;
-            // 根据 file_path 去后端获取音频文件
             console.log('准备播放的文件路径:', filePath);
-            const audioResponse = await request({
-                method: 'get',
-                url: `/${filePath}`,
-                responseType: 'arraybuffer' // 获取二进制数据
-            });
-
+            
+            // 直接使用 fetch API，避免 baseURL 问题
+            const audioResponse = await fetch(filePath);
+            const arrayBuffer = await audioResponse.arrayBuffer();
+            
             // 音频播放逻辑
-            const blob = new Blob([audioResponse], { type: 'audio/wav' });
+            const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
             const audioUrl = URL.createObjectURL(blob);
             const audio = new Audio(audioUrl);
             audio.play();
@@ -432,6 +442,7 @@ const previewVoice = async (record, isDefault = true) => {
 
 // 添加同步音频功能
 const syncAudio = async () => {
+    syncLoading.value = true; // 开始loading
     try {
         const response = await syncSpeakerAudio(); // 需要添加对应的API方法
         if (response.code === 0) {
@@ -443,6 +454,8 @@ const syncAudio = async () => {
     } catch (error) {
         console.error('同步音频出错:', error);
         message.error('同步音频出错');
+    } finally {
+        syncLoading.value = false; // 结束loading
     }
 };
 

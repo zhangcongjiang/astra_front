@@ -12,7 +12,7 @@ const BASE_URL = '/api';
 // 创建axios实例
 const instance = axios.create({
   baseURL: BASE_URL, // api的基准URL
-  timeout: 10000, // 请求超时时间
+  timeout: 160000, // 请求超时时间
   withCredentials: true, // 重要：允许携带cookie进行session认证
   headers: { // 默认请求头
     'Content-Type': 'application/json',

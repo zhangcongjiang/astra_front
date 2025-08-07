@@ -182,7 +182,7 @@ const fetchTemplates = async () => {
         // 构建查询参数
         const params = {
             page: pagination.current,
-            page_size: pagination.pageSize
+            pageSize: pagination.pageSize
         };
         
         // 基础查询参数

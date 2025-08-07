@@ -148,7 +148,7 @@ const loadAssetList = async () => {
   try {
     const params = {
       page: currentPage.value,
-      page_size: pageSize.value,
+      pageSize: pageSize.value,
       keyword: searchForm.value.keyword || undefined,
       creator: searchForm.value.creator || undefined
     }

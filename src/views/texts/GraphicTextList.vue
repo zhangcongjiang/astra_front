@@ -254,7 +254,7 @@ const fetchData = async () => {
     // 构建查询参数
     const params = {
       page: pagination.current,
-      page_size: pagination.pageSize
+      pageSize: pagination.pageSize
     };
     
     // 添加搜索条件

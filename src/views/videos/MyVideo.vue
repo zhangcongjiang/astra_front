@@ -83,7 +83,7 @@ const loadVideoList = async () => {
 
     const params = {
       page: pagination.current,
-      page_size: pagination.pageSize,
+      pageSize: pagination.pageSize,
       title: basicForm.title || undefined,
       start_time: basicForm.startTime ? dayjs(basicForm.startTime).format('YYYY-MM-DD HH:mm:ss') : undefined,
       end_time: basicForm.endTime ? dayjs(basicForm.endTime).format('YYYY-MM-DD HH:mm:ss') : undefined,
