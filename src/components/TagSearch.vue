@@ -130,7 +130,8 @@
     </div>
 
     <!-- 添加/编辑标签模态框 -->
-    <a-modal v-model:open="modalVisible">
+    <a-modal 
+      v-model:open="modalVisible"
       :title="currentTag ? '编辑标签' : '添加标签'"
       width="600px"
       :maskClosable="false"
