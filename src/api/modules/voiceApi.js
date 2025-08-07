@@ -157,7 +157,7 @@ export const updateSound = async (data) => {
 
 export const ttsPlay = async (ttsId) => {
     try {
-        const response = await request.get(`/voice/tts/play/?ttsId=${ttsId}`,)
+        const response = await request.get(`/voice/tts/play/?tts_id=${ttsId}`,)
         return response;
     } catch (error) {
         console.error(`音频播放失败:`, error);
