@@ -20,55 +20,108 @@
             </div>
 
             <!-- 新增任务模态框 -->
-            <!-- 修改 Modal 组件 -->
-            <a-modal v-model:open="addTaskModalVisible" title="新增任务" @ok="handleAddTask" @cancel="resetAddTaskForm">
-                <a-form :model="addTaskForm" :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
-                    <a-form-item label="任务名称">
-                        <a-input v-model:value="addTaskForm.name" placeholder="请输入任务名称" />
+            <a-modal v-model:open="addTaskModalVisible" title="新增任务" @ok="handleAddTask" @cancel="resetAddTaskForm" :confirmLoading="submitLoading">
+                <a-form :model="addTaskForm" :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" :rules="formRules" ref="formRef">
+                    <a-form-item label="任务名称" name="task_name">
+                        <a-input v-model:value="addTaskForm.task_name" placeholder="请输入任务名称" />
                     </a-form-item>
-                    <a-form-item label="初次执行时间">
-                        <a-date-picker v-model:value="addTaskForm.firstRunTime" show-time format="YYYY-MM-DD HH:mm:ss" />
+                    <a-form-item label="任务类型" name="task_type">
+                        <a-select v-model:value="addTaskForm.task_type" placeholder="请选择任务类型">
+                            <a-select-option value="date">定时任务</a-select-option>
+                            <a-select-option value="interval">周期性任务</a-select-option>
+                            <a-select-option value="manual">手动任务</a-select-option>
+                        </a-select>
                     </a-form-item>
-                    <!-- 修改运行周期配置 -->
-                    <a-form-item label="运行周期">
-                      <a-space>
-                        <a-input-number v-model:value="addTaskForm.intervalDay" :min="0" placeholder="天" />天
-                        <a-input-number v-model:value="addTaskForm.intervalHour" :min="0" :max="23" placeholder="小时" />时
-                        <a-input-number v-model:value="addTaskForm.intervalMinute" :min="0" :max="59" placeholder="分钟" />分
-                      </a-space>
+                    
+                    <!-- 定时任务：只显示执行时间 -->
+                    <a-form-item v-if="addTaskForm.task_type === 'date'" label="执行时间" name="execution_time">
+                        <a-date-picker v-model:value="addTaskForm.execution_time" show-time format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
                     </a-form-item>
-                    <a-form-item label="任务脚本">
-                        <a-upload v-model:file-list="addTaskForm.scriptFile" :before-upload="beforeUpload">
-                            <a-button>
-                                <upload-outlined></upload-outlined>
-                                点击上传
-                            </a-button>
+                    
+                    <!-- 周期性任务：显示初次执行时间和运行周期 -->
+                    <a-form-item v-if="addTaskForm.task_type === 'interval'" label="初次执行时间" name="first_run_time">
+                        <a-date-picker v-model:value="addTaskForm.first_run_time" show-time format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
+                    </a-form-item>
+                    <a-form-item v-if="addTaskForm.task_type === 'interval'" label="运行周期" name="run_cycle">
+                        <a-space>
+                            <a-input-number v-model:value="addTaskForm.intervalDay" :min="0" placeholder="天" />天
+                            <a-input-number v-model:value="addTaskForm.intervalHour" :min="0" :max="23" placeholder="小时" />时
+                            <a-input-number v-model:value="addTaskForm.intervalMinute" :min="0" :max="59" placeholder="分钟" />分
+                        </a-space>
+                    </a-form-item>
+                    
+                    <!-- 手动任务：显示是否携带参数 -->
+                    <a-form-item v-if="addTaskForm.task_type === 'manual'" label="是否携带参数" name="has_params">
+                        <a-radio-group v-model:value="addTaskForm.has_params">
+                            <a-radio :value="true">是</a-radio>
+                            <a-radio :value="false">否</a-radio>
+                        </a-radio-group>
+                    </a-form-item>
+                    
+                    <!-- 手动任务携带参数时显示参数输入框 -->
+                    <a-form-item v-if="addTaskForm.task_type === 'manual' && addTaskForm.has_params" label="任务参数" name="task_params">
+                        <a-textarea v-model:value="addTaskForm.task_params" placeholder="请输入任务参数，多个参数用换行分隔" :rows="3" />
+                    </a-form-item>
+                    
+                    <a-form-item label="任务描述">
+                        <a-textarea v-model:value="addTaskForm.description" placeholder="请输入任务描述" :rows="3" />
+                    </a-form-item>
+                    <a-form-item label="任务脚本" name="script_file">
+                        <a-upload 
+                            v-model:file-list="addTaskForm.scriptFileList" 
+                            :before-upload="beforeUpload" 
+                            :remove="handleRemoveFile" 
+                            accept=".py,.js,.sh,.bat"
+                            drag
+                            :multiple="false"
+                            :max-count="1"
+                            class="full-width-upload"
+                        >
+                            <div class="upload-drag-area">
+                                <p class="ant-upload-drag-icon">
+                                    <upload-outlined style="font-size: 48px; color: #1890ff;"></upload-outlined>
+                                </p>
+                                <p class="ant-upload-text">点击或拖拽文件到此区域上传</p>
+                                <p class="ant-upload-hint">
+                                    目前仅支持python3脚本，文件大小不超过10MB
+                                </p>
+                            </div>
                         </a-upload>
                     </a-form-item>
                 </a-form>
             </a-modal>
 
             <!-- 任务列表 -->
-            <!-- 修改 Table 组件 -->
-            <a-table :dataSource="currentPageTasks" :columns="columns" :pagination="false" :loading="loading" rowKey="id">
+            <a-table :columns="columns" :data-source="taskData" :loading="loading" :pagination="false"
+                :scroll="{ x: 1000 }" row-key="name">
                 <template #bodyCell="{ column, record, index }">
                     <template v-if="column.key === 'index'">
-                      {{ (pagination.current - 1) * pagination.pageSize + index + 1 }}
+                        {{ (pagination.current - 1) * pagination.pageSize + index + 1 }}
                     </template>
-                    <template v-if="column.key === 'lastResult'">
-                      <a-tag :color="getLastResultColor(record.lastResult)">
-                        {{ record.lastResult || '无' }}
-                      </a-tag>
+                    <template v-if="column.key === 'job_type'">
+                        <a-tag :color="getTaskTypeColor(record.job_type)">
+                            {{ getTaskTypeText(record.job_type) }}
+                        </a-tag>
                     </template>
                     <template v-if="column.key === 'status'">
-                      <a-switch :checked="record.status === '运行中'" checked-children="运行" un-checked-children="暂停"
-                        @change="toggleStatus(record)" />
+                        <a-switch :checked="record.is_active" checked-children="启用" un-checked-children="禁用"
+                            @change="toggleStatus(record)" :loading="record.statusLoading" />
                     </template>
+                    <template v-if="column.key === 'created_at'">
+                        {{ formatDateTime(record.created_at) }}
+                    </template>
+                  
                     <template v-if="column.key === 'action'">
-                      <a-button type="link" size="small" @click="showDetail(record)">详情</a-button>
-                      <a-button type="link" size="small" danger @click="handleDelete(record)">删除</a-button>
+                        <a-space>
+                            <a-button type="link" size="small" @click="showDetail(record)">详情</a-button>
+                            <a-button type="link" size="small" @click="editTask(record)">编辑</a-button>
+                            <a-button type="link" size="small" @click="handleExecuteTask(record)" :loading="record.executeLoading">
+                                执行
+                            </a-button>
+                            <a-button type="link" size="small" danger @click="handleDelete(record)" :loading="record.deleteLoading">删除</a-button>
+                        </a-space>
                     </template>
-                  </template>
+                </template>
             </a-table>
 
             <!-- 分页 -->
@@ -86,11 +139,21 @@ import { message } from 'ant-design-vue';
 import Pagination from '@/components/Pagination.vue';
 import { UploadOutlined } from '@ant-design/icons-vue';
 import { useRouter } from 'vue-router';
+// 在导入部分添加 excuteTask
+import { createTask, getTaskList, deleteTask, updateTaskStatus, excuteTask } from '@/api/modules/taskApi';
+import dayjs from 'dayjs';
 
 // 加载状态
 const loading = ref(false);
+const submitLoading = ref(false);
 const router = useRouter();
-
+const formRef = ref();
+// 在数据定义部分添加执行相关的状态
+// 执行任务相关状态
+const executeModalVisible = ref(false);
+const executeLoading = ref(false);
+const currentExecuteTask = ref(null);
+const executionArgs = ref('');
 // 搜索表单
 const searchForm = reactive({
     taskName: ''
@@ -104,101 +167,322 @@ const pagination = reactive({
 });
 
 // 表格列定义
-// 修改 columns 定义
 const columns = [
-  {
-    title: '序号',
-    key: 'index',
-    width: 60,
-    align: 'center'
-  },
-  {
-    title: '任务名称',
-    dataIndex: 'name',
-    key: 'name'
-  },
-  {
-    title: '上次执行结果',
-    key: 'lastResult',
-    width: 200
-  },
-  {
-    title: '下次启动时间',
-    dataIndex: 'nextRunTime',
-    key: 'nextRunTime'
-  },
-  {
-    title: '任务周期',
-    dataIndex: 'interval',
-    key: 'interval',
-    customRender: ({ text }) => {
-      const [day, hour, minute] = text.split(' ');
-      return `${day} ${hour} ${minute}`;
+    {
+        title: '序号',
+        key: 'index',
+        width: 60,
+        align: 'center'
+    },
+    {
+        title: '任务名称',
+        dataIndex: 'name',
+        key: 'name',
+        width: 150
+    },
+    {
+        title: '任务类型',
+        dataIndex: 'job_type',
+        key: 'job_type',
+        width: 100
+    },
+    {
+        title: '任务描述',
+        dataIndex: 'description',
+        key: 'description',
+        ellipsis: true
+    },
+    {
+        title: '状态',
+        key: 'status',
+        width: 100,
+        align: 'center'
+    },
+    {
+        title: '创建用户',
+        dataIndex: 'creator_name',
+        key: 'creator_name',
+        width: 120
+    },
+    {
+        title: '创建时间',
+        dataIndex: 'created_at',
+        key: 'created_at',
+        width: 180
+    },
+    {
+        title: '操作',
+        key: 'action',
+        width: 200,
+        align: 'center',
+        fixed: 'right'
     }
-  },
-  {
-    title: '状态',
-    key: 'status',
-    width: 120
-  },
-  {
-    title: '操作',
-    key: 'action',
-    width: 150,
-    align: 'center'
-  }
 ];
 
 // 任务数据
-const taskData = ref([
-    {
-        id: 1,
-        name: '数据备份',
-        nextRunTime: '2023-10-15 10:00:00',
-        interval: '0天 0小时 5分钟', // 修改为新的格式
-        lastResult: '成功',
-        status: '运行中'
-    },
-    // 更多示例数据...
-]);
+const taskData = ref([]);
 
 // 当前页显示的任务
 const currentPageTasks = computed(() => {
-    const start = (pagination.current - 1) * pagination.pageSize;
-    const end = start + pagination.pageSize;
-    return filteredTasks.value.slice(start, end);
+    return taskData.value;
 });
 
-// 过滤后的任务
-const filteredTasks = computed(() => {
-    const filtered = taskData.value.filter(task => {
-        return task.name.toLowerCase().includes(searchForm.taskName.toLowerCase());
-    });
-
-    pagination.total = filtered.length;
-    return filtered;
+// 新增任务相关状态
+const addTaskModalVisible = ref(false);
+// 新增任务表单数据
+const addTaskForm = reactive({
+    task_name: '',
+    task_type: '',
+    execution_time: null,        // 定时任务的执行时间
+    first_run_time: null,        // 周期性任务的初次执行时间
+    intervalDay: 0,
+    intervalHour: 0,
+    intervalMinute: 0,
+    has_params: false,           // 手动任务是否携带参数
+    task_params: '',             // 手动任务参数
+    description: '',
+    scriptFileList: [],
+    script_file: null
 });
+
+// 表单验证规则
+const formRules = {
+    task_name: [
+        { required: true, message: '请输入任务名称', trigger: 'blur' }
+    ],
+    task_type: [
+        { required: true, message: '请选择任务类型', trigger: 'change' }
+    ],
+    first_run_time: [
+        { required: true, message: '请选择初次执行时间', trigger: 'change' }
+    ]
+};
+
+// 显示新增任务模态框
+const showAddTaskModal = () => {
+    addTaskModalVisible.value = true;
+};
+
+// 处理新增任务
+const handleAddTask = async () => {
+    try {
+        // 表单验证
+        await formRef.value.validate();
+        
+        submitLoading.value = true;
+        
+        // 构建任务数据
+        const taskData = {
+            task_name: addTaskForm.task_name,
+            task_type: addTaskForm.task_type,
+            description: addTaskForm.description,
+            script_file: addTaskForm.script_file
+        };
+        
+        // 根据任务类型添加不同的字段
+        if (addTaskForm.task_type === 'date') {
+            // 定时任务
+            taskData.execution_time = dayjs(addTaskForm.execution_time).format('YYYY-MM-DD HH:mm:ss');
+        } else if (addTaskForm.task_type === 'interval') {
+            // 周期性任务
+            taskData.first_run_time = dayjs(addTaskForm.first_run_time).format('YYYY-MM-DD HH:mm:ss');
+            taskData.run_cycle = `${addTaskForm.intervalDay}天${addTaskForm.intervalHour}小时${addTaskForm.intervalMinute}分钟`;
+        } else if (addTaskForm.task_type === 'manual') {
+            // 手动任务
+            taskData.has_params = addTaskForm.has_params;  // 确保传递 has_params
+            if (addTaskForm.has_params) {
+                taskData.task_params = addTaskForm.task_params;
+            }
+        }
+        
+        // 确保脚本文件存在
+        if (!taskData.script_file) {
+            message.error('请上传任务脚本文件');
+            return;
+        }
+        
+        // 调用API创建任务
+        await createTask(taskData);
+        
+        message.success('任务创建成功');
+        addTaskModalVisible.value = false;
+        resetAddTaskForm();
+        
+        // 刷新任务列表
+        await fetchTasks();
+        
+    } catch (error) {
+        console.error('创建任务失败:', error);
+        if (error.name !== 'ValidateError') {
+            message.error('创建任务失败: ' + (error.message || '未知错误'));
+        }
+    } finally {
+        submitLoading.value = false;
+    }
+};
+
+// 获取任务类型颜色
+const getTaskTypeColor = (taskType) => {
+    const colorMap = {
+        'date': 'blue',
+        'interval': 'green', 
+        'manual': 'orange'
+    };
+    return colorMap[taskType] || 'default';
+};
+
+// 获取任务类型文本
+const getTaskTypeText = (taskType) => {
+    const textMap = {
+        'date': '定时任务',
+        'interval': '周期性任务',
+        'manual': '手动任务'
+    };
+    return textMap[taskType] || taskType;
+};
+
+
+// 获取执行状态颜色
+const getStatusColor = (status) => {
+    const colorMap = {
+        '未执行': 'default',
+        '执行中': 'processing',
+        '执行成功': 'success',
+        '执行失败': 'error'
+    };
+    return colorMap[status] || 'default';
+};
+
+// 格式化日期时间
+const formatDateTime = (dateTime) => {
+    if (!dateTime) return '-';
+    return dayjs(dateTime).format('YYYY-MM-DD HH:mm:ss');
+};
 
 // 切换任务状态
-const toggleStatus = (record) => {
-    record.status = record.status === '运行中' ? '暂停' : '运行中';
-    // 这里可以添加实际的API调用来更新状态
+const toggleStatus = async (record) => {
+    try {
+        record.statusLoading = true;
+        
+        const newStatus = !record.is_active;
+        await updateTaskStatus(record.id, newStatus ? 'active' : 'inactive');
+        
+        record.is_active = newStatus;
+        message.success('状态更新成功');
+        
+    } catch (error) {
+        message.error('状态更新失败: ' + (error.message || '未知错误'));
+        console.error('状态更新失败:', error);
+    } finally {
+        record.statusLoading = false;
+    }
+};
+
+
+// 添加执行任务相关的方法
+// 处理执行任务
+const handleExecuteTask = (record) => {
+    // 检查任务是否需要参数
+    if (record.need_args) {
+        // 需要参数，显示参数输入模态框
+        currentExecuteTask.value = record;
+        executionArgs.value = '';
+        executeModalVisible.value = true;
+    } else {
+        // 不需要参数，直接执行
+        executeTask(record, '');
+    }
+};
+
+// 确认执行任务（带参数）
+const confirmExecuteTask = () => {
+    if (currentExecuteTask.value) {
+        executeTask(currentExecuteTask.value, executionArgs.value);
+    }
+};
+
+// 取消执行任务
+const cancelExecuteTask = () => {
+    executeModalVisible.value = false;
+    currentExecuteTask.value = null;
+    executionArgs.value = '';
+};
+
+// 执行任务的核心方法
+const executeTask = async (record, args = '') => {
+    try {
+        // 设置按钮加载状态
+        record.executeLoading = true;
+        executeLoading.value = true;
+        
+        const executeData = {
+            task_id: record.id,
+            execution_args: args
+        };
+        
+        const response = await excuteTask(executeData);
+        
+        // 关闭模态框
+        if (executeModalVisible.value) {
+            executeModalVisible.value = false;
+            currentExecuteTask.value = null;
+            executionArgs.value = '';
+        }
+        
+        // 显示执行结果
+        if (response.data.status === 'success') {
+            message.success(`任务执行成功！\n输出：${response.data.output || '无输出'}`);
+        } else {
+            message.error(`任务执行失败！\n错误：${response.data.error || '未知错误'}`);
+        }
+        
+        // 刷新任务列表
+        await fetchTasks();
+        
+    } catch (error) {
+        message.error('执行任务失败: ' + (error.message || '未知错误'));
+        console.error('执行任务失败:', error);
+        
+        // 关闭模态框
+        if (executeModalVisible.value) {
+            executeModalVisible.value = false;
+            currentExecuteTask.value = null;
+            executionArgs.value = '';
+        }
+    } finally {
+        record.executeLoading = false;
+        executeLoading.value = false;
+    }
 };
 
 // 查看任务详情
-// 修改 showDetail 方法
 const showDetail = (record) => {
-  router.push(`/tasks/${record.id}`);
+    router.push(`/tasks/${record.id}`);
 };
 
 // 删除任务
-const handleDelete = (record) => {
-    console.log('删除任务', record);
+const handleDelete = async (record) => {
+    try {
+        record.deleteLoading = true;
+        
+        await deleteTask(record.id);
+        message.success('任务删除成功');
+        
+        // 刷新任务列表
+        await fetchTasks();
+        
+    } catch (error) {
+        message.error('删除任务失败: ' + (error.message || '未知错误'));
+        console.error('删除任务失败:', error);
+    } finally {
+        record.deleteLoading = false;
+    }
 };
 
 // 处理搜索
 const handleSearch = () => {
     pagination.current = 1;
+    fetchTasks();
 };
 
 // 重置搜索
@@ -207,82 +491,109 @@ const resetSearch = () => {
     handleSearch();
 };
 
-// 新增任务相关状态
-const addTaskModalVisible = ref(false);
-const addTaskForm = reactive({
-    name: '',
-    firstRunTime: null,
-    intervalDay: 0,
-    intervalHour: 0,
-    intervalMinute: 0,
-    scriptFile: []
-});
-
-// 显示新增任务模态框
-const showAddTaskModal = () => {
-    addTaskModalVisible.value = true;
-};
-
-// 处理新增任务
-const handleAddTask = () => {
-    // 这里添加实际的新增任务逻辑
-    console.log('新增任务', addTaskForm);
-    addTaskModalVisible.value = false;
-};
-
-// 重置新增任务表单
-const resetAddTaskForm = () => {
-    addTaskForm.name = '';
-    addTaskForm.firstRunTime = null;
-    addTaskForm.interval = '';
-    addTaskForm.scriptFile = [];
-};
-
-// 文件上传前的处理
-const beforeUpload = (file) => {
-    // 这里可以添加文件验证逻辑
-    return false; // 返回false阻止自动上传
-};
-
 // 获取任务列表
 const fetchTasks = async () => {
     try {
         loading.value = true;
-        // 这里替换为实际的API调用
-        // const response = await api.getTasks({
-        //   page: pagination.value.current,
-        //   pageSize: pagination.value.pageSize,
-        //   keyword: searchKeyword.value
-        // });
-        // taskData.value = response.data;
-        // pagination.value.total = response.total;
-
-        // 模拟数据
-        pagination.total = taskData.value.length;
+        
+        const params = {
+            page: pagination.current,
+            pageSize: pagination.pageSize,
+            task_name: searchForm.taskName || undefined
+        };
+        
+        const response = await getTaskList(params);
+        
+        // 修复：正确获取任务列表数据
+        taskData.value = response.data?.results || [];
+        pagination.total = response.data?.count || 0;
+        
     } catch (error) {
-        message.error('获取任务列表失败');
-        console.error(error);
+        message.error('获取任务列表失败: ' + (error.message || '未知错误'));
+        console.error('获取任务列表失败:', error);
     } finally {
         loading.value = false;
     }
+};
+
+// 获取上次执行结果颜色的方法
+const getLastResultColor = (result) => {
+    const resultMap = {
+        '成功': 'green',
+        '失败': 'red',
+        'success': 'green',
+        'failed': 'red'
+    };
+    return resultMap[result] || 'default';
 };
 
 // 初始化
 onMounted(() => {
     fetchTasks();
 });
-
-// 获取上次执行结果颜色的方法
-const getLastResultColor = (result) => {
-  const resultMap = {
-    '成功': 'green',
-    '失败': 'red'
-  };
-  return resultMap[result] || 'default';
-};
 </script>
 
 <style scoped>
+/* 确保上传组件与其他表单项宽度一致 */
+.full-width-upload {
+    width: 100%;
+}
+
+.full-width-upload .ant-upload.ant-upload-drag {
+    width: 100%;
+}
+
+.upload-drag-area {
+    padding: 20px;
+    text-align: center;
+    background: #fafafa;
+    border: 1px dashed #d9d9d9;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.3s;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.upload-drag-area:hover {
+    border-color: #1890ff;
+}
+
+.ant-upload-text {
+    margin: 0 0 4px;
+    color: rgba(0, 0, 0, 0.85);
+    font-size: 16px;
+}
+
+.ant-upload-hint {
+    margin: 0;
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 14px;
+}
+
+.ant-upload-drag-icon {
+    margin-bottom: 16px;
+}
+
+/* 拖拽时的样式 */
+.ant-upload.ant-upload-drag.ant-upload-drag-hover {
+    border-color: #1890ff;
+}
+
+.ant-upload.ant-upload-drag.ant-upload-drag-hover .upload-drag-area {
+    border-color: #1890ff;
+    background: #f0f8ff;
+}
+
+/* 确保表单项标签对齐 */
+.ant-form-item {
+    margin-bottom: 24px;
+}
+
+.ant-form-item-label {
+    text-align: left;
+}
+
 .content-container {
     padding: 24px;
 }
@@ -307,4 +618,13 @@ const getLastResultColor = (result) => {
     margin-bottom: 24px;
     text-align: right;
 }
+
+.upload-tip {
+    margin-top: 8px;
+    color: #999;
+    font-size: 12px;
+}
 </style>
+
+
+
