@@ -22,12 +22,12 @@
                             <a-select-option value="false">禁用</a-select-option>
                         </a-select>
                     </a-form-item>
-                    <a-form-item label="创建用户">
+                    <a-form-item label="用户">
                         <UserSelect 
-                            v-model="searchForm.creator" 
+                            v-model:value="searchForm.creator"
                             placeholder="选择用户" 
-                            :width="'120px'" 
-                            :allowClear="true"
+                            style="width: 120px" 
+                            allowClear
                         />
                     </a-form-item>
                     <a-form-item>
@@ -249,7 +249,7 @@ const columns = [
         align: 'center'
     },
     {
-        title: '创建用户',
+        title: '用户',
         dataIndex: 'creator_name',
         key: 'creator_name',
         width: 120
@@ -552,9 +552,14 @@ const handleDelete = async (record) => {
 };
 
 // 处理搜索
-const handleSearch = () => {
-    pagination.current = 1;
-    fetchTasks();
+const handleSearch = async () => {
+    try {
+        pagination.current = 1;
+        await fetchTasks();
+    } catch (error) {
+        console.error('搜索失败:', error);
+        message.error('搜索失败，请重试');
+    }
 };
 
 // 重置搜索
@@ -571,24 +576,45 @@ const fetchTasks = async () => {
     try {
         loading.value = true;
         
+        // 添加防护性检查
+        if (!searchForm) {
+            console.warn('searchForm is not available');
+            return;
+        }
+        
         const params = {
             page: pagination.current,
             pageSize: pagination.pageSize,
-            name: searchForm.taskName || undefined,
-            job_type: searchForm.taskType || undefined,     // 新增：任务类型参数
-            is_active: searchForm.status || undefined,      // 新增：启用状态参数
-            creator: searchForm.creator || undefined        // 新增：创建用户参数
+            task_name: searchForm.taskName || undefined,
+            job_type: searchForm.taskType || undefined,
+            is_active: searchForm.status || undefined,
+            creator: searchForm.creator || undefined
         };
+        
+        // 清理undefined值
+        Object.keys(params).forEach(key => {
+            if (params[key] === undefined || params[key] === '') {
+                delete params[key];
+            }
+        });
         
         const response = await getTaskList(params);
         
-        // 修复：正确获取任务列表数据
-        taskData.value = response.data?.results || [];
-        pagination.total = response.data?.count || 0;
+        // 确保响应数据存在
+        if (response && response.data) {
+            taskData.value = response.data.results || [];
+            pagination.total = response.data.count || 0;
+        } else {
+            taskData.value = [];
+            pagination.total = 0;
+        }
         
     } catch (error) {
         message.error('获取任务列表失败: ' + (error.message || '未知错误'));
         console.error('获取任务列表失败:', error);
+        // 确保在错误情况下也有默认值
+        taskData.value = [];
+        pagination.total = 0;
     } finally {
         loading.value = false;
     }
