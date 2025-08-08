@@ -7,6 +7,29 @@
                     <a-form-item label="任务名称">
                         <a-input v-model:value="searchForm.taskName" placeholder="输入任务名称" @pressEnter="handleSearch" />
                     </a-form-item>
+                    <a-form-item label="任务类型">
+                        <a-select v-model:value="searchForm.taskType" placeholder="选择任务类型" style="width: 120px" allowClear>
+                            <a-select-option value="">全部</a-select-option>
+                            <a-select-option value="date">定时任务</a-select-option>
+                            <a-select-option value="interval">周期性任务</a-select-option>
+                            <a-select-option value="manual">手动任务</a-select-option>
+                        </a-select>
+                    </a-form-item>
+                    <a-form-item label="启用状态">
+                        <a-select v-model:value="searchForm.status" placeholder="选择状态" style="width: 120px" allowClear>
+                            <a-select-option value="">全部</a-select-option>
+                            <a-select-option value="true">启用</a-select-option>
+                            <a-select-option value="false">禁用</a-select-option>
+                        </a-select>
+                    </a-form-item>
+                    <a-form-item label="创建用户">
+                        <UserSelect 
+                            v-model="searchForm.creator" 
+                            placeholder="选择用户" 
+                            :width="'120px'" 
+                            :allowClear="true"
+                        />
+                    </a-form-item>
                     <a-form-item>
                         <a-button type="primary" @click="handleSearch">查询</a-button>
                         <a-button @click="resetSearch">重置</a-button>
@@ -161,10 +184,10 @@ import { message } from 'ant-design-vue';
 import Pagination from '@/components/Pagination.vue';
 import { UploadOutlined } from '@ant-design/icons-vue';
 import { useRouter } from 'vue-router';
-// 在导入部分添加 excuteTask
+// 导入UserSelect组件
+import UserSelect from '@/components/UserSelect.vue';
 import { createTask, getTaskList, deleteTask, updateTaskStatus, excuteTask } from '@/api/modules/taskApi';
 import dayjs from 'dayjs';
-
 // 加载状态
 const loading = ref(false);
 const submitLoading = ref(false);
@@ -178,7 +201,10 @@ const currentExecuteTask = ref(null);
 const executionArgs = ref('');
 // 搜索表单
 const searchForm = reactive({
-    taskName: ''
+    taskName: '',
+    taskType: '',     // 新增：任务类型
+    status: '',       // 新增：启用状态
+    creator: undefined // 新增：创建用户
 });
 
 // 分页配置
@@ -200,7 +226,7 @@ const columns = [
         title: '任务名称',
         dataIndex: 'name',
         key: 'name',
-        width: 150
+        width: 200
     },
     {
         title: '任务类型',
@@ -212,7 +238,9 @@ const columns = [
         title: '任务描述',
         dataIndex: 'description',
         key: 'description',
+        align: 'center',
         ellipsis: true
+        
     },
     {
         title: '状态',
@@ -235,7 +263,7 @@ const columns = [
     {
         title: '操作',
         key: 'action',
-        width: 200,
+        width: 240,
         align: 'center',
         fixed: 'right'
     }
@@ -532,6 +560,9 @@ const handleSearch = () => {
 // 重置搜索
 const resetSearch = () => {
     searchForm.taskName = '';
+    searchForm.taskType = '';
+    searchForm.status = '';
+    searchForm.creator = undefined;
     handleSearch();
 };
 
@@ -543,7 +574,10 @@ const fetchTasks = async () => {
         const params = {
             page: pagination.current,
             pageSize: pagination.pageSize,
-            task_name: searchForm.taskName || undefined
+            name: searchForm.taskName || undefined,
+            job_type: searchForm.taskType || undefined,     // 新增：任务类型参数
+            is_active: searchForm.status || undefined,      // 新增：启用状态参数
+            creator: searchForm.creator || undefined        // 新增：创建用户参数
         };
         
         const response = await getTaskList(params);
