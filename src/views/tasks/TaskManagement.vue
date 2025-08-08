@@ -58,10 +58,10 @@
                         </a-radio-group>
                     </a-form-item>
                     
-                    <!-- 手动任务携带参数时显示参数输入框 -->
-                    <a-form-item v-if="addTaskForm.task_type === 'manual' && addTaskForm.has_params" label="任务参数" name="task_params">
+                    <!-- 移除这个参数输入框 -->
+                    <!-- <a-form-item v-if="addTaskForm.task_type === 'manual' && addTaskForm.has_params" label="任务参数" name="task_params">
                         <a-textarea v-model:value="addTaskForm.task_params" placeholder="请输入任务参数，多个参数用换行分隔" :rows="3" />
-                    </a-form-item>
+                    </a-form-item> -->
                     
                     <a-form-item label="任务描述">
                         <a-textarea v-model:value="addTaskForm.description" placeholder="请输入任务描述" :rows="3" />
@@ -87,6 +87,28 @@
                                 </p>
                             </div>
                         </a-upload>
+                    </a-form-item>
+                </a-form>
+            </a-modal>
+
+            <!-- 执行任务参数输入模态框 -->
+            <a-modal 
+                v-model:open="executeModalVisible" 
+                title="执行任务参数" 
+                @ok="confirmExecuteTask" 
+                @cancel="cancelExecuteTask" 
+                :confirmLoading="executeLoading"
+            >
+                <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+                    <a-form-item label="任务名称">
+                        <a-input :value="currentExecuteTask?.name" disabled />
+                    </a-form-item>
+                    <a-form-item label="执行参数" required>
+                        <a-textarea 
+                            v-model:value="executionArgs" 
+                            placeholder="请输入执行参数，多个参数用空格或换行分隔" 
+                            :rows="4" 
+                        />
                     </a-form-item>
                 </a-form>
             </a-modal>
@@ -230,6 +252,7 @@ const currentPageTasks = computed(() => {
 // 新增任务相关状态
 const addTaskModalVisible = ref(false);
 // 新增任务表单数据
+
 const addTaskForm = reactive({
     task_name: '',
     task_type: '',
@@ -239,7 +262,7 @@ const addTaskForm = reactive({
     intervalHour: 0,
     intervalMinute: 0,
     has_params: false,           // 手动任务是否携带参数
-    task_params: '',             // 手动任务参数
+    // 移除 task_params 字段
     description: '',
     scriptFileList: [],
     script_file: null
@@ -284,15 +307,17 @@ const handleAddTask = async () => {
             // 定时任务
             taskData.execution_time = dayjs(addTaskForm.execution_time).format('YYYY-MM-DD HH:mm:ss');
         } else if (addTaskForm.task_type === 'interval') {
-            // 周期性任务
+            // 周期性任务 - 修改为使用 interval 字段
             taskData.first_run_time = dayjs(addTaskForm.first_run_time).format('YYYY-MM-DD HH:mm:ss');
-            taskData.run_cycle = `${addTaskForm.intervalDay}天${addTaskForm.intervalHour}小时${addTaskForm.intervalMinute}分钟`;
+            // 将时间间隔转换为秒数，符合 DurationField 的要求
+            const totalSeconds = (addTaskForm.intervalDay * 24 * 60 * 60) + 
+                               (addTaskForm.intervalHour * 60 * 60) + 
+                               (addTaskForm.intervalMinute * 60);
+            taskData.interval = totalSeconds; // 改为 interval 字段，传递秒数
         } else if (addTaskForm.task_type === 'manual') {
-            // 手动任务
-            taskData.has_params = addTaskForm.has_params;  // 确保传递 has_params
-            if (addTaskForm.has_params) {
-                taskData.task_params = addTaskForm.task_params;
-            }
+            // 手动任务 - 只传递是否需要参数的标识
+            taskData.has_params = addTaskForm.has_params;
+            // 移除参数值的传递，参数将在执行时输入
         }
         
         // 确保脚本文件存在
@@ -341,6 +366,25 @@ const getTaskTypeText = (taskType) => {
     return textMap[taskType] || taskType;
 };
 
+// 重置新增任务表单
+const resetAddTaskForm = () => {
+    addTaskForm.task_name = '';
+    addTaskForm.task_type = '';
+    addTaskForm.execution_time = null;
+    addTaskForm.first_run_time = null;
+    addTaskForm.intervalDay = 0;
+    addTaskForm.intervalHour = 0;
+    addTaskForm.intervalMinute = 0;
+    addTaskForm.has_params = false;
+    addTaskForm.description = '';
+    addTaskForm.scriptFileList = [];
+    addTaskForm.script_file = null;
+    
+    // 重置表单验证状态
+    if (formRef.value) {
+        formRef.value.resetFields();
+    }
+};
 
 // 获取执行状态颜色
 const getStatusColor = (status) => {
@@ -525,6 +569,39 @@ const getLastResultColor = (result) => {
         'failed': 'red'
     };
     return resultMap[result] || 'default';
+};
+
+
+// 文件上传前的处理
+const beforeUpload = (file) => {
+    // 验证文件类型
+    const allowedTypes = ['.py', '.js', '.sh', '.bat'];
+    const fileName = file.name.toLowerCase();
+    const isValidType = allowedTypes.some(type => fileName.endsWith(type));
+    
+    if (!isValidType) {
+        message.error('目前只支持Python脚本！');
+        return false;
+    }
+    
+    // 验证文件大小（10MB）
+    const isLt10M = file.size / 1024 / 1024 < 10;
+    if (!isLt10M) {
+        message.error('文件大小不能超过 10MB！');
+        return false;
+    }
+    
+    // 将文件保存到表单数据中
+    addTaskForm.script_file = file;
+    
+    // 返回 false 阻止自动上传
+    return false;
+};
+
+// 处理文件移除
+const handleRemoveFile = (file) => {
+    addTaskForm.script_file = null;
+    return true;
 };
 
 // 初始化

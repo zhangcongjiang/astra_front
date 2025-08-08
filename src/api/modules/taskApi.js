@@ -7,8 +7,8 @@ export const createTask = async (taskData) => {
         const formData = new FormData();
         
         // 添加基本任务信息 - 使用后端要求的字段名
-        formData.append('name', taskData.task_name);  // 改为 name
-        formData.append('job_type', taskData.task_type);  // 改为 job_type
+        formData.append('name', taskData.task_name);
+        formData.append('job_type', taskData.task_type);
         formData.append('description', taskData.description || '');
         
         // 根据任务类型添加不同的字段
@@ -18,13 +18,14 @@ export const createTask = async (taskData) => {
         if (taskData.first_run_time) {
             formData.append('first_run_time', taskData.first_run_time);
         }
-        if (taskData.run_cycle) {
-            formData.append('run_cycle', taskData.run_cycle);
+        // 修改：使用 interval 替代 run_cycle
+        if (taskData.interval !== undefined) {
+            formData.append('interval', taskData.interval);
         }
         
         // 手动任务的参数
         if (taskData.has_params !== undefined) {
-            formData.append('need_args', taskData.has_params);  // 添加 need_args 字段
+            formData.append('need_args', taskData.has_params);
         }
         if (taskData.task_params) {
             formData.append('task_params', taskData.task_params);
