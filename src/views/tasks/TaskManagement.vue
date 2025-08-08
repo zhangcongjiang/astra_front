@@ -93,7 +93,7 @@
                         <a-upload 
                             v-model:file-list="addTaskForm.scriptFileList" 
                             :before-upload="beforeUpload" 
-                            :remove="handleRemoveFile" 
+                            @remove="handleRemoveFile" 
                             accept=".py,.js,.sh,.bat"
                             drag
                             :multiple="false"
@@ -186,7 +186,7 @@ import { UploadOutlined } from '@ant-design/icons-vue';
 import { useRouter } from 'vue-router';
 // 导入UserSelect组件
 import UserSelect from '@/components/UserSelect.vue';
-import { createTask, getTaskList, deleteTask, updateTaskStatus, excuteTask } from '@/api/modules/taskApi';
+import { createTask, getTaskList, deleteTask, updateTaskStatus, excuteTask, enableTask, disableTask } from '@/api/modules/taskApi';
 import dayjs from 'dayjs';
 // 加载状态
 const loading = ref(false);
@@ -437,10 +437,16 @@ const toggleStatus = async (record) => {
         record.statusLoading = true;
         
         const newStatus = !record.is_active;
-        await updateTaskStatus(record.id, newStatus ? 'active' : 'inactive');
+        
+        // 使用新的启用/禁用接口
+        if (newStatus) {
+            await enableTask(record.id);
+        } else {
+            await disableTask(record.id);
+        }
         
         record.is_active = newStatus;
-        message.success('状态更新成功');
+        message.success(newStatus ? '任务启用成功' : '任务禁用成功');
         
     } catch (error) {
         message.error('状态更新失败: ' + (error.message || '未知错误'));

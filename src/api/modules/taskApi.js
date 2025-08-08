@@ -89,4 +89,23 @@ export const excuteTask = async (data) => {
     }
 };
 
+export const enableTask = async (taskId) => {
+    try {
+        const response = await request.post(`/task/${taskId}/enable_task/`);
+        return response;
+    } catch (error) {
+        console.error(`任务激活失败:`, error);
+        throw error;
+    }
+};
 
+
+export const disableTask = async (taskId) => {
+    try {
+        const response = await request.post(`/task/${taskId}/disable_task/`);
+        return response;
+    } catch (error) {
+        console.error(`任务禁用失败:`, error);
+        throw error;
+    }
+};
