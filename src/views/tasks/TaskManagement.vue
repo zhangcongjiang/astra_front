@@ -10,7 +10,6 @@
                     <a-form-item label="任务类型">
                         <a-select v-model:value="searchForm.taskType" placeholder="选择任务类型" style="width: 120px" allowClear>
                             <a-select-option value="">全部</a-select-option>
-                            <a-select-option value="date">定时任务</a-select-option>
                             <a-select-option value="interval">周期性任务</a-select-option>
                             <a-select-option value="manual">手动任务</a-select-option>
                         </a-select>
@@ -50,16 +49,12 @@
                     </a-form-item>
                     <a-form-item label="任务类型" name="task_type">
                         <a-select v-model:value="addTaskForm.task_type" placeholder="请选择任务类型">
-                            <a-select-option value="date">定时任务</a-select-option>
                             <a-select-option value="interval">周期性任务</a-select-option>
                             <a-select-option value="manual">手动任务</a-select-option>
                         </a-select>
                     </a-form-item>
                     
-                    <!-- 定时任务：只显示执行时间 -->
-                    <a-form-item v-if="addTaskForm.task_type === 'date'" label="执行时间" name="execution_time">
-                        <a-date-picker v-model:value="addTaskForm.execution_time" show-time format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
-                    </a-form-item>
+                    <!-- 移除定时任务的执行时间表单项 -->
                     
                     <!-- 周期性任务：显示初次执行时间和运行周期 -->
                     <a-form-item v-if="addTaskForm.task_type === 'interval'" label="初次执行时间" name="execution_time">
@@ -330,10 +325,7 @@ const handleAddTask = async () => {
         };
         
         // 根据任务类型添加不同的字段
-        if (addTaskForm.task_type === 'date') {
-            // 定时任务
-            taskData.execution_time = dayjs(addTaskForm.execution_time).format('YYYY-MM-DD HH:mm:ss');
-        } else if (addTaskForm.task_type === 'interval') {
+        if (addTaskForm.task_type === 'interval') {
             // 周期性任务 - 修改为使用 interval 字段
             taskData.execution_time = dayjs(addTaskForm.execution_time).format('YYYY-MM-DD HH:mm:ss');
             // 将时间间隔转换为秒数，符合 DurationField 的要求
@@ -376,7 +368,6 @@ const handleAddTask = async () => {
 // 获取任务类型颜色
 const getTaskTypeColor = (taskType) => {
     const colorMap = {
-        'date': 'blue',
         'interval': 'green', 
         'manual': 'orange'
     };
@@ -386,7 +377,6 @@ const getTaskTypeColor = (taskType) => {
 // 获取任务类型文本
 const getTaskTypeText = (taskType) => {
     const textMap = {
-        'date': '定时任务',
         'interval': '周期性任务',
         'manual': '手动任务'
     };
