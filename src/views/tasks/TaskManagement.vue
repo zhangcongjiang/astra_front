@@ -62,8 +62,8 @@
                     </a-form-item>
                     
                     <!-- 周期性任务：显示初次执行时间和运行周期 -->
-                    <a-form-item v-if="addTaskForm.task_type === 'interval'" label="初次执行时间" name="first_run_time">
-                        <a-date-picker v-model:value="addTaskForm.first_run_time" show-time format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
+                    <a-form-item v-if="addTaskForm.task_type === 'interval'" label="初次执行时间" name="execution_time">
+                        <a-date-picker v-model:value="addTaskForm.execution_time" show-time format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
                     </a-form-item>
                     <a-form-item v-if="addTaskForm.task_type === 'interval'" label="运行周期" name="run_cycle">
                         <a-space>
@@ -180,7 +180,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
-import { message } from 'ant-design-vue';
+import { message, Modal } from 'ant-design-vue';
 import Pagination from '@/components/Pagination.vue';
 import { UploadOutlined } from '@ant-design/icons-vue';
 import { useRouter } from 'vue-router';
@@ -284,8 +284,7 @@ const addTaskModalVisible = ref(false);
 const addTaskForm = reactive({
     task_name: '',
     task_type: '',
-    execution_time: null,        // 定时任务的执行时间
-    first_run_time: null,        // 周期性任务的初次执行时间
+    execution_time: null,        // 定时任务的执行时间    // 周期性任务的初次执行时间
     intervalDay: 0,
     intervalHour: 0,
     intervalMinute: 0,
@@ -304,7 +303,7 @@ const formRules = {
     task_type: [
         { required: true, message: '请选择任务类型', trigger: 'change' }
     ],
-    first_run_time: [
+    execution_time: [
         { required: true, message: '请选择初次执行时间', trigger: 'change' }
     ]
 };
@@ -336,7 +335,7 @@ const handleAddTask = async () => {
             taskData.execution_time = dayjs(addTaskForm.execution_time).format('YYYY-MM-DD HH:mm:ss');
         } else if (addTaskForm.task_type === 'interval') {
             // 周期性任务 - 修改为使用 interval 字段
-            taskData.first_run_time = dayjs(addTaskForm.first_run_time).format('YYYY-MM-DD HH:mm:ss');
+            taskData.execution_time = dayjs(addTaskForm.execution_time).format('YYYY-MM-DD HH:mm:ss');
             // 将时间间隔转换为秒数，符合 DurationField 的要求
             const totalSeconds = (addTaskForm.intervalDay * 24 * 60 * 60) + 
                                (addTaskForm.intervalHour * 60 * 60) + 
@@ -399,7 +398,6 @@ const resetAddTaskForm = () => {
     addTaskForm.task_name = '';
     addTaskForm.task_type = '';
     addTaskForm.execution_time = null;
-    addTaskForm.first_run_time = null;
     addTaskForm.intervalDay = 0;
     addTaskForm.intervalHour = 0;
     addTaskForm.intervalMinute = 0;
@@ -540,21 +538,34 @@ const showDetail = (record) => {
 
 // 删除任务
 const handleDelete = async (record) => {
-    try {
-        record.deleteLoading = true;
-        
-        await deleteTask(record.id);
-        message.success('任务删除成功');
-        
-        // 刷新任务列表
-        await fetchTasks();
-        
-    } catch (error) {
-        message.error('删除任务失败: ' + (error.message || '未知错误'));
-        console.error('删除任务失败:', error);
-    } finally {
-        record.deleteLoading = false;
-    }
+    Modal.confirm({
+        title: '确认删除',
+        content: `确定要删除任务 "${record.name}" 吗？此操作不可撤销。`,
+        okText: '确定',
+        cancelText: '取消',
+        okType: 'danger',
+        onOk: async () => {
+            try {
+                record.deleteLoading = true;
+                
+                await deleteTask(record.id);
+                message.success('任务删除成功');
+                
+                // 刷新任务列表
+                await fetchTasks();
+                
+            } catch (error) {
+                message.error('删除任务失败: ' + (error.message || '未知错误'));
+                console.error('删除任务失败:', error);
+            } finally {
+                record.deleteLoading = false;
+            }
+        },
+        onCancel: () => {
+            // 取消时重置加载状态
+            record.deleteLoading = false;
+        }
+    });
 };
 
 // 处理搜索
