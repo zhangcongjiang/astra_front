@@ -91,6 +91,7 @@ const menuData = [
         id: 2,
         name: '素材中心',
         children: [
+            { id: 20, name: '热点新闻', content: '这里是热点新闻内容...', path: '/news' },
             { id: 21, name: '图像素材', content: '这里是用户收集的普通图片...', path: '/images' },
             { id: 22, name: '音乐素材', content: '这里是背景音乐的内容...', path: '/musics' },
             { id: 23, name: '视频素材', content: '这里是视频素材内容列表...', path: '/videos' },

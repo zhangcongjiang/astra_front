@@ -26,7 +26,7 @@ const router = createRouter({
             path: '/login',
             name: 'Login',
             component: () => import('@/views/Login.vue'),
-            meta: { 
+            meta: {
                 requiresGuest: true, // 只有未登录用户可以访问
                 title: '用户登录'
             }
@@ -43,6 +43,18 @@ const router = createRouter({
                     component: () => import('../views/Dashboard.vue') // 工作台组件
                 },
                 {
+                    path: '/news',
+                    name: 'NewsList',
+                    component: () => import('@/views/news/NewsList.vue'),
+                    meta: { title: '热点新闻' }
+                },
+                {
+                    path: '/news/:id',
+                    name: 'NewsDetail',
+                    component: () => import('@/views/news/NewsDetail.vue'),
+                    meta: { title: '新闻详情' }
+                },
+                {
                     path: 'images',
                     name: 'images',
                     component: ImageList // 图片列表组件
@@ -51,7 +63,7 @@ const router = createRouter({
                     path: 'musics',
                     name: 'musics',
                     component: MusicList // 音乐列表组件
-                }, 
+                },
                 {
                     path: 'speakers',
                     name: 'speakers',
@@ -67,7 +79,7 @@ const router = createRouter({
                     component: VideoTemplateApply,
                     props: true
                 },
-                 {
+                {
                     path: 'data-visuals',
                     name: 'data-visuals',
                     component: DataVisualList // 工作台组件
@@ -157,7 +169,7 @@ const router = createRouter({
                     meta: { title: '其他工具' },
                     props: { category: 'other' }
                 },
-            
+
                 {
                     path: 'assets',
                     name: 'assets',
@@ -209,29 +221,29 @@ const router = createRouter({
                 },
                 // 添加异常页面路由
                 {
-                  path: '/exception/403',
-                  name: '403',
-                  component: () => import('@/views/exception/403.vue'),
-                  meta: { title: '403 无权限' }
+                    path: '/exception/403',
+                    name: '403',
+                    component: () => import('@/views/exception/403.vue'),
+                    meta: { title: '403 无权限' }
                 },
                 {
-                  path: '/exception/404',
-                  name: '404',
-                  component: () => import('@/views/exception/404.vue'),
-                  meta: { title: '404 页面未找到' }
+                    path: '/exception/404',
+                    name: '404',
+                    component: () => import('@/views/exception/404.vue'),
+                    meta: { title: '404 页面未找到' }
                 },
                 {
-                  path: '/exception/500',
-                  name: '500',
-                  component: () => import('@/views/exception/500.vue'),
-                  meta: { title: '500 服务器错误' }
+                    path: '/exception/500',
+                    name: '500',
+                    component: () => import('@/views/exception/500.vue'),
+                    meta: { title: '500 服务器错误' }
                 },
                 // 添加404通配符路由，必须放在最后
                 {
-                  path: '/:pathMatch(.*)*',
-                  name: 'not-found',
-                  component: () => import('@/views/exception/404.vue'),
-                  meta: { title: '404 页面未找到' }
+                    path: '/:pathMatch(.*)*',
+                    name: 'not-found',
+                    component: () => import('@/views/exception/404.vue'),
+                    meta: { title: '404 页面未找到' }
                 }
             ]
         }
@@ -240,37 +252,37 @@ const router = createRouter({
 
 // 全局前置守卫
 router.beforeEach(async (to, from, next) => {
-  const authStore = useAuthStore()
-  
-  // 如果还没有检查过认证状态，先检查一次
-  if (!authStore.user && !authStore.loading) {
-    try {
-      await authStore.checkAuth()
-    } catch (error) {
-      // 认证失败，继续执行后续逻辑
+    const authStore = useAuthStore()
+
+    // 如果还没有检查过认证状态，先检查一次
+    if (!authStore.user && !authStore.loading) {
+        try {
+            await authStore.checkAuth()
+        } catch (error) {
+            // 认证失败，继续执行后续逻辑
+        }
     }
-  }
-  
-  // 如果用户未认证且访问的不是登录页
-  if (!authStore.isAuthenticated && to.path !== '/login') {
-    next('/login')
-    return
-  }
-  
-  // 如果用户已认证且访问登录页，重定向到首页
-  if (authStore.isAuthenticated && to.path === '/login') {
-    next('/')
-    return
-  }
-  
-  // 检查是否需要管理员权限
-  if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    console.error('需要管理员权限')
-    next('/')
-    return
-  }
-  
-  next()
+
+    // 如果用户未认证且访问的不是登录页
+    if (!authStore.isAuthenticated && to.path !== '/login') {
+        next('/login')
+        return
+    }
+
+    // 如果用户已认证且访问登录页，重定向到首页
+    if (authStore.isAuthenticated && to.path === '/login') {
+        next('/')
+        return
+    }
+
+    // 检查是否需要管理员权限
+    if (to.meta.requiresAdmin && !authStore.isAdmin) {
+        console.error('需要管理员权限')
+        next('/')
+        return
+    }
+
+    next()
 })
 
 export default router

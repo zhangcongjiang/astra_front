@@ -52,7 +52,7 @@
               <span class="record-time">{{ formatTime(record.executeTime) }}</span>
               <a-tag :color="getResultColor(record.result)">{{ record.result }}</a-tag>
               <span class="record-duration">耗时: {{ record.duration }}秒</span>
-              <span class="record-status">状态: {{ record.status }}</span>
+              <span class="record-status">执行状态: {{ record.status }}</span>
             </div>
             <div v-if="record.result === '失败' && record.errorStack" class="error-detail">
               <a-collapse>
@@ -217,6 +217,11 @@ onMounted(() => {
 .record-duration {
   margin-left: 16px;
   color: #888;
+}
+
+.record-status {
+  margin-left: 16px;
+  color: #666;
 }
 
 .error-detail {

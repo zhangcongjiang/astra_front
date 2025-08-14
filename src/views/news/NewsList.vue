@@ -1,0 +1,460 @@
+<template>
+  <div class="news-list-container">
+    <!-- 搜索区域 -->
+    <div class="search-area">
+      
+      <div class="search-form-wrapper">
+        <a-form layout="inline" :model="searchForm" class="search-form">
+          <a-form-item label="标题关键词">
+            <a-input 
+              v-model:value="searchForm.title" 
+              placeholder="请输入标题关键词" 
+              style="width: 200px"
+              allowClear
+            />
+          </a-form-item>
+          
+          <a-form-item label="来源平台">
+            <a-select 
+              v-model:value="searchForm.source" 
+              placeholder="请选择来源平台" 
+              style="width: 150px"
+              allowClear
+            >
+              <a-select-option value="微博">微博</a-select-option>
+              <a-select-option value="百度">百度</a-select-option>
+              <a-select-option value="今日头条">今日头条</a-select-option>
+              <a-select-option value="虎扑">虎扑</a-select-option>
+              <a-select-option value="虎扑足球">虎扑足球</a-select-option>
+            </a-select>
+          </a-form-item>
+          
+          <a-form-item label="新闻类型">
+            <a-select 
+              v-model:value="searchForm.category" 
+              placeholder="请选择新闻类型" 
+              style="width: 150px"
+              allowClear
+            >
+              <a-select-option value="tech">科技</a-select-option>
+              <a-select-option value="entertainment">娱乐</a-select-option>
+              <a-select-option value="sports">体育</a-select-option>
+              <a-select-option value="finance">财经</a-select-option>
+              <a-select-option value="society">社会</a-select-option>
+              <a-select-option value="international">国际</a-select-option>
+              <a-select-option value="business">商业</a-select-option>
+              <a-select-option value="travel">旅游</a-select-option>
+              <a-select-option value="auto">汽车</a-select-option>
+              <a-select-option value="agriculture">农业</a-select-option>
+              <a-select-option value="taiwan">台海</a-select-option>
+              <a-select-option value="nba">NBA</a-select-option>
+              <a-select-option value="cba">CBA</a-select-option>
+              <a-select-option value="football">足球</a-select-option>
+              <a-select-option value="other">其他</a-select-option>
+            </a-select>
+          </a-form-item>
+          
+          <a-form-item label="时间范围">
+            <a-select 
+              v-model:value="searchForm.timeRange" 
+              placeholder="请选择时间范围" 
+              style="width: 150px"
+              allowClear
+            >
+              <a-select-option value="1d">最近一天</a-select-option>
+              <a-select-option value="3d">最近三天</a-select-option>
+              <a-select-option value="1w">最近一周</a-select-option>
+              <a-select-option value="1m">最近一个月</a-select-option>
+              <a-select-option value="1y">最近一年</a-select-option>
+              <a-select-option value="3y">最近三年</a-select-option>
+            </a-select>
+          </a-form-item>
+          
+          <a-form-item label="排序方式">
+            <a-select 
+              v-model:value="searchForm.sortBy" 
+              placeholder="请选择排序方式" 
+              style="width: 120px"
+            >
+              <a-select-option value="hot">热度最高</a-select-option>
+              <a-select-option value="time">时间最近</a-select-option>
+              <a-select-option value="rank">最高排名</a-select-option>
+            </a-select>
+          </a-form-item>
+          
+          <a-form-item>
+            <a-space>
+              <a-button type="primary" @click="handleSearch" :loading="loading">
+                查询
+              </a-button>
+              <a-button @click="resetSearch">
+                重置
+              </a-button>
+            </a-space>
+          </a-form-item>
+        </a-form>
+      </div>
+    </div>
+
+    <!-- 新闻列表 -->
+    <div class="list-section">
+      <a-card >
+        <a-table 
+          :columns="columns" 
+          :data-source="newsList" 
+          :loading="loading"
+          :pagination="false"
+          row-key="id"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'title'">
+              <a @click="showDetail(record)" class="news-title">{{ record.title }}</a>
+            </template>
+            
+            <template v-if="column.key === 'platform'">
+              <a-tag :color="getSourceColor(record.platform)">{{ getSourceText(record.platform) }}</a-tag>
+            </template>
+            
+            <template v-if="column.key === 'category'">
+              <a-tag :color="getCategoryColor(record.category)">{{ getCategoryText(record.category) }}</a-tag>
+            </template>
+            
+            <template v-if="column.key === 'hots'">
+              <span class="hot-score">{{ record.hots }}</span>
+            </template>
+            
+            <template v-if="column.key === 'date'">
+              <span>{{ formatDateTime(record.date) }}</span>
+            </template>
+            
+            <template v-if="column.key === 'rank'">
+              <a-tag color="red" v-if="record.rank <= 3">第{{ record.rank }}名</a-tag>
+              <a-tag color="orange" v-else-if="record.rank <= 10">第{{ record.rank }}名</a-tag>
+              <a-tag v-else>第{{ record.rank }}名</a-tag>
+            </template>
+            
+            <template v-if="column.key === 'action'">
+              <a-space>
+                <a-button type="link" size="small" @click="showDetail(record)">详情</a-button>
+                <a-button type="link" size="small" @click="addToMaterialSet(record)">加入素材集</a-button>
+              </a-space>
+            </template>
+          </template>
+        </a-table>
+        
+        <!-- 分页组件 -->
+        <div class="pagination-wrapper">
+          <Pagination 
+            v-model:current="pagination.current"
+            v-model:pageSize="pagination.pageSize"
+            :total="pagination.total"
+            @change="handlePageChange"
+          />
+        </div>
+      </a-card>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
+import { getNewsList, addNewsToAsset } from '@/api/modules/newsApi'
+import Pagination from '@/components/Pagination.vue'
+import dayjs from 'dayjs'
+
+const router = useRouter()
+const loading = ref(false)
+
+// 搜索表单
+const searchForm = reactive({
+  title: '',
+  platform: undefined,
+  category: undefined,
+  timeRange: '1d',  // 默认选择最近一天
+  sortBy: 'hot'  // 默认热度最高
+})
+
+// 新闻列表
+const newsList = ref([])
+
+// 分页配置
+const pagination = reactive({
+  current: 1,
+  total: 0,
+  pageSize: 20
+})
+
+// 表格列定义
+const columns = [
+  {
+    title: '序号',
+    key: 'index',
+    width: 60,
+    customRender: ({ index }) => {
+      return (pagination.current - 1) * pagination.pageSize + index + 1
+    }
+  },
+  {
+    title: '热点内容',
+    dataIndex: 'title',
+    key: 'title',
+    width: 300,
+    ellipsis: true
+  },
+  {
+    title: '来源平台',
+    dataIndex: 'platform',  // 改为 platform
+    key: 'platform',        // 改为 platform
+    width: 100
+  },
+  {
+    title: '类型',
+    dataIndex: 'category',
+    key: 'category',
+    width: 80
+  },
+  {
+    title: '热度值',
+    dataIndex: 'hots',      // 改为 hots
+    key: 'hots',            // 改为 hots
+    width: 100,
+    sorter: true
+  },
+  {
+    title: '上榜时间',
+    dataIndex: 'date',      // 改为 date
+    key: 'date',            // 改为 date
+    width: 150
+  },
+  {
+    title: '最高排名',
+    dataIndex: 'rank',      // 改为 rank
+    key: 'rank',            // 改为 rank
+    width: 100
+  },
+  {
+    title: '操作',
+    key: 'action',
+    width: 150,
+    fixed: 'right'
+  }
+]
+
+// 获取新闻列表
+const fetchNewsList = async () => {
+  try {
+    loading.value = true
+    const params = {
+      page: pagination.current,
+      page_size: pagination.pageSize,
+      title: searchForm.title || undefined,
+      platform: searchForm.platform,
+      category: searchForm.category,
+      time_range: searchForm.timeRange,  // 使用 timeRange 而不是处理 dateRange
+      sort_by: searchForm.sortBy
+    }
+    
+    const response = await getNewsList(params)
+    newsList.value = response.data.results || []
+    pagination.total = response.data.count || 0
+  } catch (error) {
+    message.error('获取新闻列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 搜索
+const handleSearch = () => {
+  pagination.current = 1
+  fetchNewsList()
+}
+
+// 重置搜索
+const resetSearch = () => {
+  Object.assign(searchForm, {
+    title: '',
+    platform: undefined,
+    category: undefined,
+    timeRange: '1d',  // 重置为默认的最近一天
+    sortBy: 'hot'  // 重置为默认的热度最高
+  })
+  handleSearch()
+}
+
+// 分页变化
+const handlePageChange = ({ current, pageSize }) => {
+  pagination.current = current
+  pagination.pageSize = pageSize
+  fetchNewsList()
+}
+
+// 查看详情
+const showDetail = (record) => {
+  router.push(`/news/${record.id}`)
+}
+
+// 加入素材集
+const addToAsset = async (record) => {
+  try {
+    // 这里可以弹出素材集选择框，暂时使用默认素材集
+    await addNewsToAsset(record.id, 1)
+    message.success('已加入素材集')
+  } catch (error) {
+    message.error('加入素材集失败')
+  }
+}
+
+// 辅助函数
+// 获取来源平台文本
+const getSourceText = (source) => {
+  const sourceMap = {
+    '虎扑': '虎扑',
+    '虎扑足球': '虎扑足球',
+    '微博': '微博',
+    '百度': '百度',
+    '今日头条': '今日头条',
+    'NBA官网': 'NBA官网'
+  }
+  return sourceMap[source] || source
+}
+
+// 获取来源平台颜色
+const getSourceColor = (source) => {
+  const colorMap = {
+    '虎扑': 'orange',
+    '虎扑足球': 'green',
+    '微博': 'red',
+    '百度': 'blue',
+    '今日头条': '黄色',
+    'NBA官网': 'purple'
+  }
+  return colorMap[source] || 'default'
+}
+const getCategoryColor = (category) => {
+  const colors = {
+    tech: 'blue',
+    entertainment: 'pink',
+    sports: 'green',
+    finance: 'gold',
+    society: 'purple'
+  }
+  return colors[category] || 'default'
+}
+
+const getCategoryText = (category) => {
+  const texts = {
+    军事: '军事',
+    娱乐: '娱乐',
+    体育: '体育',
+    农业: '财经',
+    台海: '台海',
+    其他: '其他',
+    商业: '商业',
+    旅游: '旅游',
+    汽车: '汽车',
+    社会: '社会',
+    科技: '科技',
+    国际: '国际',
+    NBA: 'NBA',
+    CBA: 'CBA',
+    足球: '足球',
+  }
+  return texts[category] || category
+}
+
+const formatDateTime = (dateTime) => {
+  return dayjs(dateTime).format('YYYY-MM-DD HH:mm')
+}
+
+// 组件挂载时获取数据
+onMounted(() => {
+  fetchNewsList()
+})
+</script>
+
+<style scoped>
+.news-list-container {
+  padding: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.search-area {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+
+
+.search-form-wrapper {
+  margin-top: 16px;
+}
+
+.search-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: end;
+}
+
+.search-form .ant-form-item {
+  margin-bottom: 16px;
+}
+
+.search-form .ant-form-item-label {
+  font-weight: 500;
+}
+
+.list-section {
+  flex: 1;
+}
+
+.list-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.news-title {
+  color: #1890ff;
+  cursor: pointer;
+}
+
+.news-title:hover {
+  text-decoration: underline;
+}
+
+.hot-score {
+  font-weight: bold;
+  color: #ff4d4f;
+}
+
+.pagination-wrapper {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .search-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-form .ant-form-item {
+    width: 100%;
+  }
+  
+  .search-form .ant-input,
+  .search-form .ant-select {
+    width: 100% !important;
+  }
+}
+</style>
