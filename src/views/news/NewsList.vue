@@ -328,7 +328,7 @@ const getSourceColor = (source) => {
     '虎扑足球': 'green',
     '微博': 'red',
     '百度': 'blue',
-    '今日头条': '黄色',
+    '今日头条': 'gold',
     'NBA官网': 'purple'
   }
   return colorMap[source] || 'default'
