@@ -36,21 +36,21 @@
               style="width: 150px"
               allowClear
             >
-              <a-select-option value="tech">科技</a-select-option>
-              <a-select-option value="entertainment">娱乐</a-select-option>
-              <a-select-option value="sports">体育</a-select-option>
-              <a-select-option value="finance">财经</a-select-option>
-              <a-select-option value="society">社会</a-select-option>
-              <a-select-option value="international">国际</a-select-option>
-              <a-select-option value="business">商业</a-select-option>
-              <a-select-option value="travel">旅游</a-select-option>
-              <a-select-option value="auto">汽车</a-select-option>
-              <a-select-option value="agriculture">农业</a-select-option>
-              <a-select-option value="taiwan">台海</a-select-option>
+              <a-select-option value="娱乐">娱乐</a-select-option>
+              <a-select-option value="体育">体育</a-select-option>
               <a-select-option value="nba">NBA</a-select-option>
               <a-select-option value="cba">CBA</a-select-option>
-              <a-select-option value="football">足球</a-select-option>
-              <a-select-option value="other">其他</a-select-option>
+              <a-select-option value="足球">足球</a-select-option>
+              <a-select-option value="科技">科技</a-select-option>
+              <a-select-option value="财经">财经</a-select-option>
+              <a-select-option value="社会">社会</a-select-option>
+              <a-select-option value="国际">国际</a-select-option>
+              <a-select-option value="商业">商业</a-select-option>
+              <a-select-option value="旅游">旅游</a-select-option>
+              <a-select-option value="汽车">汽车</a-select-option>
+              <a-select-option value="农业">农业</a-select-option>
+              <a-select-option value="台海">台海</a-select-option>
+              <a-select-option value="其他">其他</a-select-option>
             </a-select>
           </a-form-item>
           
