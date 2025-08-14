@@ -109,3 +109,13 @@ export const disableTask = async (taskId) => {
         throw error;
     }
 };
+
+export const getTaskDetail = async (taskId) => {
+    try {
+        const response = await request.get(`/task/${taskId}/`);
+        return response;
+    } catch (error) {
+        console.error(`获取任务详情失败:`, error);
+        throw error;
+    }
+};

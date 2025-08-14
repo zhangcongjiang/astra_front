@@ -181,7 +181,16 @@ import { UploadOutlined } from '@ant-design/icons-vue';
 import { useRouter } from 'vue-router';
 // 导入UserSelect组件
 import UserSelect from '@/components/UserSelect.vue';
-import { createTask, getTaskList, deleteTask, updateTaskStatus, excuteTask, enableTask, disableTask } from '@/api/modules/taskApi';
+import { 
+    createTask, 
+    getTaskList, 
+    deleteTask, 
+    updateTaskStatus, 
+    excuteTask, 
+    enableTask, 
+    disableTask,
+    getTaskDetail  // 添加这个导入
+} from '@/api/modules/taskApi';
 import dayjs from 'dayjs';
 // 加载状态
 const loading = ref(false);
