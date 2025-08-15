@@ -338,8 +338,8 @@ const fetchImageList = async () => {
       const placeholders = response.data.results.map(item => ({
         id: item.id,
         name: item.img_name,
-        url: `/media/images/`+item.img_name , // 直接使用API返回的URL
-        uploader: item.username  || '未知', 
+        url: `/media/images/${encodeURIComponent(item.img_name)}`, // 对文件名进行URL编码
+        uploader: item.username || '未知', 
         uploadTime: item.create_time,
         tags: item.tags || [],
         loading: false, // 不需要懒加载
