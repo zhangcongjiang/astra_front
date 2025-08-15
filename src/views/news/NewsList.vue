@@ -15,8 +15,9 @@
           </a-form-item>
           
           <a-form-item label="来源平台">
+            <!-- 确保这里绑定的是 platform -->
             <a-select 
-              v-model:value="searchForm.source" 
+              v-model:value="searchForm.platform"
               placeholder="请选择来源平台" 
               style="width: 150px"
               allowClear
@@ -167,13 +168,13 @@ import dayjs from 'dayjs'
 const router = useRouter()
 const loading = ref(false)
 
-// 搜索表单
+// 搜索表单中的字段定义
 const searchForm = reactive({
   title: '',
   platform: undefined,
   category: undefined,
-  timeRange: '1d',  // 默认选择最近一天
-  sortBy: 'hot'  // 默认热度最高
+  timeRange: '1d',
+  sortBy: 'hot'
 })
 
 // 新闻列表
