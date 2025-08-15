@@ -15,7 +15,7 @@ export const getNewsList = async (params) => {
 // 获取新闻详情
 export const getNewsDetail = async (id) => {
   try {
-    const response = await request.get(`/news/${id}/`);
+    const response = await request.get(`/news/detail/?news_id=${id}`);
     return response;
   } catch (error) {
     console.error(`获取新闻详情出错:`, error);
@@ -23,6 +23,16 @@ export const getNewsDetail = async (id) => {
   }
 };
 
+// 获取新闻详情
+export const getNewsTrend = async (id) => {
+  try {
+    const response = await request.get(`/news/trend/?news_id=${id}`);
+    return response;
+  } catch (error) {
+    console.error(`获取新闻热度趋势出错:`, error);
+    throw error;
+  }
+};
 // 将新闻加入素材集
 export const addNewsToAsset = async (newsId, assetId) => {
   try {
@@ -36,13 +46,3 @@ export const addNewsToAsset = async (newsId, assetId) => {
   }
 };
 
-// 获取新闻热度排行
-export const getNewsHotRanking = async (params) => {
-  try {
-    const response = await request.get("/news/hot-ranking/", formatParams(params));
-    return response;
-  } catch (error) {
-    console.error(`获取热度排行出错:`, error);
-    throw error;
-  }
-};

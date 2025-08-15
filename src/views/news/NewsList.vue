@@ -294,14 +294,14 @@ const handlePageChange = ({ current, pageSize }) => {
 
 // 查看详情
 const showDetail = (record) => {
-  router.push(`/news/${record.id}`)
+  router.push(`/news/${record.news_id}`)
 }
 
 // 加入素材集
 const addToAsset = async (record) => {
   try {
     // 这里可以弹出素材集选择框，暂时使用默认素材集
-    await addNewsToAsset(record.id, 1)
+    await addNewsToAsset(record.news_id, 1)
     message.success('已加入素材集')
   } catch (error) {
     message.error('加入素材集失败')
