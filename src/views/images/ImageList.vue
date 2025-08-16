@@ -805,26 +805,12 @@ const handleBatchDelete = async () => {
   try {
     await deleteImages(selectedImages.value);
     
-    // 从本地数据中移除已删除的图片
-    selectedImages.value.forEach(imageId => {
-      const index = imageData.value.findIndex(img => img.id === imageId);
-      if (index !== -1) {
-        // 释放图片的Blob URL
-        if (imageData.value[index].url && imageData.value[index].url.startsWith('blob:')) {
-          URL.revokeObjectURL(imageData.value[index].url);
-        }
-        imageData.value.splice(index, 1);
-      }
-    });
-    
     message.success(`成功删除 ${selectedImages.value.length} 张图片`);
     clearSelection();
     
-    // 如果当前页没有数据了，跳转到上一页
-    if (currentPageImages.value.length === 0 && pagination.value.current > 1) {
-      pagination.value.current--;
-      fetchImageList();
-    }
+    // 重新获取图片列表，刷新页面数据
+    await fetchImageList();
+    
   } catch (error) {
     console.error('批量删除图片失败:', error);
     message.error('批量删除图片失败');

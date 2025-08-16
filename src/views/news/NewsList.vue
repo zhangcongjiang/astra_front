@@ -27,6 +27,7 @@
               <a-select-option value="今日头条">今日头条</a-select-option>
               <a-select-option value="虎扑">虎扑</a-select-option>
               <a-select-option value="虎扑足球">虎扑足球</a-select-option>
+              <a-select-option value="NBA官网">NBA官网</a-select-option>
             </a-select>
           </a-form-item>
           
