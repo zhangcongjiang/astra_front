@@ -210,8 +210,9 @@ const viewAssetDetail = (id) => {
 
 const editAsset = (asset) => {
   editingAsset.value = asset
-  assetForm.name = asset.name
-  assetForm.description = asset.description
+  // 编辑素材集的方法中
+  assetForm.value.name = asset.name
+  assetForm.value.description = asset.description
   showCreateModal.value = true
 }
 
@@ -243,7 +244,7 @@ const deleteAsset = (id) => {
 }
 
 const handleCreateAsset = async () => {
-  if (!assetForm.name.trim()) {
+  if (!assetForm.value.name.trim()) {
     message.error('请输入素材集名称')
     return
   }
@@ -251,13 +252,13 @@ const handleCreateAsset = async () => {
   try {
     if (editingAsset.value) {
       // 编辑模式 - 使用你提供的API格式
-      await updateAssetCollection(editingAsset.value.id, assetForm.name.trim())
+      await updateAssetCollection(editingAsset.value.id, assetForm.value.name.trim())
       message.success('编辑成功')
     } else {
       // 创建模式
       const data = {
-        set_name: assetForm.name.trim(),
-        description: assetForm.description.trim()
+        set_name: assetForm.value.name.trim(),
+        description: assetForm.value.description.trim()
       }
       await createAssetCollection(data)
       message.success('创建成功')
@@ -274,8 +275,8 @@ const handleCreateAsset = async () => {
 const resetForm = () => {
   showCreateModal.value = false
   editingAsset.value = null
-  assetForm.name = ''
-  assetForm.description = ''
+  assetForm.value.name = ''
+  assetForm.value.description = ''
 }
 
 const formatTime = (time) => {

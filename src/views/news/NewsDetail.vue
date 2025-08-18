@@ -93,7 +93,7 @@
         <a-divider />
         <div class="action-buttons">
           <a-space>
-            <a-button type="primary" @click="addToAsset">
+            <a-button type="primary" @click="showAssetModal" :loading="addingToAsset">
               <template #icon><PlusOutlined /></template>
               加入素材集
             </a-button>
@@ -135,7 +135,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, onBeforeUnmount, h } from 'vue'
+import { ref, onMounted, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { 
@@ -147,6 +147,7 @@ import {
   LineChartOutlined
 } from '@ant-design/icons-vue'
 import { getNewsDetail, addNewsToAsset, getNewsTrend } from '@/api/modules/newsApi'
+import { getAssetCollectionList } from '@/api/modules/assetApi'
 import dayjs from 'dayjs'
 import * as echarts from 'echarts'
 
@@ -159,6 +160,13 @@ const trendLoading = ref(false)
 const showTrendModal = ref(false)
 const modalChartContainer = ref(null)
 let modalChartInstance = null
+
+// 素材集相关状态
+const assetModalVisible = ref(false)
+const loadingAssets = ref(false)
+const addingToAsset = ref(false)
+const assetList = ref([])
+const selectedAssetId = ref(null)
 
 const newsId = route.params.news_id || route.params.id
 
@@ -705,5 +713,53 @@ onBeforeUnmount(() => {
   .news-title {
     font-size: 20px;
   }
+}
+
+.asset-selection {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.asset-radio-group {
+  width: 100%;
+}
+
+.asset-item {
+  padding: 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  transition: all 0.3s;
+}
+
+.asset-item:hover {
+  border-color: #1890ff;
+  background-color: #f6ffed;
+}
+
+.asset-info {
+  margin-left: 8px;
+}
+
+.asset-name {
+  font-weight: 500;
+  color: #262626;
+  margin-bottom: 4px;
+}
+
+.asset-desc {
+  color: #8c8c8c;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.asset-meta {
+  color: #bfbfbf;
+  font-size: 11px;
+}
+
+.no-assets {
+  text-align: center;
+  padding: 20px;
 }
 </style>

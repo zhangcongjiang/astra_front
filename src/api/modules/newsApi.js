@@ -34,11 +34,9 @@ export const getNewsTrend = async (id) => {
   }
 };
 // 将新闻加入素材集
-export const addNewsToAsset = async (newsId, assetId) => {
+export const addNewsToAsset = async (data) => {
   try {
-    const response = await request.post(`/news/${newsId}/add-to-asset/`, {
-      asset_id: assetId
-    });
+    const response = await request.post(`/news/add-to-asset/`, data);
     return response;
   } catch (error) {
     console.error(`加入素材集出错:`, error);

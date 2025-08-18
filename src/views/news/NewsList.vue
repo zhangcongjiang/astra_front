@@ -155,6 +155,40 @@
         </div>
       </a-card>
     </div>
+    
+    <!-- 素材集选择模态框 -->
+    <a-modal
+      v-model:open="assetModalVisible"
+      title="选择素材集"
+      @ok="handleAddToAsset"
+      @cancel="resetAssetModal"
+      :confirm-loading="addingToAsset"
+      :ok-button-props="{ disabled: !selectedAssetId }"
+    >
+      <div class="asset-selection">
+        <a-spin :spinning="loadingAssets">
+          <div v-if="assetList.length === 0 && !loadingAssets" class="no-assets">
+            <a-empty description="暂无素材集">
+              <a-button type="primary" @click="goToAssetPage">创建素材集</a-button>
+            </a-empty>
+          </div>
+          <a-radio-group v-else v-model:value="selectedAssetId" class="asset-radio-group">
+            <div v-for="asset in assetList" :key="asset.id" class="asset-item">
+              <a-radio :value="asset.id">
+                <div class="asset-info">
+                  <div class="asset-name">{{ asset.set_name }}</div>
+                  <div class="asset-desc" v-if="asset.description">{{ asset.description }}</div>
+                  <div class="asset-meta">
+                    <span>创建时间：{{ formatDate(asset.create_time) }}</span>
+                    <span style="margin-left: 16px;">素材数量：{{ asset.asset_count }}</span>
+                  </div>
+                </div>
+              </a-radio>
+            </div>
+          </a-radio-group>
+        </a-spin>
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -162,9 +196,10 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { getNewsList, addNewsToAsset } from '@/api/modules/newsApi'
+import { getNewsList, addNewsToAsset,getNewsDetail} from '@/api/modules/newsApi'
 import Pagination from '@/components/Pagination.vue'
 import dayjs from 'dayjs'
+import { getAssetCollectionList } from '@/api/modules/assetApi'
 
 const router = useRouter()
 const route = useRoute()  // 添加这一行
@@ -237,6 +272,99 @@ const columns = [
   }
 ]
 
+
+// 素材集相关状态
+const assetModalVisible = ref(false)
+const loadingAssets = ref(false)
+const addingToAsset = ref(false)
+const assetList = ref([])
+const selectedAssetId = ref(null)
+const currentNewsRecord = ref(null)
+
+// 修改现有的addToMaterialSet方法
+const addToMaterialSet = async (record) => {
+  currentNewsRecord.value = record
+  assetModalVisible.value = true
+  await loadAssetList()
+}
+
+// 加载素材集列表
+const loadAssetList = async () => {
+  try {
+    loadingAssets.value = true
+    const response = await getAssetCollectionList({ page: 1, page_size: 100 })
+    if (response.code === 0) {
+      assetList.value = response.data.results || []
+    } else {
+      message.error('获取素材集列表失败')
+      assetList.value = []
+    }
+  } catch (error) {
+    message.error('获取素材集列表失败')
+    assetList.value = []
+  } finally {
+    loadingAssets.value = false
+  }
+}
+
+// 处理加入素材集
+const handleAddToAsset = async () => {
+  if (!selectedAssetId.value) {
+    message.warning('请选择一个素材集')
+    return
+  }
+  
+  try {
+    addingToAsset.value = true
+    
+    // 先获取新闻详情确保数据有效
+    const detailResponse = await getNewsDetail(currentNewsRecord.value.news_id)
+    if (detailResponse.code !== 0) {
+      message.error('新闻详情获取失败，无法加入素材集')
+      return
+    }
+    
+    // 准备请求数据
+    const requestData = {
+      news_id: currentNewsRecord.value.news_id,
+      asset_id: selectedAssetId.value
+    }
+    
+    // 调用加入素材集接口
+    const response = await addNewsToAsset(requestData)
+    
+    if (response.code === 0) {
+      message.success('新闻已成功加入素材集')
+      resetAssetModal()
+    } else {
+      message.error(response.message || '加入素材集失败')
+    }
+  } catch (error) {
+    console.error('加入素材集失败:', error)
+    message.error('加入素材集失败，请稍后重试')
+  } finally {
+    addingToAsset.value = false
+  }
+}
+
+// 重置素材集模态框
+const resetAssetModal = () => {
+  assetModalVisible.value = false
+  selectedAssetId.value = null
+  assetList.value = []
+  currentNewsRecord.value = null
+}
+
+// 跳转到素材集页面
+const goToAssetPage = () => {
+  router.push('/assets')
+  resetAssetModal()
+}
+
+// 格式化日期
+const formatDate = (dateString) => {
+  return dayjs(dateString).format('YYYY-MM-DD HH:mm')
+}
 // 获取新闻列表
 const fetchNewsList = async () => {
   try {
@@ -434,7 +562,58 @@ onMounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+/* 素材集选择相关样式 */
+.asset-selection {
+  max-height: 400px;
+  overflow-y: auto;
+}
 
+.asset-radio-group {
+  width: 100%;
+}
+
+.asset-item {
+  padding: 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  transition: all 0.3s;
+}
+
+.asset-item:hover {
+  border-color: #1890ff;
+  background-color: #f6ffed;
+}
+
+.asset-info {
+  margin-left: 8px;
+}
+
+.asset-name {
+  font-weight: 500;
+  color: #262626;
+  margin-bottom: 4px;
+}
+
+.asset-desc {
+  color: #8c8c8c;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.asset-meta {
+  color: #bfbfbf;
+  font-size: 11px;
+}
+
+.asset-meta span {
+  margin-right: 8px;
+}
+
+.no-assets {
+  text-align: center;
+  padding: 20px;
+}
 
 .search-form-wrapper {
   margin-top: 16px;
@@ -501,3 +680,5 @@ onMounted(() => {
   }
 }
 </style>
+
+
