@@ -159,24 +159,17 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { getNewsList, addNewsToAsset } from '@/api/modules/newsApi'
 import Pagination from '@/components/Pagination.vue'
 import dayjs from 'dayjs'
 
 const router = useRouter()
+const route = useRoute()  // 添加这一行
 const loading = ref(false)
 
-// 搜索表单中的字段定义
-const searchForm = reactive({
-  title: '',
-  platform: undefined,
-  category: undefined,
-  timeRange: '1d',
-  sortBy: 'hot'
-})
 
 // 新闻列表
 const newsList = ref([])
@@ -269,10 +262,58 @@ const fetchNewsList = async () => {
 }
 
 // 搜索
+// 从URL查询参数初始化搜索表单
+const searchForm = reactive({
+  title: route.query.title || '',
+  platform: route.query.platform || undefined,
+  category: route.query.category || undefined,
+  timeRange: route.query.timeRange || '1d',
+  sortBy: route.query.sortBy || 'hot'
+})
+
+// 监听搜索表单变化，更新URL
+watch(searchForm, (newForm) => {
+  const query = {}
+  Object.keys(newForm).forEach(key => {
+    if (newForm[key] && newForm[key] !== '') {
+      query[key] = newForm[key]
+    }
+  })
+  
+  // 更新URL但不触发导航
+  router.replace({ 
+    path: '/news', 
+    query: {
+      ...query,
+      page: pagination.current
+    }
+  })
+}, { deep: true })
+
+// 修改搜索方法
 const handleSearch = () => {
   pagination.current = 1
   fetchNewsList()
 }
+
+// 修改跳转到详情页面的方法
+const goToDetail = (record) => {
+  // 保存当前筛选条件到URL
+  const currentQuery = { ...route.query }
+  router.push({
+    path: `/news/${record.news_id}`,
+    query: { from: '/news', ...currentQuery }
+  })
+}
+
+// 组件挂载时从URL恢复状态
+onMounted(() => {
+  // 如果URL中有页码参数，恢复分页状态
+  if (route.query.page) {
+    pagination.current = parseInt(route.query.page)
+  }
+  fetchNewsList()
+})
 
 // 重置搜索
 const resetSearch = () => {

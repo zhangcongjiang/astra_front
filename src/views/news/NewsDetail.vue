@@ -186,7 +186,17 @@ const fetchNewsDetail = async () => {
 
 // 返回列表
 const goBack = () => {
-  router.push('/news')
+  // 如果有来源信息，带上查询参数返回
+  if (route.query.from) {
+    const query = { ...route.query }
+    delete query.from // 移除from参数
+    router.push({
+      path: route.query.from,
+      query
+    })
+  } else {
+    router.push('/news')
+  }
 }
 
 // 刷新
