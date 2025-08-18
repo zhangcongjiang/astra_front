@@ -131,11 +131,59 @@
         <p>暂无趋势数据</p>
       </div>
     </a-modal>
+
+    <!-- 素材集选择模态框 -->
+    <a-modal
+      v-model:open="assetModalVisible"
+      title="选择素材集"
+      width="600px"
+      @cancel="resetAssetModal"
+    >
+      <template #footer>
+        <a-space>
+          <a-button @click="resetAssetModal">取消</a-button>
+          <a-button 
+            type="primary" 
+            :disabled="!selectedAssetId" 
+            :loading="addingToAsset"
+            @click="handleAddToAsset"
+          >
+            确认加入
+          </a-button>
+        </a-space>
+      </template>
+      
+      <div class="asset-selection">
+        <a-spin :spinning="loadingAssets">
+          <div v-if="assetList.length > 0">
+            <a-radio-group v-model:value="selectedAssetId" class="asset-radio-group">
+              <div v-for="asset in assetList" :key="asset.id" class="asset-item">
+                <a-radio :value="asset.id">
+                  <div class="asset-info">
+                    <div class="asset-name">{{ asset.name }}</div>
+                    <div class="asset-desc">{{ asset.description || '暂无描述' }}</div>
+                    <div class="asset-meta">
+                      创建时间：{{ formatDate(asset.created_at) }} | 
+                      素材数量：{{ asset.asset_count || 0 }}
+                    </div>
+                  </div>
+                </a-radio>
+              </div>
+            </a-radio-group>
+          </div>
+          <div v-else class="no-assets">
+            <a-empty description="暂无素材集">
+              <a-button type="primary" @click="goToAssetPage">创建素材集</a-button>
+            </a-empty>
+          </div>
+        </a-spin>
+      </div>
+    </a-modal>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, h } from 'vue'
+import { ref, onMounted, onBeforeUnmount, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { 
@@ -293,6 +341,84 @@ const showTrendChart = async () => {
   }
 }
 
+
+// 素材集相关方法
+const showAssetModal = async () => {
+  // 先确保有新闻数据
+  if (!newsData.value || !newsData.value.news) {
+    message.warning('新闻数据加载中，请稍后再试')
+    return
+  }
+  
+  assetModalVisible.value = true
+  await loadAssetList()
+}
+
+const loadAssetList = async () => {
+  try {
+    loadingAssets.value = true
+    const response = await getAssetCollectionList()
+    if (response.code === 0) {
+      assetList.value = response.data.results || []
+    } else {
+      message.error(response.message || '获取素材集列表失败')
+    }
+  } catch (error) {
+    console.error('获取素材集列表失败:', error)
+    message.error('获取素材集列表失败')
+  } finally {
+    loadingAssets.value = false
+  }
+}
+
+const handleAddToAsset = async () => {
+  if (!selectedAssetId.value) {
+    message.warning('请选择一个素材集')
+    return
+  }
+  
+  if (!newsData.value || !newsData.value.news || !newsData.value.news.news_id) {
+    message.error('新闻数据不完整，无法加入素材集')
+    return
+  }
+  
+  try {
+    addingToAsset.value = true
+    // 修正参数传递方式
+    const response = await addNewsToAsset({
+      news_id: newsData.value.news.news_id,
+      asset_id: selectedAssetId.value
+    })
+    
+    if (response.code === 0) {
+      message.success('已成功加入素材集')
+      resetAssetModal()
+    } else {
+      message.error(response.message || '加入素材集失败')
+    }
+  } catch (error) {
+    console.error('加入素材集失败:', error)
+    message.error('加入素材集失败')
+  } finally {
+    addingToAsset.value = false
+  }
+}
+
+const resetAssetModal = () => {
+  assetModalVisible.value = false
+  selectedAssetId.value = null
+  loadingAssets.value = false
+  addingToAsset.value = false
+}
+
+const goToAssetPage = () => {
+  resetAssetModal()
+  router.push('/assets')
+}
+
+const formatDate = (dateString) => {
+  return dayjs(dateString).format('YYYY-MM-DD HH:mm')
+}
 // 获取热度趋势数据
 const fetchTrendData = async () => {
   try {

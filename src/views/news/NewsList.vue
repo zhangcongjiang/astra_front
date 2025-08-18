@@ -314,34 +314,28 @@ const handleAddToAsset = async () => {
     return
   }
   
+  if (!currentNewsId.value) {
+    message.error('新闻ID不存在，无法加入素材集')
+    return
+  }
+  
   try {
     addingToAsset.value = true
-    
-    // 先获取新闻详情确保数据有效
-    const detailResponse = await getNewsDetail(currentNewsRecord.value.news_id)
-    if (detailResponse.code !== 0) {
-      message.error('新闻详情获取失败，无法加入素材集')
-      return
-    }
-    
-    // 准备请求数据
-    const requestData = {
-      news_id: currentNewsRecord.value.news_id,
+    // 修正参数传递方式
+    const response = await addNewsToAsset({
+      news_id: currentNewsId.value,
       asset_id: selectedAssetId.value
-    }
-    
-    // 调用加入素材集接口
-    const response = await addNewsToAsset(requestData)
+    })
     
     if (response.code === 0) {
-      message.success('新闻已成功加入素材集')
+      message.success('已成功加入素材集')
       resetAssetModal()
     } else {
       message.error(response.message || '加入素材集失败')
     }
   } catch (error) {
     console.error('加入素材集失败:', error)
-    message.error('加入素材集失败，请稍后重试')
+    message.error('加入素材集失败')
   } finally {
     addingToAsset.value = false
   }
