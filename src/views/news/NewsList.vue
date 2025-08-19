@@ -196,7 +196,7 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { getNewsList, addNewsToAsset,getNewsDetail} from '@/api/modules/newsApi'
+import { getNewsList, addNewsToAsset, getNewsDetail } from '@/api/modules/newsApi'
 import Pagination from '@/components/Pagination.vue'
 import dayjs from 'dayjs'
 import { getAssetCollectionList } from '@/api/modules/assetApi'
@@ -314,16 +314,28 @@ const handleAddToAsset = async () => {
     return
   }
   
-  if (!currentNewsId.value) {
+  if (!currentNewsRecord.value || !currentNewsRecord.value.news_id) {
     message.error('新闻ID不存在，无法加入素材集')
     return
   }
   
   try {
     addingToAsset.value = true
-    // 修正参数传递方式
+    
+    // 先获取新闻详情
+    console.log('正在获取新闻详情，news_id:', currentNewsRecord.value.news_id)
+    const newsDetailResponse = await getNewsDetail(currentNewsRecord.value.news_id)
+    
+    if (newsDetailResponse.code !== 0) {
+      message.error('获取新闻详情失败，无法加入素材集')
+      return
+    }
+    
+    console.log('新闻详情获取成功:', newsDetailResponse.data)
+    
+    // 然后调用加入素材集接口
     const response = await addNewsToAsset({
-      news_id: currentNewsId.value,
+      news_id: currentNewsRecord.value.news_id,
       asset_id: selectedAssetId.value
     })
     
