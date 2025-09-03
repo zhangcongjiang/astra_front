@@ -393,14 +393,15 @@ const previewMusic = async (music) => {
       const filePath = response.data.file_path;
       // 根据 file_path 去后端获取音频文件
       console.log('准备播放的文件路径:', filePath);
-      const audioResponse = await request({
-        method: 'get',
-        url: `/${filePath}`,
-        responseType: 'arraybuffer' // 获取二进制数据
-      });
-
-      // 音频播放逻辑
-      const blob = new Blob([audioResponse], { type: `audio/${response.data.format}` });
+      
+      // 使用fetch直接请求文件
+      const audioResponse = await fetch(filePath);
+      if (!audioResponse.ok) {
+        throw new Error(`HTTP error! status: ${audioResponse.status}`);
+      }
+      
+      const arrayBuffer = await audioResponse.arrayBuffer();
+      const blob = new Blob([arrayBuffer], { type: `audio/${response.data.format}` });
       const audioUrl = URL.createObjectURL(blob);
       const audio = new Audio(audioUrl);
       audio.play();
@@ -629,13 +630,15 @@ const togglePlay = async (music) => {
     const response = await soundPlay(music.id);
     if (response && response.data && response.data.file_path) {
       const filePath = response.data.file_path;
-      const audioResponse = await request({
-        method: 'get',
-        url: `/${filePath}`,
-        responseType: 'arraybuffer'
-      });
-
-      const blob = new Blob([audioResponse], { type: `audio/${response.data.format}` });
+      
+      // 使用fetch直接请求文件
+      const audioResponse = await fetch(filePath);
+      if (!audioResponse.ok) {
+        throw new Error(`HTTP error! status: ${audioResponse.status}`);
+      }
+      
+      const arrayBuffer = await audioResponse.arrayBuffer();
+      const blob = new Blob([arrayBuffer], { type: `audio/${response.data.format}` });
       const audioUrl = URL.createObjectURL(blob);
       const audio = new Audio(audioUrl);
 
@@ -926,17 +929,20 @@ const fetchAssetCollections = async () => {
     const response = await getAssetCollectionList({});
     console.log('素材集API返回:', response);
     
-    if (response && response.results && Array.isArray(response.results)) {
+    if (response?.data?.results && Array.isArray(response.data.results)) {
+      assetCollections.value = response.data.results;
+      console.log('设置的素材集数据:', assetCollections.value);
+    } else if (response?.results && Array.isArray(response.results)) {
+      // 兼容旧的数据格式
       assetCollections.value = response.results;
-      console.log('素材集列表:', assetCollections.value);
+      console.log('设置的素材集数据:', assetCollections.value);
     } else {
-      console.warn('素材集数据格式异常:', response);
+      console.log('数据格式不正确:', response);
       assetCollections.value = [];
     }
   } catch (error) {
     console.error('获取素材集列表失败:', error);
     message.error('获取素材集列表失败');
-    assetCollections.value = [];
   } finally {
     loadingAssets.value = false;
   }

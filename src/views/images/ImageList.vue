@@ -695,12 +695,17 @@ const fetchAssetCollections = async () => {
     const response = await getAssetCollectionList({});
     console.log('API返回数据:', response);
     
-    // 修改条件判断：直接检查 results 数组
-    if (response?.results && Array.isArray(response.results)) {
+    // 修正：应该检查 response.data.results
+    if (response?.data?.results && Array.isArray(response.data.results)) {
+      assetCollections.value = response.data.results;
+      console.log('设置的素材集数据:', assetCollections.value);
+    } else if (response?.results && Array.isArray(response.results)) {
+      // 兼容旧的数据格式
       assetCollections.value = response.results;
       console.log('设置的素材集数据:', assetCollections.value);
     } else {
       console.log('数据格式不正确:', response);
+      assetCollections.value = [];
     }
   } catch (error) {
     console.error('获取素材集列表失败:', error);
