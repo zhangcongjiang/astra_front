@@ -6,16 +6,12 @@
         <a-form-item label="标题">
           <a-input v-model:value="basicForm.title" placeholder="输入标题" @pressEnter="handleSearch" />
         </a-form-item>
-        <a-form-item label="创作时间">
-          <a-range-picker v-model:value="basicForm.dateRange" :show-time="{ format: 'HH:mm' }" format="YYYY-MM-DD HH:mm"
-            :placeholder="['开始时间', '结束时间']" @change="handleDateChange" />
-        </a-form-item>
-        <a-form-item label="用户">
-          <UserSelect 
-            v-model="basicForm.creator" 
-            placeholder="选择用户" 
-            width="120px"
-          />
+        <a-form-item label="视频类型">
+          <a-select v-model:value="basicForm.videoType" placeholder="选择类型" style="width: 120px" allowClear>
+            <a-select-option :value="undefined">全部</a-select-option>
+            <a-select-option value="JianYing">剪映视频</a-select-option>
+            <a-select-option value="Regular">普通视频</a-select-option>
+          </a-select>
         </a-form-item>
         <a-form-item label="生成状态">
           <a-select v-model:value="basicForm.result" placeholder="选择状态" style="width: 120px" allowClear>
@@ -25,6 +21,19 @@
             <a-select-option value="Fail">失败</a-select-option>
           </a-select>
         </a-form-item>
+        
+        <a-form-item label="用户">
+          <UserSelect 
+            v-model="basicForm.creator" 
+            placeholder="选择用户" 
+            width="120px"
+          />
+        </a-form-item>
+        <a-form-item label="创作时间">
+          <a-range-picker v-model:value="basicForm.dateRange" :show-time="{ format: 'HH:mm' }" format="YYYY-MM-DD HH:mm"
+            :placeholder="['开始时间', '结束时间']" @change="handleDateChange" />
+        </a-form-item>
+        
         <a-form-item>
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="resetBasicSearch">重置</a-button>
@@ -73,6 +82,7 @@ const basicForm = reactive({
   startTime: null,
   endTime: null,
   creator: undefined,
+  videoType: undefined,
   result: undefined
 });
 
@@ -88,6 +98,7 @@ const loadVideoList = async () => {
       start_time: basicForm.startTime ? dayjs(basicForm.startTime).format('YYYY-MM-DD HH:mm:ss') : undefined,
       end_time: basicForm.endTime ? dayjs(basicForm.endTime).format('YYYY-MM-DD HH:mm:ss') : undefined,
       creator: basicForm.creator || undefined,
+      video_type: basicForm.videoType || undefined,
       result: basicForm.result || undefined
     };
 
@@ -126,6 +137,7 @@ const resetBasicSearch = () => {
   basicForm.startTime = null;
   basicForm.endTime = null;
   basicForm.creator = undefined;
+  basicForm.videoType = undefined;
   basicForm.result = undefined;
   handleSearch();
 };
@@ -168,6 +180,18 @@ const getStatusInfo = (result) => {
   }
 };
 
+// 获取视频类型文本
+const getVideoTypeText = (videoType) => {
+  switch (videoType) {
+    case 'JianYing':
+      return '剪映视频';
+    case 'Regular':
+      return '普通视频';
+    default:
+      return '未知类型';
+  }
+};
+
 // 表格列定义
 const columns = [
   {
@@ -188,6 +212,13 @@ const columns = [
     width: 100,
     align: 'center',
     render: (row) => row.username || '未知用户'  // 显示username字段
+  },
+  {
+    title: '视频类型',
+    key: 'video_type',
+    width: 100,
+    align: 'center',
+    render: (row) => getVideoTypeText(row.video_type)
   },
   {
     title: '状态',

@@ -167,13 +167,18 @@ const formatTime = (timeStr) => {
 // 格式化间隔时间显示
 const formatInterval = (interval) => {
   if (!interval) return '无';
-  // interval格式为 "HH:MM:SS"，如 "00:10:00" 表示10分钟
-  const parts = interval.split(':');
+  // interval格式为 "DD HH:MM:SS"，如 "1 00:00:00" 表示1天
+  const dayparts = interval.split(' ');
+  const days = parseInt(dayparts[0]);
+
+  const parts = dayparts[1].split(':');
+
   const hours = parseInt(parts[0]);
   const minutes = parseInt(parts[1]);
   const seconds = parseInt(parts[2]);
   
   let result = [];
+  if (days > 0) result.push(`${days}天`);
   if (hours > 0) result.push(`${hours}小时`);
   if (minutes > 0) result.push(`${minutes}分钟`);
   if (seconds > 0) result.push(`${seconds}秒`);

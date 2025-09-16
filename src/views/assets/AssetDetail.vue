@@ -49,11 +49,33 @@
                 >
                   <template #cover>
                     <div class="item-cover">
-                      <img 
-                        :src="item.url" 
-                        :alt="item.name"
-                        class="cover-image"
-                      />
+                      <div 
+                        class="lazy-image-container"
+                        :ref="el => setImageRef(el, item.id)"
+                      >
+                        <img 
+                          v-if="loadedImages.has(item.id)"
+                          :src="item.url" 
+                          :alt="item.name"
+                          class="cover-image"
+                          @load="onImageLoad(item.id)"
+                          @error="onImageError(item.id)"
+                        />
+                        <div 
+                          v-else-if="errorImages.has(item.id)"
+                          class="image-error"
+                        >
+                          <FileImageOutlined :style="{ fontSize: '32px', color: '#ccc' }" />
+                          <p>加载失败</p>
+                        </div>
+                        <div 
+                          v-else
+                          class="image-placeholder"
+                        >
+                          <a-spin size="small" />
+                          <p>加载中...</p>
+                        </div>
+                      </div>
                       <div class="delete-overlay" @click.stop>
                         <a-popconfirm
                           title="确定要删除这个素材吗？"
@@ -349,7 +371,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, h } from 'vue'
+import { ref, computed, onMounted, onUnmounted, h, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import { 
@@ -393,6 +415,12 @@ const searchKeyword = ref('')
 const imageItems = ref([])
 const videoItems = ref([])
 const audioItems = ref([])
+
+// 图片懒加载相关状态
+const loadedImages = ref(new Set())
+const errorImages = ref(new Set())
+const imageRefs = ref(new Map())
+const imageObserver = ref(null)
 const playingAudioId = ref(null)
 
 // 播放状态管理
@@ -439,6 +467,91 @@ const filteredTextItems = computed(() => {
 const totalItemsCount = computed(() => {
   return imageItems.value.length + videoItems.value.length + audioItems.value.length + textItems.value.length
 })
+
+// 图片懒加载相关方法
+const setImageRef = (el, imageId) => {
+  if (el) {
+    imageRefs.value.set(imageId, el)
+    // 开始观察这个元素
+    if (imageObserver.value) {
+      imageObserver.value.observe(el)
+    }
+  } else {
+    // 清理引用
+    const oldEl = imageRefs.value.get(imageId)
+    if (oldEl && imageObserver.value) {
+      imageObserver.value.unobserve(oldEl)
+    }
+    imageRefs.value.delete(imageId)
+  }
+}
+
+// 初始化Intersection Observer
+const initImageObserver = () => {
+  if (typeof IntersectionObserver === 'undefined') {
+    // 如果浏览器不支持IntersectionObserver，直接加载所有图片
+    imageItems.value.forEach(item => {
+      loadedImages.value.add(item.id)
+    })
+    return
+  }
+
+  imageObserver.value = new IntersectionObserver(
+    (entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          // 找到对应的图片ID
+          const imageId = Array.from(imageRefs.value.entries())
+            .find(([id, el]) => el === entry.target)?.[0]
+          
+          if (imageId && !loadedImages.value.has(imageId) && !errorImages.value.has(imageId)) {
+            // 开始加载图片
+            loadedImages.value.add(imageId)
+            // 停止观察这个元素
+            imageObserver.value.unobserve(entry.target)
+          }
+        }
+      })
+    },
+    {
+      // 提前50px开始加载
+      rootMargin: '50px',
+      // 当元素10%可见时触发
+      threshold: 0.1
+    }
+  )
+}
+
+// 图片加载成功回调
+const onImageLoad = (imageId) => {
+  // 图片加载成功，可以添加一些额外的处理逻辑
+  console.log(`图片 ${imageId} 加载成功`)
+}
+
+// 图片加载失败回调
+const onImageError = (imageId) => {
+  console.error(`图片 ${imageId} 加载失败`)
+  loadedImages.value.delete(imageId)
+  errorImages.value.add(imageId)
+}
+
+// 清理懒加载状态
+const clearLazyLoadState = () => {
+  loadedImages.value.clear()
+  errorImages.value.clear()
+  imageRefs.value.clear()
+  
+  if (imageObserver.value) {
+    imageObserver.value.disconnect()
+    imageObserver.value = null
+  }
+}
+
+// 重置懒加载（在数据重新加载时调用）
+const resetLazyLoad = () => {
+  clearLazyLoadState()
+  initImageObserver()
+}
 
 // 图片预览相关方法
 const openPreview = (image, index) => {
@@ -814,6 +927,11 @@ const loadAssetDetail = async () => {
       console.error('API返回错误:', response)
       message.error(response.message || '获取素材集详情失败')
     }
+    
+    // 在数据加载完成后重置懒加载
+    await nextTick()
+    resetLazyLoad()
+    
   } catch (error) {
     console.error('加载素材集详情失败:', error)
     console.error('错误详情:', error.response)
@@ -871,23 +989,29 @@ const formatTime = (time) => {
 // 生命周期
 onMounted(() => {
   loadAssetDetail()
+  initImageObserver()
   document.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
-  // 清理所有文本保存定时器
-  textSaveTimers.forEach(timer => {
-    clearTimeout(timer)
-  })
-  textSaveTimers.clear()
-  
-  document.removeEventListener('keydown', handleKeydown)
+  // 停止所有音频播放
   if (currentPlayingAudio.value) {
     currentPlayingAudio.value.pause()
   }
+  
+  // 停止所有视频播放
   if (currentPlayingVideo.value) {
     currentPlayingVideo.value.pause()
   }
+  
+  // 清理文本保存定时器
+  textSaveTimers.forEach(timer => clearTimeout(timer))
+  textSaveTimers.clear()
+  
+  // 清理懒加载
+  clearLazyLoadState()
+  
+  document.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -1033,11 +1157,47 @@ onUnmounted(() => {
   position: relative;
 }
 
+.lazy-image-container {
+  width: 100%;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f5f5f5;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
 .cover-image {
   width: 100%;
   height: 100%;
-  object-fit: cover; /* 保持图片比例，填满容器 */
+  object-fit: cover;
   transition: transform 0.3s ease;
+}
+
+.image-placeholder,
+.image-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 12px;
+}
+
+.image-placeholder p,
+.image-error p {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+}
+
+.image-error {
+  color: #ff4d4f;
+}
+
+/* 加载动画优化 */
+.image-placeholder .ant-spin {
+  margin-bottom: 8px;
 }
 
 .item-card:hover .cover-image {
