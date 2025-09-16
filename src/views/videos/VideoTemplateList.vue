@@ -58,7 +58,26 @@
                             
                             <!-- 左侧封面 -->
                             <div class="cover-wrapper">
-                                <img :src="getCoverUrl(template)" class="cover-image" :class="template.orientation" alt="视频封面">
+                                <div class="video-container" :class="template.orientation">
+                                    <video 
+                                        :src="getVideoUrl(template)" 
+                                        class="cover-video" 
+                                        :class="template.orientation"
+                                        preload="metadata"
+                                        muted
+                                        @click="playVideo($event)"
+                                        @loadedmetadata="onVideoLoaded($event)"
+                                    >
+                                        您的浏览器不支持视频播放
+                                    </video>
+                                    <div class="play-overlay" @click="playVideo($event)">
+                                        <div class="play-button">
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                                                <path d="M8 5v14l11-7z"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             
                             <!-- 右侧内容 -->
@@ -349,6 +368,44 @@ const getDefaultCover = (orientation) => {
     ? '/src/assets/images/default-horizontal.jpg'
     : '/src/assets/images/default-vertical.jpg';
 };
+
+// 获取视频URL
+const getVideoUrl = (template) => {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8089';
+  const staticBaseUrl = baseUrl.replace('/api', '');
+  
+  if (template.demo) {
+    // 如果demo是完整URL，直接返回
+    if (template.demo.startsWith('http')) {
+      return template.demo;
+    }
+    // 如果是相对路径，拼接完整URL
+    return `${staticBaseUrl}${template.demo}`;
+  }
+  
+  return template.videoUrl || template.cover || '';
+};
+
+// 视频播放处理
+const playVideo = (event) => {
+  const video = event.target.tagName === 'VIDEO' ? event.target : event.target.closest('.video-container').querySelector('video');
+  const overlay = event.target.closest('.video-container').querySelector('.play-overlay');
+  
+  if (video.paused) {
+    video.play();
+    overlay.style.display = 'none';
+  } else {
+    video.pause();
+    overlay.style.display = 'flex';
+  }
+};
+
+// 视频元数据加载完成
+const onVideoLoaded = (event) => {
+  const video = event.target;
+  // 设置视频封面帧（第一帧）
+  video.currentTime = 0.1;
+};
 </script>
 
 <style scoped>
@@ -549,6 +606,80 @@ const getDefaultCover = (orientation) => {
 .cover-image.vertical {
   aspect-ratio: 9/16;
   height: 100%;
+}
+
+/* 视频容器样式 */
+.video-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cover-video {
+  border-radius: 8px;
+  object-fit: cover;
+  object-position: center;
+  background: transparent;
+}
+
+.cover-video.horizontal {
+  aspect-ratio: 16/9;
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+}
+
+.cover-video.vertical {
+  aspect-ratio: 9/16;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+}
+
+.play-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  transition: opacity 0.3s ease;
+  cursor: pointer;
+}
+
+.play-overlay:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.play-button {
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.play-button:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.1);
+}
+
+.play-button svg {
+  margin-left: 2px; /* 视觉居中调整 */
 }
 
 .template-card {
