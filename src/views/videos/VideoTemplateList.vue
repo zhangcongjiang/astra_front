@@ -15,6 +15,13 @@
                     <a-form-item label="模板名称">
                         <a-input v-model:value="basicForm.name" placeholder="输入模板名称" @pressEnter="handleSearch" />
                     </a-form-item>
+                    <a-form-item label="模板类型">
+                        <a-select v-model:value="basicForm.templateType" placeholder="选择模板类型" style="width: 120px" allowClear>
+                            <a-select-option value="">全部</a-select-option>
+                            <a-select-option value="JianYing">剪映视频</a-select-option>
+                            <a-select-option value="Regular">普通视频</a-select-option>
+                        </a-select>
+                    </a-form-item>
                     <a-form-item label="方向">
                         <a-select v-model:value="basicForm.orientation" placeholder="全部方向" style="width: 120px">
                             <a-select-option value="">全部</a-select-option>
@@ -48,12 +55,6 @@
                            :xs="24" :sm="12" :md="8" :lg="6">
                     <a-card hoverable class="template-card">
                         <div class="card-content">
-                            <!-- 视频类型标签 - 移到卡片右上角 -->
-                            <div class="video-type">
-                                <a-tag :color="template.orientation === 'horizontal' ? 'blue' : 'green'">
-                                    {{ template.orientation === 'horizontal' ? '16 : 9' : '9 : 16' }}
-                                </a-tag>
-                            </div>
                             
                             <!-- 左侧封面 -->
                             <div class="cover-wrapper">
@@ -65,6 +66,14 @@
                                 <!-- 上部信息 -->
                                 <div class="info-wrapper">
                                     <h3>{{ template.name }}</h3>
+                                    <div class="template-type-info">
+                                        <span class="type-label">类型：</span>
+                                        <span class="type-value">{{ getTemplateTypeText(template.template_type) }}</span>
+                                    </div>
+                                    <div class="template-size-info">
+                                        <span class="size-label">尺寸：</span>
+                                        <span class="size-value">{{ template.orientation === 'horizontal' ? '横版视频（16:9）' : '竖版视频（9:16）' }}</span>
+                                    </div>
                                     <p class="description" :title="template.description">
                                         {{ template.description }}
                                     </p>
@@ -115,6 +124,7 @@ const searchType = ref('basic');
 // 基础查询表单
 const basicForm = reactive({
     name: '',
+    templateType: '',
     orientation: '',
     dateRange: [],
     startTime: null,
@@ -190,6 +200,9 @@ const fetchTemplates = async () => {
             if (basicForm.name) {
                 params.name = basicForm.name;
             }
+            if (basicForm.templateType) {
+                params.template_type = basicForm.templateType;
+            }
             if (basicForm.orientation) {
                 params.orientation = basicForm.orientation;
             }
@@ -209,6 +222,7 @@ const fetchTemplates = async () => {
                 name: template.name,
                 description: template.desc,
                 orientation: template.orientation?.toLowerCase() || 'horizontal',
+                template_type: template.template_type,
                 tags: template.tags || [],
                 cover: template.demo, // 使用demo字段作为封面
                 videoUrl: template.demo,
@@ -249,6 +263,7 @@ const handleDateChange = (dates) => {
 // 重置基础查询
 const resetBasicSearch = () => {
     basicForm.name = '';
+    basicForm.templateType = '';
     basicForm.orientation = '';
     basicForm.dateRange = [];
     basicForm.startTime = null;
@@ -292,6 +307,18 @@ const getTagNames = (tagIds) => {
     return names;
 };
 
+// 获取模板类型文本
+const getTemplateTypeText = (templateType) => {
+    switch (templateType) {
+        case 'JianYing':
+            return '剪映视频';
+        case 'Regular':
+            return '普通视频';
+        default:
+            return '未知类型';
+    }
+};
+
 // 根据标签ID查找标签
 const findTagById = (tagId) => {
     for (const category of tagCategories.value) {
@@ -332,6 +359,33 @@ const getDefaultCover = (orientation) => {
 
 .video-type .ant-tag {
     font-size: 12px;
+    font-weight: 500;
+}
+
+.template-type-info {
+    margin: 8px 0;
+    font-size: 12px;
+    color: #666;
+}
+
+.template-size-info {
+    margin: 8px 0;
+    font-size: 12px;
+    color: #666;
+}
+
+.type-label, .size-label {
+    font-weight: 500;
+    margin-right: 4px;
+}
+
+.type-value {
+    color: #1890ff;
+    font-weight: 500;
+}
+
+.size-value {
+    color: #52c41a;
     font-weight: 500;
 }
 
