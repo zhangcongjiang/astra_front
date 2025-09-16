@@ -41,10 +41,105 @@
       </a-form>
     </div>
 
-    <!-- 数据表格 -->
-    <n-card>
-      <n-data-table :columns="columns" :data="videoList" :pagination="false" :loading="loading" />
-    </n-card>
+    <!-- 视频卡片列表 -->
+    <div class="video-grid">
+      <a-spin :spinning="loading" tip="加载中...">
+        <a-row :gutter="[16, 16]">
+          <a-col v-for="video in videoList" :key="video.id" :xs="24" :sm="12" :md="8" :lg="6">
+            <a-card hoverable class="video-card">
+              <div class="card-content">
+                <!-- 视频封面或播放器 -->
+                <div class="video-cover">
+                  <!-- 普通视频且生成成功时显示视频播放器 -->
+                  <div v-if="video.video_type === 'Regular' && video.result === 'Success' && video.video_path" class="video-player">
+                    <video 
+                      :key="video.id" 
+                      :src="getVideoUrl(video)" 
+                      controls 
+                      preload="metadata" 
+                      @error="handleVideoError"
+                      @fullscreenchange="handleFullscreenChange"
+                      @loadstart="handleVideoLoadStart"
+                      @loadedmetadata="handleVideoLoadedMetadata"
+                      @canplay="handleVideoCanPlay"
+                      @click="handleVideoClick"
+                      @play="handleVideoPlay"
+                      @pause="handleVideoPause"
+                    >
+                      您的浏览器不支持视频播放
+                    </video>
+                  </div>
+                  <!-- 其他情况显示占位图 -->
+                  <div v-else class="cover-placeholder">
+                    <video-camera-outlined style="font-size: 48px; color: #ccc;" />
+                  </div>
+                  
+                  <!-- 状态提示信息 -->
+                  <div class="status-tip" :class="{ 'pointer-events-none': video.video_type === 'Regular' && video.result === 'Success' }">
+                    <!-- 生成中状态 -->
+                     <div v-if="video.result === 'Processing'" class="tip-text processing">
+                       视频正在急速生成中...
+                     </div>
+                    
+                    <!-- 生成失败状态 -->
+                    <div v-else-if="video.result === 'Fail'" class="tip-text failed">
+                      视频生成失败，请重试
+                    </div>
+                    
+                    <!-- 剪映视频成功状态 -->
+                     <div v-else-if="video.video_type === 'JianYing' && video.result === 'Success'" class="tip-text jianying">
+                       剪映视频请打开剪映播放
+                     </div>
+                  </div>
+                </div>
+                
+                <!-- 视频信息 -->
+                <div class="video-info">
+                  <div class="video-title">{{ video.title }}</div>
+                  
+                  <!-- 用户和创建时间一行 -->
+                  <div class="meta-row">
+                    <div class="meta-item">
+                      <span class="label">用户:</span>
+                      <span class="value">{{ video.username || '未知用户' }}</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="label">创建时间:</span>
+                      <span class="value">{{ formatTime(video.create_time) }}</span>
+                    </div>
+                  </div>
+                  
+                  <!-- 视频类型和生成状态一行 -->
+                  <div class="meta-row">
+                    <div class="meta-item">
+                      <span class="label">类型:</span>
+                      <span class="value">{{ getVideoTypeText(video.video_type) }}</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="label">状态:</span>
+                      <div class="status-container">
+                        <a-tag v-if="video.result !== 'Process'" :color="getStatusColor(video.result)">
+                          {{ getStatusInfo(video.result).text }}
+                        </a-tag>
+                        <div v-else class="progress-container">
+                          <a-progress :percent="Math.round((video.process || 0) * 100)" size="small" :show-info="false" />
+                          <span class="progress-text">{{ Math.round((video.process || 0) * 100) }}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <template #actions>
+                <a-button type="primary" size="small" @click="showDetail(video)">详情</a-button>
+                <a-button type="danger" size="small" @click="handleDelete(video)">删除</a-button>
+              </template>
+            </a-card>
+          </a-col>
+        </a-row>
+      </a-spin>
+    </div>
 
     <!-- 分页组件 -->
     <Pagination v-model:current="pagination.current" v-model:pageSize="pagination.pageSize" :total="pagination.total"
@@ -56,6 +151,7 @@
 import { ref, computed, reactive, onMounted } from 'vue';
 import { h } from 'vue';
 import { NDataTable, NCard, NButton, NProgress, NTag, useDialog, useMessage } from 'naive-ui';
+import { VideoCameraOutlined } from '@ant-design/icons-vue';
 import Pagination from '@/components/Pagination.vue';
 import { getVideoList,deleteVideo } from '@/api/modules/videoApi.js';
 import dayjs from 'dayjs';
@@ -107,6 +203,18 @@ const loadVideoList = async () => {
     if (response.code === 0) {
       videoList.value = response.data.results || [];
       pagination.total = response.data.count || 0;
+      
+      // 调试：打印视频数据
+      console.log('获取到的视频列表:', videoList.value);
+      videoList.value.forEach((video, index) => {
+        console.log(`视频${index + 1}:`, {
+          id: video.id,
+          video_type: video.video_type,
+          result: video.result,
+          video_path: video.video_path,
+          渲染条件: video.video_type === 'Regular' && video.result === 'Success' && video.video_path
+        });
+      });
     } else {
       console.error('获取视频列表失败:', response.message);
     }
@@ -191,6 +299,84 @@ const getVideoTypeText = (videoType) => {
       return '未知类型';
   }
 };
+
+// 获取状态颜色
+const getStatusColor = (result) => {
+  switch (result) {
+    case 'Success':
+      return 'success';
+    case 'Fail':
+      return 'error';
+    case 'Process':
+      return 'processing';
+    default:
+      return 'default';
+  }
+};
+
+// 格式化时间
+const formatTime = (time) => {
+  return dayjs(time).format('YYYY-MM-DD HH:mm:ss');
+};
+
+// 获取视频URL
+const getVideoUrl = (video) => {
+  console.log('getVideoUrl调用:', video);
+  if (!video?.video_path) {
+    console.log('视频路径为空');
+    return '';
+  }
+  console.log('返回视频URL:', video.video_path);
+  // video_path已经是完整路径，直接返回
+  return video.video_path;
+};
+
+// 处理视频加载错误
+const handleVideoError = (event) => {
+  console.error('视频加载失败:', event);
+  message.error('视频加载失败');
+};
+
+// 调试用的视频事件处理函数
+const handleVideoLoadStart = (event) => {
+  console.log('视频开始加载:', event.target.src);
+};
+
+const handleVideoCanPlay = (event) => {
+  console.log('视频可以播放:', event.target.src);
+};
+
+const handleVideoLoadedMetadata = (event) => {
+  console.log('视频元数据加载完成:', event.target.src);
+  // 只在首次加载时重置播放位置
+  if (event.target.currentTime > 0) {
+    console.log('检测到缓存的播放位置，重置为0');
+    event.target.currentTime = 0;
+  }
+};
+
+const handleVideoClick = (event) => {
+  console.log('视频被点击:', event.target);
+  console.log('视频元素状态:', {
+    src: event.target.src,
+    readyState: event.target.readyState,
+    networkState: event.target.networkState,
+    paused: event.target.paused,
+    controls: event.target.controls,
+    currentTime: event.target.currentTime,
+    duration: event.target.duration
+  });
+};
+
+const handleVideoPlay = (event) => {
+  console.log('视频开始播放:', event.target.currentTime);
+};
+
+const handleVideoPause = (event) => {
+  console.log('视频暂停:', event.target.currentTime);
+};
+
+
 
 // 表格列定义
 const columns = [
@@ -410,5 +596,212 @@ const handleDelete = async (row) => {
 /* 操作按钮样式 */
 .n-button {
   margin-right: 8px;
+}
+
+/* 视频卡片网格样式 */
+.video-grid {
+  margin-bottom: 20px;
+}
+
+.video-card {
+  height: 100%;
+  transition: all 0.3s ease;
+}
+
+.video-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.card-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* 视频封面样式 */
+.video-cover {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-player {
+  width: 100%;
+  height: 100%;
+  background: #f0f0f0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.video-player video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  background-color: #000;
+}
+
+.cover-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+
+
+/* 状态提示信息样式 */
+.status-tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+.tip-text {
+  color: white;
+  font-size: 16px;
+  font-weight: 500;
+  text-align: center;
+  padding: 8px 16px;
+  border-radius: 4px;
+  backdrop-filter: blur(4px);
+}
+
+.tip-text.processing {
+  background: rgba(24, 144, 255, 0.8);
+}
+
+.tip-text.failed {
+  background: rgba(255, 77, 79, 0.8);
+}
+
+.tip-text.jianying {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.pointer-events-none {
+  pointer-events: none;
+}
+
+/* 视频信息样式 */
+.video-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.video-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+  color: #262626;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.meta-item {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+}
+
+.meta-item:first-child {
+  margin-right: 12px;
+}
+
+.label {
+  color: #8c8c8c;
+  font-size: 12px;
+  margin-right: 4px;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.value {
+  color: #595959;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 状态容器样式 */
+.status-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-container .ant-tag {
+  margin: 0;
+  font-size: 12px;
+}
+
+.status-container .ant-progress {
+  flex: 1;
+  max-width: 100px;
+}
+
+.progress-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+
+.progress-container .ant-progress {
+  flex: 1;
+  margin: 0;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: #666;
+  min-width: 35px;
+  text-align: right;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .video-cover {
+    height: 120px;
+  }
+  
+  .video-title {
+    font-size: 14px;
+  }
+  
+  .meta-row {
+    font-size: 12px;
+  }
 }
 </style>
