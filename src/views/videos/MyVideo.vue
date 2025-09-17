@@ -132,7 +132,17 @@
               </div>
               
               <template #actions>
-                <a-button type="primary" size="small" @click="showDetail(video)">详情</a-button>
+                <a-button 
+                  v-if="video.video_type === 'Regular' && video.result === 'Success' && video.video_path" 
+                  
+                  type="primary"
+                  size="small" 
+                  @click="showPublishModal(video)"
+                >
+                  发布
+                </a-button>
+                <a-button type="default"  size="small" @click="showDetail(video)">详情</a-button>
+                
                 <a-button type="danger" size="small" @click="handleDelete(video)">删除</a-button>
               </template>
             </a-card>
@@ -144,6 +154,111 @@
     <!-- 分页组件 -->
     <Pagination v-model:current="pagination.current" v-model:pageSize="pagination.pageSize" :total="pagination.total"
       @change="handlePageChange" />
+      
+    <!-- 发布弹窗 -->
+    <a-modal 
+      v-model:open="publishModalVisible" 
+      title="发布视频" 
+      width="800px"
+      :footer="null"
+      @cancel="closePublishModal"
+    >
+      <div class="publish-modal-content">
+        <!-- 视频信息部分 -->
+        <div class="video-info-section">
+          <h3>视频信息</h3>
+          <div class="video-info-content">
+            <div class="cover-section">
+              <div class="cover-preview">
+                 <img 
+                   v-if="editableVideo.coverPath" 
+                   :src="editableVideo.coverPath.startsWith('data:') ? editableVideo.coverPath : getCoverUrl(selectedVideo)" 
+                   class="cover-image"
+                   alt="封面"
+                 />
+                 <div v-else class="cover-placeholder">
+                   <video-camera-outlined style="font-size: 32px; color: #ccc;" />
+                   <span>暂无封面</span>
+                 </div>
+               </div>
+               <div class="cover-actions">
+                 <input 
+                   ref="coverInput" 
+                   type="file" 
+                   accept="image/*" 
+                   style="display: none" 
+                   @change="handleCoverChange"
+                 />
+                 <a-button size="small" @click="$refs.coverInput.click()">
+                   {{ editableVideo.coverPath ? '替换封面' : '上传封面' }}
+                 </a-button>
+               </div>
+            </div>
+            <div class="video-details">
+              <div class="detail-item">
+                <span class="detail-label">标题：</span>
+                <a-input 
+                  v-model:value="editableVideo.title" 
+                  placeholder="请输入视频标题"
+                  class="detail-input"
+                />
+              </div>
+              <div class="detail-item">
+                 <span class="detail-label">内容：</span>
+                 <a-textarea 
+                   v-model:value="editableVideo.content" 
+                   placeholder="请输入视频内容描述"
+                   :rows="3"
+                   class="detail-input"
+                 />
+               </div>
+               <div class="detail-item">
+                 <span class="detail-label">标签：</span>
+                 <a-input 
+                   v-model:value="editableVideo.tags" 
+                   placeholder="请输入标签，多个标签用逗号分隔"
+                   class="detail-input"
+                 />
+               </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 平台选择部分 -->
+        <div class="platform-section">
+          <h3>选择发布平台</h3>
+          <div class="platform-grid">
+            <div 
+              v-for="platform in platforms" 
+              :key="platform.key"
+              class="platform-item"
+              :class="{ active: selectedPlatforms.includes(platform.key) }"
+              @click="togglePlatform(platform.key)"
+            >
+              <div class="platform-icon">
+                <component :is="platform.icon" :style="{ fontSize: '24px', color: platform.color }" />
+              </div>
+              <div class="platform-name">{{ platform.name }}</div>
+              <div class="platform-check" v-if="selectedPlatforms.includes(platform.key)">
+                <check-circle-filled style="color: #52c41a; font-size: 16px;" />
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div class="modal-actions">
+          <a-button @click="closePublishModal">取消</a-button>
+          <a-button 
+            type="primary" 
+            :disabled="selectedPlatforms.length === 0"
+            @click="handlePublish"
+          >
+            发布到选中平台 ({{ selectedPlatforms.length }})
+          </a-button>
+        </div>
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -151,7 +266,16 @@
 import { ref, computed, reactive, onMounted } from 'vue';
 import { h } from 'vue';
 import { NDataTable, NCard, NButton, NProgress, NTag, useDialog, useMessage } from 'naive-ui';
-import { VideoCameraOutlined } from '@ant-design/icons-vue';
+import { 
+  VideoCameraOutlined,
+  GlobalOutlined,
+  PlayCircleOutlined,
+  WechatOutlined,
+  HeartOutlined,
+  FileTextOutlined,
+  WeiboOutlined,
+  CheckCircleFilled
+} from '@ant-design/icons-vue';
 import Pagination from '@/components/Pagination.vue';
 import { getVideoList,deleteVideo } from '@/api/modules/videoApi.js';
 import dayjs from 'dayjs';
@@ -181,6 +305,57 @@ const basicForm = reactive({
   videoType: undefined,
   result: undefined
 });
+
+// 发布弹窗相关
+const publishModalVisible = ref(false);
+const selectedVideo = ref(null);
+const selectedPlatforms = ref([]);
+const editableVideo = ref({
+  title: '',
+  content: '',
+  coverPath: '',
+  tags: ''
+});
+
+// 平台列表
+const platforms = ref([
+  {
+    key: 'toutiao',
+    name: '今日头条',
+    icon: GlobalOutlined,
+    color: '#ff6600'
+  },
+  {
+    key: 'douyin',
+    name: '抖音',
+    icon: PlayCircleOutlined,
+    color: '#000000'
+  },
+  {
+    key: 'wechat',
+    name: '微信视频号',
+    icon: WechatOutlined,
+    color: '#07c160'
+  },
+  {
+    key: 'xiaohongshu',
+    name: '小红书',
+    icon: HeartOutlined,
+    color: '#ff2442'
+  },
+  {
+    key: 'baijiahao',
+    name: '百家号',
+    icon: FileTextOutlined,
+    color: '#3385ff'
+  },
+  {
+    key: 'weibo',
+    name: '微博',
+    icon: WeiboOutlined,
+    color: '#e6162d'
+  }
+]);
 
 
 const loadVideoList = async () => {
@@ -376,7 +551,94 @@ const handleVideoPause = (event) => {
   console.log('视频暂停:', event.target.currentTime);
 };
 
+// 显示发布弹窗
+const showPublishModal = (video) => {
+  selectedVideo.value = video;
+  selectedPlatforms.value = [];
+  // 初始化可编辑的视频信息
+  editableVideo.value = {
+    title: video.title || '',
+    content: video.content || '',
+    coverPath: video.cover_path || '',
+    tags: video.tags || ''
+  };
+  publishModalVisible.value = true;
+};
 
+const closePublishModal = () => {
+  publishModalVisible.value = false;
+  selectedVideo.value = null;
+  selectedPlatforms.value = [];
+};
+
+const togglePlatform = (platformKey) => {
+  const index = selectedPlatforms.value.indexOf(platformKey);
+  if (index > -1) {
+    selectedPlatforms.value.splice(index, 1);
+  } else {
+    selectedPlatforms.value.push(platformKey);
+  }
+};
+
+const getCoverUrl = (video) => {
+  if (!video?.cover_path) {
+    return '';
+  }
+  return video.cover_path;
+};
+
+// 处理封面文件变化
+const handleCoverChange = (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    // 验证文件类型
+    if (!file.type.startsWith('image/')) {
+      message.error('请选择图片文件');
+      return;
+    }
+    
+    // 验证文件大小（限制为5MB）
+    if (file.size > 5 * 1024 * 1024) {
+      message.error('图片大小不能超过5MB');
+      return;
+    }
+    
+    // 创建预览URL
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      editableVideo.value.coverPath = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    
+    // 这里可以添加上传到服务器的逻辑
+    // uploadCoverToServer(file);
+  }
+};
+
+const handleFullscreenChange = (event) => {
+  console.log('全屏状态变化:', event);
+};
+
+const handlePublish = async () => {
+  if (!selectedVideo.value || selectedPlatforms.value.length === 0) {
+    message.warning('请选择要发布的平台');
+    return;
+  }
+  
+  try {
+    // 这里可以调用发布API
+    console.log('发布视频:', {
+      video: selectedVideo.value,
+      platforms: selectedPlatforms.value
+    });
+    
+    message.success(`视频已成功发布到 ${selectedPlatforms.value.length} 个平台`);
+    closePublishModal();
+  } catch (error) {
+    console.error('发布失败:', error);
+    message.error('发布失败，请稍后重试');
+  }
+};
 
 // 表格列定义
 const columns = [
@@ -802,6 +1064,202 @@ const handleDelete = async (row) => {
   
   .meta-row {
     font-size: 12px;
+  }
+}
+
+/* 发布弹窗样式 */
+.publish-modal-content {
+  padding: 16px 0;
+}
+
+.video-info-section {
+  margin-bottom: 24px;
+}
+
+.video-info-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.video-info-content {
+  display: flex;
+  gap: 16px;
+}
+
+.cover-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 200px;
+}
+
+.cover-preview {
+  width: 200px;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #e8e8e8;
+}
+
+.cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cover-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: #fafafa;
+  gap: 8px;
+}
+
+.cover-placeholder span {
+  font-size: 12px;
+  color: #999;
+}
+
+.cover-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.video-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.detail-label {
+  font-weight: 500;
+  color: #666;
+  min-width: 60px;
+  flex-shrink: 0;
+  line-height: 32px;
+}
+
+.detail-value {
+  color: #333;
+  word-break: break-all;
+}
+
+.detail-input {
+  flex: 1;
+}
+
+.cover-thumbnail {
+  width: 60px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #e8e8e8;
+}
+
+.platform-section {
+  margin-bottom: 24px;
+}
+
+.platform-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.platform-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.platform-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 12px;
+  border: 2px solid #e8e8e8;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #fff;
+}
+
+.platform-item:hover {
+  border-color: #1890ff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+}
+
+.platform-item.active {
+  border-color: #52c41a;
+  background: #f6ffed;
+  box-shadow: 0 2px 8px rgba(82, 196, 26, 0.2);
+}
+
+.platform-icon {
+  margin-bottom: 8px;
+}
+
+.platform-name {
+  font-size: 12px;
+  color: #333;
+  text-align: center;
+  font-weight: 500;
+}
+
+.platform-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #e8e8e8;
+}
+
+@media (max-width: 768px) {
+  .video-info-content {
+    flex-direction: column;
+  }
+  
+  .cover-section {
+    width: 100%;
+  }
+  
+  .cover-preview {
+    width: 100%;
+    height: 160px;
+  }
+  
+  .platform-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+  }
+  
+  .platform-item {
+    padding: 12px 8px;
   }
 }
 </style>
