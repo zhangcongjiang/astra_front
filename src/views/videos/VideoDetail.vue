@@ -32,6 +32,26 @@
           </n-descriptions-item>
         </n-descriptions>
         
+        <!-- 视频封面 -->
+        <div v-if="videoDetail.cover" class="cover-section">
+          <h4>视频封面</h4>
+          <div class="cover-container">
+            <img 
+              :src="getCoverUrl(videoDetail.cover)" 
+              alt="视频封面" 
+              class="cover-image"
+            />
+          </div>
+        </div>
+        
+        <!-- 视频文案 -->
+        <div v-if="videoDetail.content" class="content-section">
+          <h4>视频文案</h4>
+          <div class="content-container">
+            <pre class="content-text">{{ videoDetail.content }}</pre>
+          </div>
+        </div>
+        
         <div class="action-buttons">
           <n-button 
             type="warning" 
@@ -115,6 +135,12 @@ const getStatusText = (status) => {
 // 格式化时间
 const formatTime = (time) => {
   return dayjs(time).format('YYYY-MM-DD HH:mm:ss');
+};
+
+// 获取封面URL
+const getCoverUrl = (coverPath) => {
+  if (!coverPath) return '';
+  return coverPath.startsWith('http') ? coverPath : `http://localhost:8089${coverPath}`;
 };
 
 // 返回上一页
@@ -216,5 +242,63 @@ onMounted(() => {
   justify-content: center;
   align-items: center;
   height: 400px;
+}
+
+/* 封面样式 */
+.cover-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.cover-section h4 {
+  margin: 0 0 12px 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.cover-container {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.cover-image {
+  max-width: 300px;
+  max-height: 200px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  object-fit: cover;
+}
+
+/* 文案样式 */
+.content-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.content-section h4 {
+  margin: 0 0 12px 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.content-container {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e9ecef;
+}
+
+.content-text {
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 </style>
