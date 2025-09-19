@@ -47,13 +47,7 @@
                   style="cursor: pointer;"
                 />
               </div>
-              <div class="cover-info">
-                <p><strong>尺寸:</strong> {{ coverDetail.width }} × {{ coverDetail.height }}</p>
-                <p><strong>格式:</strong> {{ coverDetail.spec?.format?.toUpperCase() }}</p>
-                <p v-if="coverDetail.tags?.length"><strong>标签:</strong> 
-                  <n-tag v-for="tag in coverDetail.tags" :key="tag.id" size="small" style="margin-right: 4px;">{{ tag.tag_name }}</n-tag>
-                </p>
-              </div>
+              
             </div>
             <div v-else class="no-cover">
               <n-text depth="3">暂无封面</n-text>
