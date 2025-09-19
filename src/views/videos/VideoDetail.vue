@@ -13,44 +13,73 @@
     </div>
 
     <div v-else-if="videoDetail" class="detail-content">
-      <!-- 基本信息卡片 -->
-      <n-card title="基本信息" class="info-card">
-        <n-descriptions :column="2" label-placement="left">
-          <n-descriptions-item label="标题">
-            <n-text strong>{{ videoDetail.title }}</n-text>
+      <!-- 视频详情卡片 -->
+      <n-card title="视频详情" class="info-card">
+        <!-- 基本信息 -->
+        <n-descriptions :column="2" label-placement="left" class="basic-info">
+          <n-descriptions-item label="视频标题">
+            {{ videoDetail.title }}
           </n-descriptions-item>
-          <n-descriptions-item label="用户">
-            <n-tag type="info">{{ videoDetail.creator }}</n-tag>
+          <n-descriptions-item label="创建者">
+            {{ videoDetail.username || videoDetail.creator || '未知用户' }}
+          </n-descriptions-item>
+          <n-descriptions-item label="视频类型">
+            <n-tag type="info">{{ getVideoTypeText(videoDetail.video_type) }}</n-tag>
           </n-descriptions-item>
           <n-descriptions-item label="生成状态">
-            <n-tag :type="getStatusType(videoDetail.result)">
-              {{ getStatusText(videoDetail.result) }}
-            </n-tag>
+            <n-tag :type="getStatusType(videoDetail.result)">{{ getStatusText(videoDetail.result) }}</n-tag>
           </n-descriptions-item>
           <n-descriptions-item label="创建时间">
             {{ formatTime(videoDetail.create_time) }}
           </n-descriptions-item>
         </n-descriptions>
         
-        <!-- 视频封面 -->
-        <div v-if="videoDetail.cover" class="cover-section">
-          <h4>视频封面</h4>
-          <div class="cover-container">
-            <img 
-              :src="getCoverUrl(videoDetail.cover)" 
-              alt="视频封面" 
-              class="cover-image"
-            />
-          </div>
-        </div>
-        
-        <!-- 视频文案 -->
-        <div v-if="videoDetail.content" class="content-section">
-          <h4>视频文案</h4>
-          <div class="content-container">
-            <pre class="content-text">{{ videoDetail.content }}</pre>
-          </div>
-        </div>
+        <!-- Tab切换 -->
+        <n-tabs v-model:value="activeTab" type="line" class="detail-tabs">
+          <n-tab-pane name="cover" tab="视频封面">
+            <div v-if="coverDetail" class="cover-section">
+              <div class="cover-preview">
+                <img 
+                  :src="getCoverUrl()" 
+                  alt="视频封面" 
+                  class="cover-image" 
+                  @click="showImagePreview"
+                  style="cursor: pointer;"
+                />
+              </div>
+              <div class="cover-info">
+                <p><strong>尺寸:</strong> {{ coverDetail.width }} × {{ coverDetail.height }}</p>
+                <p><strong>格式:</strong> {{ coverDetail.spec?.format?.toUpperCase() }}</p>
+                <p v-if="coverDetail.tags?.length"><strong>标签:</strong> 
+                  <n-tag v-for="tag in coverDetail.tags" :key="tag.id" size="small" style="margin-right: 4px;">{{ tag.tag_name }}</n-tag>
+                </p>
+              </div>
+            </div>
+            <div v-else class="no-cover">
+              <n-text depth="3">暂无封面</n-text>
+            </div>
+          </n-tab-pane>
+          
+          <n-tab-pane name="content" tab="视频文案">
+            <div v-if="videoDetail.content" class="content-section">
+              <div class="content-container">
+                <pre>{{ videoDetail.content }}</pre>
+              </div>
+            </div>
+            <div v-else class="no-content">
+              <n-text depth="3">暂无文案</n-text>
+            </div>
+          </n-tab-pane>
+          
+          <n-tab-pane name="parameters" tab="生成参数">
+            <div v-if="formattedParameters" class="parameters-section">
+              <pre>{{ formattedParameters }}</pre>
+            </div>
+            <div v-else class="no-parameters">
+              <n-text depth="3">暂无参数</n-text>
+            </div>
+          </n-tab-pane>
+        </n-tabs>
         
         <div class="action-buttons">
           <n-button 
@@ -62,11 +91,6 @@
           </n-button>
         </div>
       </n-card>
-
-      <!-- 数据详情 - 只显示 parameters -->
-      <n-card title="参数详情" class="data-card">
-        <pre style="background: #f5f5f5; padding: 16px; border-radius: 4px; overflow-x: auto;">{{ formatParametersData }}</pre>
-      </n-card>
     </div>
 
     <div v-else class="error-container">
@@ -76,6 +100,21 @@
         </template>
       </n-result>
     </div>
+    
+    <!-- 图片预览模态框 -->
+    <n-modal v-model:show="imagePreviewVisible" preset="card" style="width: 90%; max-width: 1200px;">
+      <template #header>
+        <span>封面预览</span>
+      </template>
+      <div class="image-preview-container">
+        <img 
+          v-if="coverDetail" 
+          :src="getCoverUrl()" 
+          alt="封面预览" 
+          class="preview-image"
+        />
+      </div>
+    </n-modal>
   </div>
 </template>
 
@@ -91,9 +130,13 @@ import {
   NText, 
   NSpin, 
   NResult,
+  NTabs,
+  NTabPane,
+  NModal,
   useMessage 
 } from 'naive-ui';
 import { getVideoDetail, regenerateVideo } from '@/api/modules/videoApi.js';
+import { getImageDetail } from '@/api/modules/imageApi.js';
 import dayjs from 'dayjs';
 
 const route = useRoute();
@@ -103,12 +146,13 @@ const message = useMessage();
 const loading = ref(false);
 const regenerating = ref(false);
 const videoDetail = ref(null);
+const coverDetail = ref(null);
+const activeTab = ref('cover');
+const imagePreviewVisible = ref(false);
 
 // 格式化 parameters 数据
-const formatParametersData = computed(() => {
-  if (!videoDetail.value?.parameters) {
-    return '{}';
-  }
+const formattedParameters = computed(() => {
+  if (!videoDetail.value?.parameters) return null;
   return JSON.stringify(videoDetail.value.parameters, null, 2);
 });
 
@@ -132,15 +176,55 @@ const getStatusText = (status) => {
   return statusMap[status] || status;
 };
 
+// 获取视频类型文本
+const getVideoTypeText = (type) => {
+  const typeMap = {
+    'JianYing': '剪映视频',
+    'Regular': '普通视频'
+  };
+  return typeMap[type] || type || '未知类型';
+};
+
 // 格式化时间
 const formatTime = (time) => {
   return dayjs(time).format('YYYY-MM-DD HH:mm:ss');
 };
 
+// 获取封面详情
+const loadCoverDetail = async (coverId) => {
+  if (!coverId) return;
+  try {
+    const response = await getImageDetail(coverId);
+    console.log('封面详情响应:', response);
+    if (response && response.data) {
+      coverDetail.value = response.data;
+    } else if (response) {
+      // 如果response存在但没有data字段，直接使用response
+      coverDetail.value = response;
+    }
+  } catch (error) {
+    console.error('获取封面详情失败:', error);
+    // API调用失败时，使用coverId作为img_name创建基本的封面信息
+    if (coverId) {
+      coverDetail.value = {
+        img_name: `${coverId}.png`,
+        id: coverId
+      };
+    } else {
+      coverDetail.value = null;
+    }
+  }
+};
+
 // 获取封面URL
-const getCoverUrl = (coverPath) => {
-  if (!coverPath) return '';
-  return coverPath.startsWith('http') ? coverPath : `http://localhost:8089${coverPath}`;
+const getCoverUrl = () => {
+  if (!coverDetail.value?.img_name) return '';
+  return `http://127.0.0.1:8089/media/images/${coverDetail.value.img_name}`;
+};
+
+// 显示图片预览
+const showImagePreview = () => {
+  imagePreviewVisible.value = true;
 };
 
 // 返回上一页
@@ -173,10 +257,17 @@ const loadVideoDetail = async () => {
   try {
     loading.value = true;
     const response = await getVideoDetail(route.params.id);
-    if (response.code === 0) {
+    if (response && response.code === 0) {
       videoDetail.value = response.data;
+      // 如果有封面ID，尝试获取封面详情（不阻塞主流程）
+      if (videoDetail.value.cover) {
+        loadCoverDetail(videoDetail.value.cover).catch(() => {
+          // 封面加载失败不影响主流程
+          console.warn('封面加载失败，但不影响页面显示');
+        });
+      }
     } else {
-      message.error('获取视频详情失败');
+      message.error(response?.message || '获取视频详情失败');
     }
   } catch (error) {
     message.error('获取视频详情失败');
@@ -244,61 +335,95 @@ onMounted(() => {
   height: 400px;
 }
 
-/* 封面样式 */
+.basic-info {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.detail-tabs {
+  margin-top: 20px;
+}
+
 .cover-section {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.cover-section h4 {
-  margin: 0 0 12px 0;
-  color: #333;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.cover-container {
   display: flex;
-  justify-content: flex-start;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.cover-preview {
+  flex-shrink: 0;
 }
 
 .cover-image {
   max-width: 300px;
-  max-height: 200px;
+  max-height: 400px;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  object-fit: cover;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  object-fit: contain;
 }
 
-/* 文案样式 */
-.content-section {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid #f0f0f0;
+.cover-info {
+  flex: 1;
+  padding: 10px 0;
 }
 
-.content-section h4 {
-  margin: 0 0 12px 0;
-  color: #333;
-  font-size: 16px;
-  font-weight: 600;
+.cover-info p {
+  margin: 8px 0;
+  color: #666;
+}
+
+.content-section,
+.parameters-section {
+  padding: 10px 0;
 }
 
 .content-container {
   background: #f8f9fa;
-  border-radius: 8px;
   padding: 16px;
+  border-radius: 8px;
   border: 1px solid #e9ecef;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
-.content-text {
+.content-container pre,
+.parameters-section pre {
   margin: 0;
-  font-family: 'Courier New', monospace;
-  font-size: 14px;
-  line-height: 1.6;
-  color: #333;
   white-space: pre-wrap;
   word-wrap: break-word;
+  font-family: 'Courier New', monospace;
+  line-height: 1.5;
+}
+
+.parameters-section pre {
+  background: #f5f5f5;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.no-cover,
+.no-content,
+.no-parameters {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+}
+
+.image-preview-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 8px;
 }
 </style>

@@ -171,11 +171,19 @@
             <div class="cover-section">
               <div class="cover-preview">
                  <img 
-                   v-if="editableVideo.coverPath" 
-                   :src="editableVideo.coverPath.startsWith('data:') ? editableVideo.coverPath : getCoverUrl(selectedVideo)" 
+                   v-if="editableVideo.coverPath && editableVideo.coverPath.startsWith('data:')" 
+                   :src="editableVideo.coverPath" 
                    class="cover-image"
                    alt="封面"
                  />
+                 <img 
+                    v-else-if="coverDetail && getCoverUrl()" 
+                    :src="getCoverUrl()" 
+                    class="cover-image"
+                    alt="封面"
+                    @click="showImagePreview"
+                    style="cursor: pointer;"
+                  />
                  <div v-else class="cover-placeholder">
                    <video-camera-outlined style="font-size: 32px; color: #ccc;" />
                    <span>暂无封面</span>
@@ -259,6 +267,25 @@
         </div>
       </div>
     </a-modal>
+    
+    <!-- 图片预览模态框 -->
+    <a-modal 
+      v-model:open="imagePreviewVisible" 
+      title="封面预览" 
+      width="90%"
+      style="max-width: 1200px;"
+      :footer="null"
+      centered
+    >
+      <div class="image-preview-container">
+        <img 
+          v-if="coverDetail && getCoverUrl()" 
+          :src="getCoverUrl()" 
+          alt="封面预览" 
+          class="preview-image"
+        />
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -278,6 +305,7 @@ import {
 } from '@ant-design/icons-vue';
 import Pagination from '@/components/Pagination.vue';
 import { getVideoList,deleteVideo } from '@/api/modules/videoApi.js';
+import { getImageDetail } from '@/api/modules/imageApi.js';
 import dayjs from 'dayjs';
 import UserSelect from '@/components/UserSelect.vue'
 
@@ -310,6 +338,8 @@ const basicForm = reactive({
 const publishModalVisible = ref(false);
 const selectedVideo = ref(null);
 const selectedPlatforms = ref([]);
+const coverDetail = ref(null);
+const imagePreviewVisible = ref(false);
 const editableVideo = ref({
   title: '',
   content: '',
@@ -552,9 +582,11 @@ const handleVideoPause = (event) => {
 };
 
 // 显示发布弹窗
-const showPublishModal = (video) => {
+const showPublishModal = async (video) => {
   selectedVideo.value = video;
   selectedPlatforms.value = [];
+  coverDetail.value = null;
+  
   // 初始化可编辑的视频信息
   editableVideo.value = {
     title: video.title || '',
@@ -562,6 +594,12 @@ const showPublishModal = (video) => {
     coverPath: video.cover_path || '',
     tags: video.tags || ''
   };
+  
+  // 如果视频有封面ID，加载封面详情
+  if (video.cover) {
+    await loadCoverDetail(video.cover);
+  }
+  
   publishModalVisible.value = true;
 };
 
@@ -569,6 +607,12 @@ const closePublishModal = () => {
   publishModalVisible.value = false;
   selectedVideo.value = null;
   selectedPlatforms.value = [];
+  coverDetail.value = null;
+};
+
+// 显示图片预览
+const showImagePreview = () => {
+  imagePreviewVisible.value = true;
 };
 
 const togglePlatform = (platformKey) => {
@@ -580,7 +624,39 @@ const togglePlatform = (platformKey) => {
   }
 };
 
-const getCoverUrl = (video) => {
+// 获取封面详情
+const loadCoverDetail = async (coverId) => {
+  if (!coverId) return;
+  try {
+    const response = await getImageDetail(coverId);
+    console.log('封面详情响应:', response);
+    if (response && response.data) {
+      coverDetail.value = response.data;
+    } else if (response) {
+      // 如果response存在但没有data字段，直接使用response
+      coverDetail.value = response;
+    }
+  } catch (error) {
+    console.error('获取封面详情失败:', error);
+    // API调用失败时，使用coverId作为img_name创建基本的封面信息
+    if (coverId) {
+      coverDetail.value = {
+        img_name: `${coverId}.png`,
+        id: coverId
+      };
+    } else {
+      coverDetail.value = null;
+    }
+  }
+};
+
+// 获取封面URL
+const getCoverUrl = () => {
+  if (!coverDetail.value?.img_name) return '';
+  return `http://127.0.0.1:8089/media/images/${coverDetail.value.img_name}`;
+};
+
+const getVideoCoverUrl = (video) => {
   if (!video?.cover_path) {
     return '';
   }
@@ -798,6 +874,19 @@ const handleDelete = async (row) => {
 </script>
 
 <style scoped>
+.image-preview-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
 .graphic-list-container {
   padding: 20px;
   min-height: 100vh;
