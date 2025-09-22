@@ -171,10 +171,10 @@
 </template>
 
 <script setup>
-import { ref, watch, computed, nextTick } from 'vue';
+import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons-vue';
-import { addTag } from '@/api/modules/tagApi';
+import { addTag, deleteTag, updateTag } from '@/api/modules/tagApi';
 
 const props = defineProps({
   tags: {
@@ -197,6 +197,14 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  allowVoiceTagging: {
+    type: Boolean,
+    default: false
+  },
+  selectedTags: {
+    type: Array,
+    default: () => []
+  },
   category: {
     type: String,
     required: true
@@ -208,12 +216,14 @@ const emit = defineEmits([
   'update:selectedTags', 
   'update:tags',
   'add-image-tag',
-  'remove-image-tag'
+  'remove-image-tag',
+  'add-voice-tag',
+  'remove-voice-tag'
 ]);
 
 // 标签相关状态
 const selectedFirstLevelTags = ref([]);
-const selectedTags = ref([]);
+const internalSelectedTags = ref([]);
 const hoverSecondLevelTags = ref([]);
 const showHoverPreview = ref(false);
 const allSecondLevelTags = ref([]);
@@ -282,7 +292,7 @@ arr = [...arr, ...category.children];
 allSecondLevelTags.value = arr;
 
 if (props.allowImageTagging) {
-selectedTags.value = [...props.imageTags];
+  internalSelectedTags.value = [...props.imageTags];
 }
 };
 
@@ -297,7 +307,10 @@ const isTagSelected = (tagId) => {
   if (props.allowImageTagging) {
     return props.imageTags.includes(tagId);
   }
-  return selectedTags.value.includes(tagId);
+  if (props.allowVoiceTagging) {
+    return props.selectedTags.includes(tagId);
+  }
+  return props.selectedTags.includes(tagId);
 };
 
 // 方法
@@ -327,11 +340,13 @@ const resetHoverPreview = () => {
 };
 
 const handleFirstLevelChange = (category, checked) => {
+  const newSelectedTags = [...props.selectedTags];
+  
   if (checked) {
     selectedFirstLevelTags.value.push(category.id);
     // 将一级标签 ID 添加到 selectedTags
-    if (!selectedTags.value.includes(category.id)) {
-      selectedTags.value.push(category.id);
+    if (!newSelectedTags.includes(category.id)) {
+      newSelectedTags.push(category.id);
     }
     
     // 在图片标签模式下触发 add-image-tag 事件
@@ -339,20 +354,29 @@ const handleFirstLevelChange = (category, checked) => {
       console.log('一级标签选中，触发 add-image-tag 事件:', category.id);
       emit('add-image-tag', category.id);
     }
+    // 在语音标签模式下触发 add-voice-tag 事件
+    if (props.allowVoiceTagging) {
+      console.log('一级标签选中，触发 add-voice-tag 事件:', category.id);
+      emit('add-voice-tag', category.id);
+    }
   } else {
     const index = selectedFirstLevelTags.value.indexOf(category.id);
     if (index > -1) {
       selectedFirstLevelTags.value.splice(index, 1);
     }
     // 从 selectedTags 中移除一级标签 ID
-    const tagIndex = selectedTags.value.indexOf(category.id);
+    const tagIndex = newSelectedTags.indexOf(category.id);
     if (tagIndex > -1) {
-      selectedTags.value.splice(tagIndex, 1);
+      newSelectedTags.splice(tagIndex, 1);
     }
     if (category.tags) {
-      selectedTags.value = selectedTags.value.filter(
-        tagId => !category.tags.some(tag => tag.id === tagId)
-      );
+      // 移除该分类下的所有子标签
+      category.tags.forEach(tag => {
+        const childIndex = newSelectedTags.indexOf(tag.id);
+        if (childIndex > -1) {
+          newSelectedTags.splice(childIndex, 1);
+        }
+      });
     }
     
     // 在图片标签模式下触发 remove-image-tag 事件
@@ -360,14 +384,19 @@ const handleFirstLevelChange = (category, checked) => {
       console.log('一级标签取消选中，触发 remove-image-tag 事件:', category.id);
       emit('remove-image-tag', category.id);
     }
+    // 在语音标签模式下触发 remove-voice-tag 事件
+    if (props.allowVoiceTagging) {
+      console.log('一级标签取消选中，触发 remove-voice-tag 事件:', category.id);
+      emit('remove-voice-tag', category.id);
+    }
   }
-  emit('update:selectedTags', selectedTags.value); // 更新选中的标签
+  emit('update:selectedTags', newSelectedTags); // 更新选中的标签
   resetHoverPreview();
   emit('search'); // 选择一级标签时自动触发查询
 };
 
 const handleSecondLevelChange = (tagId, checked) => {
-  console.log('handleSecondLevelChange 被调用:', tagId, checked, 'allowImageTagging:', props.allowImageTagging);
+  console.log('handleSecondLevelChange 被调用:', tagId, checked, 'allowImageTagging:', props.allowImageTagging, 'allowVoiceTagging:', props.allowVoiceTagging);
   if (props.allowImageTagging) {
     // 图片标签模式
     if (checked) {
@@ -377,26 +406,35 @@ const handleSecondLevelChange = (tagId, checked) => {
       console.log('准备触发 remove-image-tag 事件:', tagId);
       emit('remove-image-tag', tagId);
     }
+  } else if (props.allowVoiceTagging) {
+    // 语音标签模式
+    if (checked) {
+      console.log('准备触发 add-voice-tag 事件:', tagId);
+      emit('add-voice-tag', tagId);
+    } else {
+      console.log('准备触发 remove-voice-tag 事件:', tagId);
+      emit('remove-voice-tag', tagId);
+    }
   } else {
     // 普通查询模式
+    const newSelectedTags = [...props.selectedTags];
     if (checked) {
-      selectedTags.value.push(tagId);
+      newSelectedTags.push(tagId);
     } else {
-      const index = selectedTags.value.indexOf(tagId);
+      const index = newSelectedTags.indexOf(tagId);
       if (index > -1) {
-        selectedTags.value.splice(index, 1);
+        newSelectedTags.splice(index, 1);
       }
     }
-    emit('update:selectedTags', selectedTags.value);
+    emit('update:selectedTags', newSelectedTags);
     emit('search'); // 点击标签时自动触发查询
   }
 };
 
 const clearTags = () => {
   selectedFirstLevelTags.value = [];
-  selectedTags.value = [];
   resetHoverPreview();
-  emit('update:selectedTags', selectedTags.value);
+  emit('update:selectedTags', []);
   emit('search');
 };
 
@@ -443,17 +481,25 @@ const handleModalOk = async () => {
     const tagData = {
       tag_name: tagForm.value.name,
       parent: tagForm.value.type === 'main' ? '' : tagForm.value.parentId || '',
-      category: props.category // 使用从 ImageList 传递过来的 category
+      category: props.category // 使用从父组件传递过来的 category
     };
     
+    // 确保category字段不为空
+    if (!tagData.category) {
+      message.error('标签分类不能为空');
+      return;
+    }
+    
+    console.log('准备发送的tagData:', tagData);
+    console.log('tagData.category:', tagData.category);
+    console.log('props.category:', props.category);
+    
     if (currentTag.value) {
-      // 更新标签逻辑
-      tagData.id = currentTag.value.id;
-      // await api.updateTag(tagData);
-      message.success('标签更新成功');
+      // 编辑标签
+      await handleUpdateTag(currentTag.value.id, tagData);
     } else {
-      // 创建标签逻辑
-      await handleAddTag(tagData); // 调用添加标签方法
+      // 新增标签
+      await handleAddTag(tagData);
     }
     
     // 刷新标签列表
@@ -466,9 +512,13 @@ const handleModalOk = async () => {
 
 const handleDeleteTag = async (tagId) => {
   try {
-    // await api.deleteTag(tagId);
-    message.success('标签删除成功');
-    emit('update:tags');
+    const response = await deleteTag(tagId);
+    if (response.code === 0) {
+      message.success('标签删除成功');
+      emit('update:tags');
+    } else {
+      message.error(response.message || '标签删除失败');
+    }
   } catch (error) {
     message.error('标签删除失败');
     console.error(error);
@@ -490,6 +540,21 @@ const handleAddTag = async (tagData) => {
   }
 };
 
+const handleUpdateTag = async (tagId, tagData) => {
+  try {
+    const response = await updateTag(tagId, tagData);
+    if (response.code === 0) {
+      message.success('标签更新成功');
+      emit('update:tags'); // 触发标签列表更新
+    } else {
+      message.error(response.message || '标签更新失败');
+    }
+  } catch (error) {
+    console.error('标签更新失败:', error);
+    message.error('标签更新失败');
+  }
+};
+
 // 监听tags变化
 watch(() => props.tags, () => {
   initSecondLevelTags();
@@ -498,9 +563,41 @@ watch(() => props.tags, () => {
 // 监听图片标签变化
 watch(() => props.imageTags, (newVal) => {
   if (props.allowImageTagging) {
-    selectedTags.value = [...newVal];
+    internalSelectedTags.value = [...newVal];
   }
 });
+
+// 根据选中的标签ID更新一级标签选中状态
+const updateFirstLevelTagsFromSelected = (selectedTagIds) => {
+  selectedFirstLevelTags.value = [];
+  
+  selectedTagIds.forEach(tagId => {
+    // 检查是否为一级标签
+    const firstLevelTag = props.tags.find(tag => tag.id === tagId);
+    if (firstLevelTag && !selectedFirstLevelTags.value.includes(tagId)) {
+      selectedFirstLevelTags.value.push(tagId);
+    }
+    
+    // 检查是否为二级标签，如果是，则选中其父级标签
+    props.tags.forEach(category => {
+      if (category.tags) {
+        const secondLevelTag = category.tags.find(tag => tag.id === tagId);
+        if (secondLevelTag && !selectedFirstLevelTags.value.includes(category.id)) {
+          selectedFirstLevelTags.value.push(category.id);
+        }
+      }
+    });
+  });
+};
+
+// 监听朗读者标签变化
+watch(() => props.selectedTags, (newVal) => {
+  if (props.allowVoiceTagging && newVal) {
+    internalSelectedTags.value = [...newVal];
+    // 同时更新一级标签选中状态
+    updateFirstLevelTagsFromSelected(newVal);
+  }
+}, { immediate: true });
 </script>
 
 <style scoped>
