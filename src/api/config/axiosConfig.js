@@ -96,13 +96,14 @@ instance.interceptors.response.use(
     console.log('响应数据:', data)
     
     // 根据后端返回的格式处理响应
-    if (data.code === 0) {
-      // 成功响应
+    if (data.code === 0 || data.code === undefined) {
+      // 成功响应：code为0或者没有code字段（直接返回数据的情况）
       return data
     } else {
-      // 业务错误
-      console.error('业务错误:', data.message)
-      throw new Error(data.message || '请求失败')
+      // 业务错误：code存在且不为0
+      const errorMessage = data.message || data.error || '请求失败';
+      console.error('业务错误:', errorMessage, '完整响应:', data);
+      throw new Error(errorMessage);
     }
   },
   error => {

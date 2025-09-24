@@ -18,7 +18,21 @@
         <!-- 基本信息 -->
         <n-descriptions :column="2" label-placement="left" class="basic-info">
           <n-descriptions-item label="视频标题">
-            {{ videoDetail.title }}
+            <div class="title-with-copy">
+              <span>{{ videoDetail.title }}</span>
+              <n-button 
+                size="small" 
+                type="text" 
+                @click="copyToClipboard(videoDetail.title, '标题')"
+                class="copy-btn"
+              >
+                <template #icon>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                  </svg>
+                </template>
+              </n-button>
+            </div>
           </n-descriptions-item>
           <n-descriptions-item label="创建者">
             {{ videoDetail.username || videoDetail.creator || '未知用户' }}
@@ -56,6 +70,22 @@
           
           <n-tab-pane name="content" tab="视频文案">
             <div v-if="videoDetail.content" class="content-section">
+              <div class="content-header">
+                <span class="content-title">视频文案</span>
+                <n-button 
+                  size="small" 
+                  type="primary" 
+                  @click="copyToClipboard(videoDetail.content, '文案')"
+                  class="copy-btn-primary"
+                >
+                  <template #icon>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                    </svg>
+                  </template>
+                  复制文案
+                </n-button>
+              </div>
               <div class="content-container">
                 <pre>{{ videoDetail.content }}</pre>
               </div>
@@ -136,6 +166,36 @@ import dayjs from 'dayjs';
 const route = useRoute();
 const router = useRouter();
 const message = useMessage();
+
+// 复制到剪贴板功能
+const copyToClipboard = async (text, type) => {
+  if (!text) {
+    message.warning(`${type}内容为空，无法复制`);
+    return;
+  }
+  
+  try {
+    await navigator.clipboard.writeText(text);
+    message.success(`${type}已复制到剪贴板`);
+  } catch (err) {
+    console.error('复制失败:', err);
+    // 降级方案：使用传统的复制方法
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      message.success(`${type}已复制到剪贴板`);
+    } catch (fallbackErr) {
+      console.error('降级复制也失败:', fallbackErr);
+      message.error('复制失败，请手动复制');
+    }
+  }
+};
 
 const loading = ref(false);
 const regenerating = ref(false);
@@ -419,5 +479,49 @@ onMounted(() => {
   max-height: 80vh;
   object-fit: contain;
   border-radius: 8px;
+}
+
+/* 复制按钮样式 */
+.title-with-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title-with-copy span {
+  flex: 1;
+  word-break: break-all;
+}
+
+.copy-btn {
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.copy-btn:hover {
+  opacity: 1;
+}
+
+.content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.content-title {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.copy-btn-primary {
+  font-size: 12px;
+}
+
+.copy-btn-primary .n-button__icon {
+  margin-right: 4px;
 }
 </style>

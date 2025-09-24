@@ -48,7 +48,7 @@
       <!-- 标签查询 -->
       <div class="tag-search" v-if="searchType === 'tag'">
         <TagSearch :tags="tagCategories" :showActions="true" v-model:selectedTags="selectedTags"
-          :category="TAG_CATEGORY" @search="handleSearch" />
+          :category="TAG_CATEGORY" @search="handleSearch" @update:tags="fetchTagCategories" />
       </div>
     </div>
 
@@ -120,9 +120,14 @@
           <div style="text-align: center;">
             <div class="music-tags"
               style="display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 4px;">
-              <a-tag v-for="tag in getTagNames(record.tags)" :key="tag.id" color="blue">
+              <a-tag v-for="tag in getTagNames(record.tags)" :key="tag.id" color="blue"
+                style="cursor: pointer;" @click="filterByTag(tag.id, tag.name)" :title="`点击筛选标签: ${tag.name}`">
                 {{ tag.name }}
               </a-tag>
+              <a-tooltip title="编辑标签">
+                <tags-outlined @click.stop="showTagEditModal(record)"
+                  style="cursor: pointer; color: #1890ff;" />
+              </a-tooltip>
             </div>
           </div>
         </template>
@@ -221,13 +226,24 @@
         </a-select>
       </div>
     </a-modal>
+
+    <!-- 标签编辑模态框 -->
+    <a-modal v-model:open="tagEditModalVisible" :title="`编辑标签 - ${currentTagMusic?.name}`" width="800px"
+      :maskClosable="false" @ok="handleTagEditSubmit" @cancel="closeTagEditModal">
+      <div style="margin-bottom: 16px;">
+        <strong>音乐：</strong>{{ currentTagMusic?.name }}
+      </div>
+      <TagSearch :tags="tagCategories" :show-actions="false" :allowVoiceTagging="true"
+        :selectedTags="tagForm.currentTags" v-model:selectedTags="tagForm.currentTags" 
+        @add-voice-tag="addMusicTag" @remove-voice-tag="removeMusicTag" />
+    </a-modal>
   </div>
 </template>
 
 <script setup>
 import { request } from '@/api/config/request';
 import { ref, reactive, computed, onMounted } from 'vue'
-import { UploadOutlined, PlayCircleOutlined, PauseCircleOutlined, FolderAddOutlined } from '@ant-design/icons-vue'
+import { UploadOutlined, PlayCircleOutlined, PauseCircleOutlined, FolderAddOutlined, TagsOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import TagSearch from '@/components/TagSearch.vue'
@@ -269,6 +285,7 @@ const basicForm = reactive({
 
 // 标签数据 - 替换现有的硬编码数据
 const tagCategories = ref([]);
+const TAG_CATEGORY = 'SOUND';
 
 // 获取标签分类数据
 const fetchTagCategories = async () => {
@@ -521,19 +538,22 @@ const musicForm = reactive({
 });
 const musicFormRef = ref(null);
 
-// 根据标签ID获取标签名称
+// 根据标签ID获取标签名称，添加标签存在性验证
 const getTagNames = (tagIds) => {
   const names = [];
   if (!tagIds || !Array.isArray(tagIds)) return names;
 
   tagIds.forEach(tagId => {
-    const foundTag = findTagById(tagId);
+    // 如果tagId是对象，提取ID
+    const id = typeof tagId === 'object' ? tagId.id : tagId;
+    const foundTag = findTagById(id);
     if (foundTag) {
       names.push({
         id: foundTag.id,
         name: foundTag.name
       });
     }
+    // 如果标签不存在（已被删除），则不添加到names数组中
   });
   return names;
 };
@@ -716,8 +736,6 @@ const resetBasicSearch = () => {
   handleSearch();
 };
 
-// 在 script setup 顶部添加
-const TAG_CATEGORY = 'SOUND';
 const uploadModalVisible = ref(false);
 const uploadForm = reactive({
   name: '',
@@ -751,6 +769,13 @@ const assetCollections = ref([]);
 const selectedAssetId = ref(null);
 const loadingAssets = ref(false);
 
+// 标签编辑相关变量
+const tagEditModalVisible = ref(false);
+const currentTagMusic = ref(null);
+const tagForm = reactive({
+  currentTags: []
+});
+
 const showUploadModal = () => {
   uploadModalVisible.value = true;
 };
@@ -760,24 +785,25 @@ const closeUploadModal = () => {
   uploadFormRef.value?.resetFields();
   uploadForm.audioFile = null;
 };
-// 添加音乐标签（用于编辑模态框）
+// 添加音乐标签（用于标签编辑模态框）
 const addMusicTag = (tagId) => {
   console.log('=== addMusicTag 函数被调用 ===', tagId);
-  if (!musicForm.tags.includes(tagId)) {
-    musicForm.tags.push(tagId);
-    console.log('添加标签ID:', tagId, '当前tags:', musicForm.tags);
+  if (!tagForm.currentTags.includes(tagId)) {
+    tagForm.currentTags.push(tagId);
+    console.log('添加标签ID:', tagId, '当前tags:', tagForm.currentTags);
   } else {
     console.log('标签已存在，不重复添加:', tagId);
   }
 };
 
-// 移除音乐标签（用于编辑模态框）
+// 移除音乐标签（用于标签编辑模态框）
 const removeMusicTag = (tagId) => {
-  const index = musicForm.tags.indexOf(tagId);
+  const index = tagForm.currentTags.indexOf(tagId);
   if (index > -1) {
-    musicForm.tags.splice(index, 1);
-    console.log('移除标签ID:', tagId, '当前tags:', musicForm.tags);
+    tagForm.currentTags.splice(index, 1);
+    console.log('移除标签ID:', tagId, '当前tags:', tagForm.currentTags);
   }
+  
 };
 
 // 处理文件选择
@@ -976,6 +1002,68 @@ const handleAddToAsset = async () => {
   } finally {
     loadingAssets.value = false;
   }
+};
+
+// 显示标签编辑模态框
+const showTagEditModal = (music) => {
+  currentTagMusic.value = music;
+  // 确保 tags 是 ID 数组
+  if (Array.isArray(music.tags)) {
+    tagForm.currentTags = [...music.tags];
+  } else {
+    tagForm.currentTags = [];
+  }
+  console.log('显示标签编辑模态框，当前音乐标签ID：', tagForm.currentTags);
+  console.log('音乐数据：', music);
+  tagEditModalVisible.value = true;
+};
+
+// 关闭标签编辑模态框
+const closeTagEditModal = () => {
+  tagEditModalVisible.value = false;
+  currentTagMusic.value = null;
+  tagForm.currentTags = [];
+};
+
+// 提交标签编辑
+const handleTagEditSubmit = async () => {
+  try {
+    await updateSound({
+      sound_id: currentTagMusic.value.id,
+      name: currentTagMusic.value.name,
+      singer: currentTagMusic.value.artist,
+      tag_ids: tagForm.currentTags
+    });
+
+    // 更新本地数据
+    const index = musicData.value.findIndex(m => m.id === currentTagMusic.value.id);
+    if (index !== -1) {
+      musicData.value[index].tags = [...tagForm.currentTags];
+    }
+
+    // 重新获取标签分类数据，确保标签列表刷新
+    await fetchTagCategories();
+
+    message.success('标签更新成功');
+    closeTagEditModal();
+  } catch (error) {
+    console.error('标签更新失败:', error);
+    message.error('标签更新失败，请重试');
+  }
+};
+
+// 根据标签快速过滤
+const filterByTag = (tagId, tagName) => {
+  // 切换到标签查询模式
+  searchType.value = 'tag';
+  // 清空当前选中的标签
+  selectedTags.value = [];
+  // 选中点击的标签
+  selectedTags.value.push(tagId);
+  // 执行搜索
+  handleSearch();
+  // 显示成功提示
+  message.success(`已按标签"${tagName}"进行筛选`);
 };
 
 // 初始化

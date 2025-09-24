@@ -38,15 +38,15 @@
 
                 <!-- 标签查询 -->
                 <div v-else-if="searchType === 'tag'" class="tag-search">
-                    <TagSearch v-model:selectedTags="selectedTags" :tagCategories="tagCategories" :category="'VIDEO'"
-                        :showActions="true" @search="handleSearch" />
+                    <TagSearch v-model:selectedTags="selectedTags" :tags="tagCategories" :category="'VIDEO'"
+                        :showActions="true" @search="handleSearch" @update:tags="fetchTagCategories" />
                 </div>
 
                 <!-- 搜索操作 -->
                 <div class="search-actions" v-if="searchType === 'basic'">
                     <a-space>
                         <a-button type="primary" @click="handleSearch">
-                            <SearchOutlined /> 搜索
+                            <SearchOutlined /> 查询
                         </a-button>
                         <a-button @click="resetBasicSearch">
                             <ReloadOutlined /> 重置
@@ -107,9 +107,9 @@
                                     </div>
 
                                     <div class="tags" v-if="getTagNames(item.tags).length > 0">
-                                        <a-tag v-for="tagName in getTagNames(item.tags)" :key="tagName" color="blue"
-                                            size="small">
-                                            {{ tagName }}
+                                        <a-tag v-for="tag in getTagNames(item.tags)" :key="tag.id" color="blue"
+                                            size="small" class="clickable-tag" @click="filterByTag(tag.id, tag.name)">
+                                            {{ tag.name }}
                                         </a-tag>
                                     </div>
                                 </div>
@@ -128,7 +128,7 @@
                                                     <a-menu-item key="download" @click="handleDownload(item)">
                                                         <DownloadOutlined /> 下载
                                                     </a-menu-item>
-                                                    <a-menu-item key="edit" @click="editVideo(video)">
+                                                    <a-menu-item key="edit" @click="handleEdit(item)">
                                                             <EditOutlined />
                                                             编辑
                                                         </a-menu-item>
@@ -159,8 +159,8 @@
 
         <!-- 标签编辑模态框 -->
         <a-modal v-model:open="tagModalVisible" title="编辑标签" @ok="handleTagSubmit" @cancel="closeTagModal" :width="600">
-            <TagSearch v-model:selectedTags="tagForm.currentTags" :tagCategories="tagCategories"
-                :showSearchButton="false" />
+            <TagSearch :tags="tagCategories" :show-actions="false" :allowImageTagging="true"
+                :image-tags="tagForm.currentTags" @add-image-tag="addVideoTag" @remove-image-tag="removeVideoTag" :category="'VIDEO'" />
         </a-modal>
 
         <!-- 上传视频模态框 -->
@@ -250,7 +250,6 @@ import {
     getVideoAssetList,
     deleteVideoAsset,
     editVideoAsset,
-    updateVideoAssetTags,
     uploadVideoAsset
 } from '@/api/modules/videoApi';
 import { getTagsByCategory } from '@/api/modules/tagApi';
@@ -303,20 +302,20 @@ const selectedAssetId = ref(null);
 const loadingAssets = ref(false);
 
 // 获取标签分类
-// 获取标签分类
 const fetchTagCategories = async () => {
     try {
-        const response = await getTagsByCategory({ category: 'VIDEO' }); // 修复API调用
+        const response = await getTagsByCategory({ category: 'VIDEO' });
         if (response?.code === 0) {
-            const flattenTags = (categories) => {
-                return categories.reduce((acc, category) => {
-                    if (category.tags && Array.isArray(category.tags)) {
-                        acc.push(...category.tags);
-                    }
-                    return acc;
-                }, []);
-            };
-            tagCategories.value = flattenTags(response.data);
+            // 转换数据结构，将tag_name映射为name
+            tagCategories.value = response.data.map(tag => ({
+                ...tag,
+                name: tag.tag_name, // 将tag_name映射为name
+                children: tag.children ? tag.children.map(child => ({
+                    ...child,
+                    name: child.tag_name
+                })) : []
+            }));
+            console.log('**VIDEO tagCategories**:', tagCategories.value);
         }
     } catch (error) {
         console.error('获取VIDEO标签失败:', error);
@@ -361,10 +360,54 @@ const formatDate = (dateString) => {
     return dayjs(dateString).format('YYYY-MM-DD HH:mm');
 };
 
-// 获取标签名称
+// 根据标签ID查找标签（递归查找，支持二级标签）
+const findTagById = (tagId) => {
+    const searchInCategories = (categories) => {
+        for (const category of categories) {
+            // 检查当前分类是否匹配
+            if (category.id === tagId) {
+                return category;
+            }
+            // 如果有子分类，递归查找
+            if (category.children && category.children.length > 0) {
+                const foundTag = searchInCategories(category.children);
+                if (foundTag) return foundTag;
+            }
+        }
+        return null;
+    };
+    
+    return searchInCategories(tagCategories.value);
+};
+
+// 获取标签名称，添加标签存在性验证
 const getTagNames = (tags) => {
     if (!tags || !Array.isArray(tags)) return [];
-    return tags.map(tag => tag.name || tag.tag_name).filter(Boolean);
+
+    // 返回包含标签名称和ID的对象数组，只显示存在的标签
+    return tags.map(tag => {
+        // 如果tag有tag_name属性，直接使用
+        if (tag.tag_name) {
+            // 验证标签是否仍然存在于tagCategories中
+            const existingTag = findTagById(tag.id);
+            if (existingTag) {
+                return {
+                    id: tag.id,
+                    name: tag.tag_name
+                };
+            }
+            return null; // 标签已被删除，返回null
+        }
+        // 如果只有ID，通过ID查找标签
+        const foundTag = findTagById(tag.id || tag);
+        if (foundTag) {
+            return {
+                id: foundTag.id,
+                name: foundTag.name || foundTag.tag_name
+            };
+        }
+        return null; // 标签不存在，返回null
+    }).filter(tag => tag && tag.name); // 过滤掉null值和没有名称的标签
 };
 
 // 获取数据
@@ -390,7 +433,7 @@ const fetchData = async () => {
 
         // 标签查询参数
         if (searchType.value === 'tag' && selectedTags.value.length > 0) {
-            params.tags = selectedTags.value.join(',');
+            params.tag_id = selectedTags.value.join(',');
         }
 
         const response = await getVideoAssetList(params);
@@ -398,8 +441,10 @@ const fetchData = async () => {
             // 映射数据，添加uploader字段
             data.value = response.data.results.map(item => ({
                 ...item,
-                uploader: item.username || item.creator || '未知' // 优先使用username字段
+                uploader: item.username || item.creator || '未知', // 优先使用username字段
+                tags: item.tags || [] // 确保tags字段存在
             }));
+            
             pagination.total = response.data.count || 0;
         } else {
             message.error(response?.message || '获取视频列表失败');
@@ -437,6 +482,24 @@ const resetBasicSearch = () => {
 // 日期变化
 const handleDateChange = (dates) => {
     basicForm.dateRange = dates;
+};
+
+// 通过标签快速过滤
+const filterByTag = (tagId, tagName) => {
+    // 切换到标签查询模式
+    searchType.value = 'tag';
+    
+    // 清空当前选中的标签
+    selectedTags.value = [];
+    
+    // 选中点击的标签
+    selectedTags.value.push(tagId);
+    
+    // 执行搜索
+    handleSearch();
+    
+    // 提示用户
+    message.success(`已按标签"${tagName}"进行筛选`);
 };
 
 // 显示上传模态框
@@ -591,16 +654,32 @@ const closeTagModal = () => {
     tagForm.currentTags = [];
 };
 
+// 添加视频标签
+const addVideoTag = (tagId) => {
+    if (!tagForm.currentTags.includes(tagId)) {
+        tagForm.currentTags.push(tagId);
+        console.log('添加视频标签ID:', tagId, '当前标签:', tagForm.currentTags);
+    }
+};
+
+// 移除视频标签
+const removeVideoTag = (tagId) => {
+    const index = tagForm.currentTags.indexOf(tagId);
+    if (index > -1) {
+        tagForm.currentTags.splice(index, 1);
+        console.log('移除视频标签ID:', tagId, '当前标签:', tagForm.currentTags);
+    }
+};
+
 // 提交标签编辑
 const handleTagSubmit = async () => {
     try {
-        const formData = new FormData();
-        formData.append('asset_id', tagForm.assetId);
-        tagForm.currentTags.forEach(tagId => {
-            formData.append('tag_ids[]', tagId);
-        });
+        const editData = {
+            asset_id: tagForm.assetId,
+            tag_ids: tagForm.currentTags
+        };
 
-        const response = await updateVideoAssetTags(formData);
+        const response = await editVideoAsset(editData);
         if (response.code === 0) {
             const videoIndex = data.value.findIndex(v => v.id === tagForm.assetId);
             if (videoIndex !== -1) {
@@ -877,6 +956,16 @@ const handleAddToAsset = async () => {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
+}
+
+.clickable-tag {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.clickable-tag:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .card-actions {

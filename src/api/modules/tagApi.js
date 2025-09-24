@@ -21,3 +21,23 @@ export const addTag = async (data) => {
     throw error;
   }
 };
+
+export const deleteTag = async (tagId) => {
+  try {
+    const response = await request.post('/tag/delete/', { tag_id: tagId });
+    return response;
+  } catch (error) {
+    console.error('删除标签失败:', error);
+    throw error;
+  }
+};
+
+export const updateTag = async (tagId, data) => {
+  try {
+    const response = await request.post('/tag/update/', { tag_id: tagId, ...data });
+    return response;
+  } catch (error) {
+    console.error('更新标签失败:', error);
+    throw error;
+  }
+};

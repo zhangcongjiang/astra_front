@@ -365,15 +365,54 @@ const handleTagClick = (tagId) => {
   selectedTags.value = [tagId]; // 设置选中的标签
   handleSearch(); // 触发查询
 };
-// 修改获取标签名称的方法
+// 根据标签ID查找标签（递归查找）
+const findTagById = (tagId) => {
+  const searchInCategories = (categories) => {
+    for (const category of categories) {
+      // 检查当前分类是否匹配
+      if (category.id === tagId) {
+        return category;
+      }
+      // 如果有子分类，递归查找
+      if (category.children && category.children.length > 0) {
+        const foundTag = searchInCategories(category.children);
+        if (foundTag) return foundTag;
+      }
+    }
+    return null;
+  };
+  
+  return searchInCategories(tagCategories.value);
+};
+
+// 修改获取标签名称的方法，添加标签存在性验证
 const getTagNames = (tags) => {
   if (!tags || !Array.isArray(tags)) return [];
 
-  // 返回包含标签名称和ID的对象数组
-  return tags.map(tag => ({
-    id: tag.id, // 标签ID
-    name: tag.tag_name // 标签名称
-  })).filter(tag => tag.name);
+  // 返回包含标签名称和ID的对象数组，只显示存在的标签
+  return tags.map(tag => {
+    // 如果tag有tag_name属性，直接使用
+    if (tag.tag_name) {
+      // 验证标签是否仍然存在于tagCategories中
+      const existingTag = findTagById(tag.id);
+      if (existingTag) {
+        return {
+          id: tag.id,
+          name: tag.tag_name
+        };
+      }
+      return null; // 标签已被删除，返回null
+    }
+    // 如果只有ID，通过ID查找标签
+    const foundTag = findTagById(tag.id || tag);
+    if (foundTag) {
+      return {
+        id: foundTag.id,
+        name: foundTag.name
+      };
+    }
+    return null; // 标签不存在，返回null
+  }).filter(tag => tag && tag.name); // 过滤掉null值和没有名称的标签
 };
 
 // 初始化

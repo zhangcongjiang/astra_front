@@ -81,6 +81,9 @@
               <a-button type="link" :disabled="record.status === 'published'" @click="handlePublish(record)">
                 发布
               </a-button>
+              <a-button type="link" @click="handlePublishToToutiao(record)" style="color: #ff6600;">
+                发布到头条
+              </a-button>
               <a-button type="link" danger @click="handleDelete(record)">删除</a-button>
             </div>
           </template>
@@ -211,6 +214,9 @@ import {
   uploadMarkdown,
   importFromUrl  // 新增URL导入API
 } from '@/api/modules/textApi';
+// 导入头条文章发布相关功能
+import { ArticleToutiao } from '@/utils/toutiaoArticleAutomation.js';
+import { publishArticleToToutiao } from '@/utils/toutiaoArticleApi.js';
 
 const router = useRouter();
 
@@ -412,7 +418,7 @@ const columns = [
   {
     title: '操作',
     key: 'action',
-    width: '200px',
+    width: '280px',
     align: 'center',
   },
 ];
@@ -480,6 +486,40 @@ const handlePublish = async (record) => {
     fetchData();
   } catch (error) {
     message.error('发布失败');
+  }
+};
+
+// 发布到头条
+const handlePublishToToutiao = async (record) => {
+  try {
+    message.loading({ content: '正在发布到头条...', key: 'publishToutiao', duration: 0 });
+    
+    // 构建发布数据
+    const publishData = {
+      origin: {
+        title: record.title,
+        htmlContent: record.content,
+        textContent: record.content.replace(/<[^>]*>/g, ''), // 移除HTML标签
+        tags: record.tags || [],
+        cover: record.cover || null
+      },
+      data: {
+        title: record.title,
+        htmlContent: record.content,
+        textContent: record.content.replace(/<[^>]*>/g, ''),
+        tags: record.tags || [],
+        cover: record.cover || null
+      },
+      isAutoPublish: true
+    };
+    
+    // 调用后端API发布到头条
+    await publishArticleToToutiao(publishData);
+    
+    message.success({ content: '发布到头条成功', key: 'publishToutiao' });
+  } catch (error) {
+    console.error('发布到头条失败:', error);
+    message.error({ content: error.message || '发布到头条失败', key: 'publishToutiao' });
   }
 };
 

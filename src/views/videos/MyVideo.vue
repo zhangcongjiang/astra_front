@@ -306,6 +306,16 @@ import {
 import Pagination from '@/components/Pagination.vue';
 import { getVideoList,deleteVideo } from '@/api/modules/videoApi.js';
 import { getImageDetail } from '@/api/modules/imageApi.js';
+import { publishToDouyin, getDouyinPublishStatus } from '@/api/modules/douyinApi';
+import { publishToRednote, getRednotePublishStatus } from '@/api/modules/rednoteApi';
+import { VideoDouyin } from '@/utils/douyinAutomation';
+import { VideoRednote } from '@/utils/rednoteAutomation';
+import { VideoBaijiahao } from '@/utils/baijiahaoAutomation';
+import { VideoBilibili } from '@/utils/bilibiliAutomation';
+import { VideoToutiaohao } from '@/utils/toutiaoAutomation';
+import { VideoWeibo } from '@/utils/weiboAutomation';
+import { VideoWeiXinChannel } from '@/utils/weixinChannelAutomation';
+import { convertToDouyinFormat, convertToRednoteFormat, convertToBaijiahaoFormat, convertToBilibiliFormat, convertToToutiaoFormat, convertToWeiboFormat, convertToWeixinChannelFormat, validatePublishData } from '@/utils/dataConverter';
 import dayjs from 'dayjs';
 import UserSelect from '@/components/UserSelect.vue'
 
@@ -351,7 +361,7 @@ const editableVideo = ref({
 const platforms = ref([
   {
     key: 'toutiao',
-    name: '今日头条',
+    name: '头条号',
     icon: GlobalOutlined,
     color: '#ff6600'
   },
@@ -378,6 +388,12 @@ const platforms = ref([
     name: '百家号',
     icon: FileTextOutlined,
     color: '#3385ff'
+  },
+  {
+    key: 'bilibili',
+    name: 'B站',
+    icon: PlayCircleOutlined,
+    color: '#00a1d6'
   },
   {
     key: 'weibo',
@@ -626,24 +642,51 @@ const togglePlatform = (platformKey) => {
 
 // 获取封面详情
 const loadCoverDetail = async (coverId) => {
-  if (!coverId) return;
+  if (!coverId) {
+    console.warn('封面ID为空，跳过加载');
+    return;
+  }
+  
   try {
+    console.log('开始加载封面详情，ID:', coverId);
     const response = await getImageDetail(coverId);
     console.log('封面详情响应:', response);
+    
     if (response && response.data) {
       coverDetail.value = response.data;
+      console.log('封面详情加载成功:', response.data);
     } else if (response) {
       // 如果response存在但没有data字段，直接使用response
       coverDetail.value = response;
+      console.log('封面详情加载成功（无data字段）:', response);
+    } else {
+      console.warn('封面详情响应为空');
+      throw new Error('封面详情响应为空');
     }
   } catch (error) {
-    console.error('获取封面详情失败:', error);
+    console.error('获取封面详情失败:', {
+      coverId,
+      error: error.message,
+      stack: error.stack
+    });
+    
+    // 根据错误类型提供不同的降级处理
+    if (error.message && error.message.includes('请求失败')) {
+      console.log('API请求失败，使用默认封面信息');
+    } else if (error.message && error.message.includes('网络')) {
+      console.log('网络错误，使用默认封面信息');
+    } else {
+      console.log('未知错误，使用默认封面信息');
+    }
+    
     // API调用失败时，使用coverId作为img_name创建基本的封面信息
     if (coverId) {
       coverDetail.value = {
         img_name: `${coverId}.png`,
-        id: coverId
+        id: coverId,
+        fallback: true // 标记这是降级数据
       };
+      console.log('已设置默认封面信息:', coverDetail.value);
     } else {
       coverDetail.value = null;
     }
@@ -701,18 +744,424 @@ const handlePublish = async () => {
     return;
   }
   
+  let loadingMessage = null;
+  
   try {
-    // 这里可以调用发布API
-    console.log('发布视频:', {
-      video: selectedVideo.value,
-      platforms: selectedPlatforms.value
-    });
+    // 检查是否包含抖音平台
+    const hasDouyin = selectedPlatforms.value.some(platform => platform === 'douyin');
+    // 检查是否包含小红书平台
+    const hasRednote = selectedPlatforms.value.some(platform => platform === 'xiaohongshu');
     
-    message.success(`视频已成功发布到 ${selectedPlatforms.value.length} 个平台`);
-    closePublishModal();
+    if (hasDouyin) {
+      // 转换数据格式
+      const douyinData = convertToDouyinFormat(selectedVideo.value, editableVideo.value);
+      
+      // 验证数据完整性
+      const validation = validatePublishData(douyinData, 'douyin');
+      
+      if (!validation.isValid) {
+        message.error(`发布数据验证失败: ${validation.errors.join(', ')}`);
+        return;
+      }
+      
+      // 显示警告信息
+      if (validation.warnings.length > 0) {
+        message.warning(`注意: ${validation.warnings.join(', ')}`);
+      }
+      
+      loadingMessage = message.loading('正在发布到抖音平台...', 0);
+      
+      try {
+        const douyinResult = await publishToDouyin(douyinData);
+        
+        if (douyinResult && douyinResult.success) {
+          message.success('抖音发布成功!');
+        } else {
+          const errorMsg = douyinResult?.message || '发布失败，请检查网络连接或稍后重试';
+          message.error(`抖音发布失败: ${errorMsg}`);
+        }
+      } catch (douyinError) {
+        console.error('抖音发布API调用失败:', douyinError);
+        
+        // 根据错误类型提供不同的提示
+        let errorMessage = '抖音发布失败';
+        if (douyinError.message) {
+          if (douyinError.message.includes('网络')) {
+            errorMessage = '网络连接失败，请检查网络后重试';
+          } else if (douyinError.message.includes('权限')) {
+            errorMessage = '发布权限不足，请检查账号授权';
+          } else if (douyinError.message.includes('格式')) {
+            errorMessage = '视频格式不支持，请检查视频文件';
+          } else {
+            errorMessage = `抖音发布失败: ${douyinError.message}`;
+          }
+        }
+        
+        message.error(errorMessage);
+      }
+    }
+    
+    if (hasRednote) {
+      // 转换数据格式
+      const rednoteData = convertToRednoteFormat(selectedVideo.value, editableVideo.value);
+      
+      // 验证数据完整性
+      const validation = validatePublishData(rednoteData, 'xiaohongshu');
+      
+      if (!validation.isValid) {
+        message.error(`小红书发布数据验证失败: ${validation.errors.join(', ')}`);
+        return;
+      }
+      
+      // 显示警告信息
+      if (validation.warnings.length > 0) {
+        message.warning(`小红书注意: ${validation.warnings.join(', ')}`);
+      }
+      
+      loadingMessage = message.loading('正在发布到小红书平台...', 0);
+      
+      try {
+        const rednoteResult = await publishToRednote(rednoteData);
+        
+        if (rednoteResult && rednoteResult.success) {
+          message.success('小红书发布成功!');
+        } else {
+          const errorMsg = rednoteResult?.message || '发布失败，请检查网络连接或稍后重试';
+          message.error(`小红书发布失败: ${errorMsg}`);
+        }
+      } catch (rednoteError) {
+        console.error('小红书发布API调用失败:', rednoteError);
+        
+        // 根据错误类型提供不同的提示
+        let errorMessage = '小红书发布失败';
+        if (rednoteError.message) {
+          if (rednoteError.message.includes('网络')) {
+            errorMessage = '网络连接失败，请检查网络后重试';
+          } else if (rednoteError.message.includes('权限')) {
+            errorMessage = '发布权限不足，请检查账号授权';
+          } else if (rednoteError.message.includes('格式')) {
+            errorMessage = '视频格式不支持，请检查视频文件';
+          } else {
+            errorMessage = `小红书发布失败: ${rednoteError.message}`;
+          }
+        }
+        
+        message.error(errorMessage);
+      }
+    }
+    
+    // 检查是否包含百家号平台
+    const hasBaijiahao = selectedPlatforms.value.some(platform => platform === 'baijiahao');
+    
+    if (hasBaijiahao) {
+      // 转换数据格式
+      const baijiahaoData = convertToBaijiahaoFormat(selectedVideo.value, editableVideo.value);
+      
+      // 验证数据完整性
+      const validation = validatePublishData(baijiahaoData, 'baijiahao');
+      
+      if (!validation.isValid) {
+        message.error(`百家号发布数据验证失败: ${validation.errors.join(', ')}`);
+        return;
+      }
+      
+      // 显示警告信息
+      if (validation.warnings.length > 0) {
+        message.warning(`百家号注意: ${validation.warnings.join(', ')}`);
+      }
+      
+      loadingMessage = message.loading('正在发布到百家号平台...', 0);
+      
+      try {
+        const baijiahaoResult = await VideoBaijiahao({
+          data: baijiahaoData,
+          platform: 'baijiahao'
+        });
+        
+        if (baijiahaoResult && baijiahaoResult.success) {
+          message.success('百家号发布成功!');
+        } else {
+          const errorMsg = baijiahaoResult?.message || '发布失败，请检查网络连接或稍后重试';
+          message.error(`百家号发布失败: ${errorMsg}`);
+        }
+      } catch (baijiahaoError) {
+        console.error('百家号发布API调用失败:', baijiahaoError);
+        
+        // 根据错误类型提供不同的提示
+        let errorMessage = '百家号发布失败';
+        if (baijiahaoError.message) {
+          if (baijiahaoError.message.includes('网络')) {
+            errorMessage = '网络连接失败，请检查网络后重试';
+          } else if (baijiahaoError.message.includes('权限')) {
+            errorMessage = '发布权限不足，请检查账号授权';
+          } else if (baijiahaoError.message.includes('格式')) {
+            errorMessage = '视频格式不支持，请检查视频文件';
+          } else {
+            errorMessage = `百家号发布失败: ${baijiahaoError.message}`;
+          }
+        }
+        
+        message.error(errorMessage);
+      }
+    }
+     
+     // 检查是否包含B站平台
+     const hasBilibili = selectedPlatforms.value.some(platform => platform === 'bilibili');
+     
+     if (hasBilibili) {
+       // 转换数据格式
+       const bilibiliData = convertToBilibiliFormat(selectedVideo.value, editableVideo.value);
+       
+       // 验证数据完整性
+       const validation = validatePublishData(bilibiliData, 'bilibili');
+       
+       if (!validation.isValid) {
+         message.error(`B站发布数据验证失败: ${validation.errors.join(', ')}`);
+         return;
+       }
+       
+       // 显示警告信息
+       if (validation.warnings.length > 0) {
+         message.warning(`B站注意: ${validation.warnings.join(', ')}`);
+       }
+       
+       loadingMessage = message.loading('正在发布到B站平台...', 0);
+       
+       try {
+         const bilibiliResult = await VideoBilibili({
+           data: bilibiliData,
+           platform: 'bilibili'
+         });
+         
+         if (bilibiliResult && bilibiliResult.success) {
+           message.success('B站发布成功!');
+         } else {
+           const errorMsg = bilibiliResult?.message || '发布失败，请检查网络连接或稍后重试';
+           message.error(`B站发布失败: ${errorMsg}`);
+         }
+       } catch (bilibiliError) {
+         console.error('B站发布API调用失败:', bilibiliError);
+         
+         // 根据错误类型提供不同的提示
+         let errorMessage = 'B站发布失败';
+         if (bilibiliError.message) {
+           if (bilibiliError.message.includes('网络')) {
+             errorMessage = '网络连接失败，请检查网络后重试';
+           } else if (bilibiliError.message.includes('权限')) {
+             errorMessage = '发布权限不足，请检查账号授权';
+           } else if (bilibiliError.message.includes('格式')) {
+             errorMessage = '视频格式不支持，请检查视频文件';
+           } else {
+             errorMessage = `B站发布失败: ${bilibiliError.message}`;
+           }
+         }
+         
+         message.error(errorMessage);
+       }
+     }
+      
+      // 检查是否包含头条号平台
+      const hasToutiao = selectedPlatforms.value.some(platform => platform === 'toutiao');
+      
+      if (hasToutiao) {
+        // 转换数据格式
+        const toutiaoData = convertToToutiaoFormat(selectedVideo.value, editableVideo.value);
+        
+        // 验证数据完整性
+        const validation = validatePublishData(toutiaoData, 'toutiao');
+        
+        if (!validation.isValid) {
+          message.error(`头条号发布数据验证失败: ${validation.errors.join(', ')}`);
+          return;
+        }
+        
+        // 显示警告信息
+        if (validation.warnings.length > 0) {
+          message.warning(`头条号注意: ${validation.warnings.join(', ')}`);
+        }
+        
+        loadingMessage = message.loading('正在发布到头条号平台...', 0);
+        
+        try {
+          const toutiaoResult = await VideoToutiaohao({
+            data: toutiaoData,
+            platform: 'toutiao'
+          });
+          
+          if (toutiaoResult && toutiaoResult.success) {
+            message.success('头条号发布成功!');
+          } else {
+            const errorMsg = toutiaoResult?.message || '发布失败，请检查网络连接或稍后重试';
+            message.error(`头条号发布失败: ${errorMsg}`);
+          }
+        } catch (toutiaoError) {
+          console.error('头条号发布API调用失败:', toutiaoError);
+          
+          // 根据错误类型提供不同的提示
+          let errorMessage = '头条号发布失败';
+          if (toutiaoError.message) {
+            if (toutiaoError.message.includes('网络')) {
+              errorMessage = '网络连接失败，请检查网络后重试';
+            } else if (toutiaoError.message.includes('权限')) {
+              errorMessage = '发布权限不足，请检查账号授权';
+            } else if (toutiaoError.message.includes('格式')) {
+              errorMessage = '视频格式不支持，请检查视频文件';
+            } else {
+              errorMessage = `头条号发布失败: ${toutiaoError.message}`;
+            }
+          }
+          
+          message.error(errorMessage);
+        }
+      }
+      
+      // 检查是否包含微博平台
+      const hasWeibo = selectedPlatforms.value.some(platform => platform === 'weibo');
+      
+      if (hasWeibo) {
+        // 转换数据格式
+        const weiboData = convertToWeiboFormat(selectedVideo.value, editableVideo.value);
+        
+        // 验证数据完整性
+        const validation = validatePublishData(weiboData, 'weibo');
+        
+        if (!validation.isValid) {
+          message.error(`微博发布数据验证失败: ${validation.errors.join(', ')}`);
+          return;
+        }
+        
+        // 显示警告信息
+        if (validation.warnings.length > 0) {
+          message.warning(`微博注意: ${validation.warnings.join(', ')}`);
+        }
+        
+        loadingMessage = message.loading('正在发布到微博平台...', 0);
+        
+        try {
+          const weiboResult = await VideoWeibo({
+            data: weiboData,
+            platform: 'weibo'
+          });
+          
+          if (weiboResult && weiboResult.success) {
+            message.success('微博发布成功!');
+          } else {
+            const errorMsg = weiboResult?.message || '发布失败，请检查网络连接或稍后重试';
+            message.error(`微博发布失败: ${errorMsg}`);
+          }
+        } catch (weiboError) {
+          console.error('微博发布API调用失败:', weiboError);
+          
+          // 根据错误类型提供不同的提示
+          let errorMessage = '微博发布失败';
+          if (weiboError.message) {
+            if (weiboError.message.includes('网络')) {
+              errorMessage = '网络连接失败，请检查网络后重试';
+            } else if (weiboError.message.includes('权限')) {
+              errorMessage = '发布权限不足，请检查账号授权';
+            } else if (weiboError.message.includes('格式')) {
+              errorMessage = '视频格式不支持，请检查视频文件';
+            } else {
+              errorMessage = `微博发布失败: ${weiboError.message}`;
+            }
+          }
+          
+          message.error(errorMessage);
+        }
+      }
+      
+      // 检查是否包含微信视频号平台
+      const hasWeixinChannel = selectedPlatforms.value.some(platform => platform === 'wechat');
+      
+      if (hasWeixinChannel) {
+        // 转换数据格式
+        const weixinChannelData = convertToWeixinChannelFormat(selectedVideo.value, editableVideo.value);
+        
+        // 验证数据完整性
+        const validation = validatePublishData(weixinChannelData, 'wechat');
+        
+        if (!validation.isValid) {
+          message.error(`微信视频号发布数据验证失败: ${validation.errors.join(', ')}`);
+          return;
+        }
+        
+        // 显示警告信息
+        if (validation.warnings.length > 0) {
+          message.warning(`微信视频号注意: ${validation.warnings.join(', ')}`);
+        }
+        
+        loadingMessage = message.loading('正在发布到微信视频号平台...', 0);
+        
+        try {
+          const weixinChannelResult = await VideoWeiXinChannel({
+            data: weixinChannelData,
+            platform: 'wechat'
+          });
+          
+          if (weixinChannelResult && weixinChannelResult.success) {
+            message.success('微信视频号发布成功!');
+          } else {
+            const errorMsg = weixinChannelResult?.message || '发布失败，请检查网络连接或稍后重试';
+            message.error(`微信视频号发布失败: ${errorMsg}`);
+          }
+        } catch (weixinChannelError) {
+          console.error('微信视频号发布API调用失败:', weixinChannelError);
+          
+          // 根据错误类型提供不同的提示
+          let errorMessage = '微信视频号发布失败';
+          if (weixinChannelError.message) {
+            if (weixinChannelError.message.includes('网络')) {
+              errorMessage = '网络连接失败，请检查网络后重试';
+            } else if (weixinChannelError.message.includes('权限')) {
+              errorMessage = '发布权限不足，请检查账号授权';
+            } else if (weixinChannelError.message.includes('格式')) {
+              errorMessage = '视频格式不支持，请检查视频文件';
+            } else {
+              errorMessage = `微信视频号发布失败: ${weixinChannelError.message}`;
+            }
+          }
+          
+          message.error(errorMessage);
+        }
+      }
+      
+      // 处理其他平台
+      const otherPlatforms = selectedPlatforms.value.filter(platform => platform !== 'douyin' && platform !== 'xiaohongshu' && platform !== 'baijiahao' && platform !== 'bilibili' && platform !== 'toutiao' && platform !== 'weibo' && platform !== 'wechat');
+    if (otherPlatforms.length > 0) {
+      console.log('发布到其他平台:', {
+        video: selectedVideo.value,
+        platforms: otherPlatforms
+      });
+      
+      // 模拟其他平台发布
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      message.success(`视频已成功发布到 ${otherPlatforms.length} 个其他平台`);
+    }
+    
+    // 发布完成后关闭弹窗
+    setTimeout(() => {
+      closePublishModal();
+    }, 1500);
+    
   } catch (error) {
-    console.error('发布失败:', error);
-    message.error('发布失败，请稍后重试');
+    console.error('发布过程中出现未预期的错误:', error);
+    
+    // 提供用户友好的错误信息
+    let userMessage = '发布失败，请稍后重试';
+    if (error.message) {
+      if (error.message.includes('数据格式转换失败')) {
+        userMessage = '视频数据格式有误，请检查视频信息';
+      } else if (error.message.includes('网络')) {
+        userMessage = '网络连接异常，请检查网络后重试';
+      }
+    }
+    
+    message.error(userMessage);
+  } finally {
+    // 清理加载状态
+    if (loadingMessage && typeof loadingMessage === 'function') {
+      loadingMessage();
+    }
   }
 };
 

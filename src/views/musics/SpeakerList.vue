@@ -15,6 +15,12 @@
                     <a-form-item label="朗读者">
                         <a-input v-model:value="basicForm.reader" placeholder="输入朗读者" @pressEnter="handleSearch" />
                     </a-form-item>
+                    <a-form-item label="来源">
+                        <a-select v-model:value="basicForm.origin" placeholder="选择来源" style="width: 150px" allowClear>
+                            <a-select-option value="INDEX_TTS">INDEX-TTS</a-select-option>
+                            <a-select-option value="EDGE_TTS">EDGE-TTS</a-select-option>
+                        </a-select>
+                    </a-form-item>
                     <a-form-item>
                         <a-button type="primary" @click="handleSearch">查询</a-button>
                         <a-button @click="resetBasicSearch">重置</a-button>
@@ -25,7 +31,7 @@
             <!-- 标签查询 -->
             <div class="tag-search" v-if="searchType === 'tag'">
                 <TagSearch :tags="tagCategories" :showActions="true" v-model:selectedTags="selectedTags"
-                    :category="TAG_CATEGORY" @search="handleSearch" @update:tags="fetchTagCategories" />
+          :category="TAG_CATEGORY" @search="handleSearch" @update:tags="fetchTagCategories" />
             </div>
         </div>
 
@@ -53,6 +59,13 @@
                         <span>{{ record.name }}</span>
                     </div>
                 </template>
+                <template #origin="{ record }">
+                    <div style="text-align: center;">
+                        <a-tag :color="record.origin === 'INDEX_TTS' ? 'blue' : 'green'">
+                            {{ record.origin === 'INDEX_TTS' ? 'INDEX-TTS' : 'EDGE-TTS' }}
+                        </a-tag>
+                    </div>
+                </template>
                 <template #create_time="{ record }">
                     <div style="text-align: center;">
                         <span>{{ formatDateTime(record.create_time) }}</span>
@@ -64,8 +77,9 @@
                         <div class="voice-tags">
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <div style="display: flex; flex-wrap: wrap; gap: 4px;">
-                                    <a-tag v-for="tag in getTagNames(record.tags)" :key="tag.id" color="blue">{{
-                                        tag.name }}</a-tag>
+                                    <a-tag v-for="tag in getTagNames(record.tags)" :key="tag.id" color="blue" 
+                                           style="cursor: pointer;" @click="filterByTag(tag.id, tag.name)"
+                                           :title="`点击筛选标签: ${tag.name}`">{{ tag.name }}</a-tag>
                                 </div>
                                 <a-tooltip title="编辑标签">
                                     <tags-outlined @click.stop="showTagModal(record)"
@@ -103,9 +117,9 @@
     <!-- 标签编辑模态框 -->
     <a-modal v-model:visible="tagModalVisible" title="编辑音色标签" @ok="handleTagSubmit" @cancel="closeTagModal"
         width="800px">
-        <TagSearch :tags="tagCategories" :show-actions="false" :allow-voice-tagging="true"
-            v-model:selectedTags="tagForm.currentTags" @add-voice-tag="addVoiceTag"
-            @remove-voice-tag="removeVoiceTag" />
+        <TagSearch :tags="tagCategories" :show-actions="false" :allowVoiceTagging="true"
+            :selectedTags="tagForm.currentTags" v-model:selectedTags="tagForm.currentTags" 
+            @add-voice-tag="addVoiceTag" @remove-voice-tag="removeVoiceTag" />
     </a-modal>
 
     <!-- 新增朗读者模态框 -->
@@ -115,6 +129,27 @@
             <a-form-item label="朗读者姓名" required>
                 <a-input v-model:value="addSpeakerForm.name" placeholder="请输入朗读者姓名" />
             </a-form-item>
+            <a-form-item label="来源" required>
+                <a-radio-group v-model:value="addSpeakerForm.origin">
+                    <a-radio value="INDEX_TTS">INDEX-TTS</a-radio>
+                    <a-radio value="EDGE_TTS">EDGE-TTS</a-radio>
+                </a-radio-group>
+            </a-form-item>
+            <!-- EDGE-TTS 专用参数 -->
+            <template v-if="addSpeakerForm.origin === 'EDGE_TTS'">
+                <a-form-item label="语速调节">
+                    <a-input-number v-model:value="addSpeakerForm.voice_rate" :min="-50" :max="100" :step="10" addon-after="%" placeholder="0" style="width: 100%" />
+                    <div style="font-size: 12px; color: #999; margin-top: 4px;">调节语音播放速度，范围：-50% 到 100%</div>
+                </a-form-item>
+                <a-form-item label="音量调节">
+                    <a-input-number v-model:value="addSpeakerForm.volume" :min="-50" :max="100" :step="10" addon-after="%" placeholder="0" style="width: 100%" />
+                    <div style="font-size: 12px; color: #999; margin-top: 4px;">调节音量大小，范围：-50% 到 100%</div>
+                </a-form-item>
+                <a-form-item label="音调调节">
+                    <a-input-number v-model:value="addSpeakerForm.voice_pitch" :min="-50" :max="50" :step="5" addon-after="Hz" placeholder="0" style="width: 100%" />
+                    <div style="font-size: 12px; color: #999; margin-top: 4px;">调节音调高低，范围：-50Hz 到 50Hz</div>
+                </a-form-item>
+            </template>
             <a-form-item label="音频文件" required>
                 <a-upload
                     v-model:file-list="addSpeakerForm.fileList"
@@ -162,6 +197,7 @@ const TAG_CATEGORY = 'SPEAKER';
 // 基础查询表单
 const basicForm = reactive({
     reader: '',
+    origin: undefined,
 });
 
 // 标签数据
@@ -250,6 +286,23 @@ const handleTagSubmit = async () => {
         message.error('标签更新失败');
     }
 };
+
+// 添加朗读者标签
+const addVoiceTag = (tagId) => {
+    if (!tagForm.currentTags.includes(tagId)) {
+        tagForm.currentTags.push(tagId);
+        console.log('添加朗读者标签ID:', tagId, '当前标签:', tagForm.currentTags);
+    }
+};
+
+// 移除朗读者标签
+const removeVoiceTag = (tagId) => {
+    const index = tagForm.currentTags.indexOf(tagId);
+    if (index > -1) {
+        tagForm.currentTags.splice(index, 1);
+        console.log('移除朗读者标签ID:', tagId, '当前标签:', tagForm.currentTags);
+    }
+};
 // 获取音色列表
 // 修改 fetchSpeakerList 函数
 const fetchSpeakerList = async () => {
@@ -258,6 +311,7 @@ const fetchSpeakerList = async () => {
             page: pagination.current,
             pageSize: pagination.pageSize,
             name: basicForm.reader,
+            origin: basicForm.origin,
         };
 
         if (selectedTags.value.length > 0) {
@@ -308,6 +362,10 @@ const addSpeakerModalVisible = ref(false);
 const addSpeakerLoading = ref(false);
 const addSpeakerForm = reactive({
     name: '',
+    origin: 'INDEX_TTS',
+    voice_rate: 0,
+    volume: 0,
+    voice_pitch: 0,
     fileList: []
 });
 
@@ -381,15 +439,52 @@ const toggleAudio = async (record) => {
     }
 };
 
-// 修改获取标签名称的方法
+// 根据标签ID查找标签（递归查找，支持二级标签）
+const findTagById = (tagId) => {
+    const searchInCategories = (categories) => {
+        for (const category of categories) {
+            // 检查当前分类是否匹配
+            if (category.id === tagId) {
+                return category;
+            }
+            // 如果有子分类，递归查找
+            if (category.children && category.children.length > 0) {
+                const foundTag = searchInCategories(category.children);
+                if (foundTag) return foundTag;
+            }
+        }
+        return null;
+    };
+    
+    return searchInCategories(tagCategories.value);
+};
+
+// 获取标签名称，添加标签存在性验证
 const getTagNames = (tags) => {
     if (!tags || !Array.isArray(tags)) return [];
-
-    // 返回包含标签名称和ID的对象数组
-    return tags.map(tag => ({
-        id: tag.id, // 标签ID
-        name: tag.tag_name // 标签名称
-    })).filter(tag => tag.name);
+    
+    return tags.map(tag => {
+        // 如果tag有name属性，验证标签是否仍然存在
+        if (tag.tag_name) {
+            const existingTag = findTagById(tag.id);
+            if (existingTag) {
+                return {
+                    id: tag.id,
+                    name: tag.tag_name
+                };
+            }
+            return null; // 标签已被删除，返回null
+        }
+        // 如果只有ID，通过ID查找标签
+        const foundTag = findTagById(tag.id || tag);
+        if (foundTag) {
+            return {
+                id: foundTag.id,
+                name: foundTag.name
+            };
+        }
+        return null; // 标签不存在，返回null
+    }).filter(Boolean); // 过滤掉null值
 };
 
 
@@ -409,9 +504,26 @@ const handleSearch = () => {
 // 重置基础查询
 const resetBasicSearch = () => {
     basicForm.reader = '';
-    basicForm.language = '';
-    basicForm.emotion = '';
+    basicForm.origin = undefined;
     handleSearch();
+};
+
+// 通过标签快速过滤
+const filterByTag = (tagId, tagName) => {
+    // 切换到标签查询模式
+    searchType.value = 'tag';
+    
+    // 清空当前选中的标签
+    selectedTags.value = [];
+    
+    // 选中点击的标签
+    selectedTags.value.push(tagId);
+    
+    // 执行搜索
+    handleSearch();
+    
+    // 提示用户
+    message.success(`已按标签"${tagName}"进行筛选`);
 };
 
 // 格式化时间显示
@@ -435,6 +547,10 @@ const showAddSpeakerModal = () => {
 const closeAddSpeakerModal = () => {
     addSpeakerModalVisible.value = false;
     addSpeakerForm.name = '';
+    addSpeakerForm.origin = 'INDEX_TTS';
+    addSpeakerForm.voice_rate = 0;
+    addSpeakerForm.volume = 0;
+    addSpeakerForm.voice_pitch = 0;
     addSpeakerForm.fileList = [];
 };
 
@@ -472,6 +588,18 @@ const handleAddSpeaker = async () => {
     try {
         const formData = new FormData();
         formData.append('name', addSpeakerForm.name.trim());
+        formData.append('origin', addSpeakerForm.origin);
+        // EDGE-TTS 专用参数
+        if (addSpeakerForm.origin === 'EDGE_TTS') {
+            // 格式化参数为带符号和单位的字符串
+            const voiceRate = addSpeakerForm.voice_rate >= 0 ? `+${addSpeakerForm.voice_rate}%` : `${addSpeakerForm.voice_rate}%`;
+            const volume = addSpeakerForm.volume >= 0 ? `+${addSpeakerForm.volume}%` : `${addSpeakerForm.volume}%`;
+            const voicePitch = addSpeakerForm.voice_pitch >= 0 ? `+${addSpeakerForm.voice_pitch}Hz` : `${addSpeakerForm.voice_pitch}Hz`;
+            
+            formData.append('voice_rate', voiceRate);
+            formData.append('volume', volume);
+            formData.append('voice_pitch', voicePitch);
+        }
         formData.append('audio_file', addSpeakerForm.fileList[0].originFileObj);
 
         const response = await addSpeaker(formData);
@@ -511,6 +639,14 @@ const columns = [
         align: 'center',
         width: 150,
         slots: { customRender: 'reader' }
+    },
+    {
+        title: '来源',
+        dataIndex: 'origin',
+        key: 'origin',
+        align: 'center',
+        width: 120,
+        slots: { customRender: 'origin' }
     },
     {
         title: '上传时间',
