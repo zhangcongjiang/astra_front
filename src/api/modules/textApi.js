@@ -60,8 +60,9 @@ export const deleteText = async (text_id) => {
  */
 export const downloadText = async (textId, title) => {
     try {
+        const filename = `${title}.docx`;
         const response = request.download(`/text/download/${textId}/`,
-            {}, filename = `${title}.docx`
+            {}, filename
         );
         return response;
     } catch (error) {

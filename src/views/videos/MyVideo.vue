@@ -306,18 +306,10 @@ import {
 import Pagination from '@/components/Pagination.vue';
 import { getVideoList,deleteVideo } from '@/api/modules/videoApi.js';
 import { getImageDetail } from '@/api/modules/imageApi.js';
-import { publishToDouyin, getDouyinPublishStatus } from '@/api/modules/douyinApi';
-import { publishToRednote, getRednotePublishStatus } from '@/api/modules/rednoteApi';
-import { VideoDouyin } from '@/utils/douyinAutomation';
-import { VideoRednote } from '@/utils/rednoteAutomation';
-import { VideoBaijiahao } from '@/utils/baijiahaoAutomation';
-import { VideoBilibili } from '@/utils/bilibiliAutomation';
-import { VideoToutiaohao } from '@/utils/toutiaoAutomation';
-import { VideoWeibo } from '@/utils/weiboAutomation';
-import { VideoWeiXinChannel } from '@/utils/weixinChannelAutomation';
-import { convertToDouyinFormat, convertToRednoteFormat, convertToBaijiahaoFormat, convertToBilibiliFormat, convertToToutiaoFormat, convertToWeiboFormat, convertToWeixinChannelFormat, validatePublishData } from '@/utils/dataConverter';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import dayjs from 'dayjs';
 import UserSelect from '@/components/UserSelect.vue'
+import { publishToDouyinWithExtension } from '@/utils/extensionPublisher';
 
 
 // 加载状态
@@ -483,18 +475,6 @@ const handleDateChange = (dates) => {
 };
 
 
-// 下载视频
-const downloadVideo = (row) => {
-  console.log('下载视频:', row);
-  // 这里可以实现下载逻辑
-};
-
-// 预览视频
-const previewVideo = (row) => {
-  console.log('预览视频:', row);
-  // 这里可以实现预览逻辑
-};
-
 // 获取状态显示信息
 const getStatusInfo = (result) => {
   switch (result) {
@@ -619,6 +599,159 @@ const showPublishModal = async (video) => {
   publishModalVisible.value = true;
 };
 
+
+const handlePublish = async () => {
+  try {
+    if (!selectedVideo.value) {
+      ElMessage.error('请选择要发布的视频');
+      return;
+    }
+
+    if (selectedPlatforms.value.length === 0) {
+      ElMessage.error('请选择至少一个发布平台');
+      return;
+    }
+
+    // 显示发布进度
+    const loadingMessage = ElMessage({
+      message: '正在发布视频...',
+      type: 'info',
+      duration: 0,
+      showClose: false
+    });
+
+    const publishResults = [];
+    const videoData = selectedVideo.value;
+
+    // 遍历选中的平台进行发布
+    for (const platform of selectedPlatforms.value) {
+      try {
+        console.log(`开始发布到${platform}`);
+        
+        let result;
+        switch (platform) {
+          case 'douyin':
+            // 转换数据格式
+            const douyinData = convertToDouyinFormat(videoData, editableVideo.value);
+            
+            // 验证数据
+            const validation = validatePublishData(douyinData, '抖音');
+            if (!validation.isValid) {
+              throw new Error(`抖音发布数据验证失败: ${validation.errors.join(', ')}`);
+            }
+            
+            // 发布到抖音
+            result = await publishToDouyin(douyinData);
+            break;
+            
+          case 'xiaohongshu':
+            // 小红书发布逻辑
+            result = await publishToRednote(videoData, editableVideo.value);
+            break;
+            
+          case 'weibo':
+            // 微博发布逻辑
+            result = await publishToWeibo(videoData, editableVideo.value);
+            break;
+            
+          case 'bilibili':
+            // B站发布逻辑
+            result = await publishToBili(videoData, editableVideo.value);
+            break;
+            
+          default:
+            // 使用扩展API发布到其他平台
+            result = await publishViaExtension(platform, videoData, editableVideo.value);
+            break;
+        }
+        
+        publishResults.push({
+          platform,
+          success: result.success,
+          message: result.message,
+          data: result.data
+        });
+        
+        console.log(`${platform}发布结果:`, result);
+        
+      } catch (error) {
+        console.error(`${platform}发布失败:`, error);
+        
+        // 特殊处理抖音发布错误
+        let errorMessage = error.message || `${platform}发布失败`;
+        if (platform === 'douyin' && error.message && error.message.includes('请在新打开的抖音创作者页面中重新执行发布操作')) {
+          errorMessage = '抖音发布需要在创作者页面进行，已为您打开新窗口，请在新页面中重新点击发布按钮';
+          // 显示操作提示
+          ElMessageBox.alert(
+            '抖音发布需要在官方创作者页面进行操作。我们已经为您打开了抖音创作者页面，请按照以下步骤操作：\n\n1. 切换到新打开的抖音创作者页面\n2. 确保已登录您的抖音账号\n3. 在该页面中重新点击发布按钮\n\n如果页面没有自动打开，请手动访问：https://creator.douyin.com',
+            '抖音发布提示',
+            {
+              confirmButtonText: '我知道了',
+              type: 'warning',
+              dangerouslyUseHTMLString: false
+            }
+          );
+        }
+        
+        publishResults.push({
+          platform,
+          success: false,
+          message: errorMessage,
+          error: error
+        });
+      }
+    }
+    
+    // 关闭加载提示
+    loadingMessage.close();
+    
+    // 显示发布结果
+    const successCount = publishResults.filter(r => r.success).length;
+    const totalCount = publishResults.length;
+    const douyinResult = publishResults.find(r => r.platform === 'douyin');
+    
+    if (successCount === totalCount) {
+      ElMessage.success(`所有平台发布成功！(${successCount}/${totalCount})`);
+    } else if (successCount > 0) {
+      // 检查是否包含抖音发布失败
+      if (douyinResult && !douyinResult.success && douyinResult.message.includes('创作者页面')) {
+        ElMessage({
+          message: `部分平台发布成功 (${successCount}/${totalCount})，抖音需要在创作者页面操作`,
+          type: 'warning',
+          duration: 6000,
+          showClose: true
+        });
+      } else {
+        ElMessage.warning(`部分平台发布成功 (${successCount}/${totalCount})`);
+      }
+    } else {
+      // 检查是否全部失败都是因为抖音创作者页面问题
+      if (totalCount === 1 && douyinResult && douyinResult.message.includes('创作者页面')) {
+        ElMessage({
+          message: '抖音发布需要在创作者页面进行，请在新打开的页面中重新操作',
+          type: 'info',
+          duration: 6000,
+          showClose: true
+        });
+      } else {
+        ElMessage.error('所有平台发布失败，请检查网络连接和平台设置');
+      }
+    }
+    
+    // 显示详细结果
+    console.log('发布结果汇总:', publishResults);
+    
+    // 关闭发布弹窗
+    closePublishModal();
+    
+    // 刷新视频列表
+    await loadVideoList();
+    
+  } catch (error) {
+    console.error('发布过程中出现错误:', error);
+    ElMessage.error(`发布失败: ${error.message || '未知错误'}`);
+  }
+}
 const closePublishModal = () => {
   publishModalVisible.value = false;
   selectedVideo.value = null;
@@ -642,51 +775,24 @@ const togglePlatform = (platformKey) => {
 
 // 获取封面详情
 const loadCoverDetail = async (coverId) => {
-  if (!coverId) {
-    console.warn('封面ID为空，跳过加载');
-    return;
-  }
-  
+  if (!coverId) return;
   try {
-    console.log('开始加载封面详情，ID:', coverId);
     const response = await getImageDetail(coverId);
     console.log('封面详情响应:', response);
-    
     if (response && response.data) {
       coverDetail.value = response.data;
-      console.log('封面详情加载成功:', response.data);
     } else if (response) {
       // 如果response存在但没有data字段，直接使用response
       coverDetail.value = response;
-      console.log('封面详情加载成功（无data字段）:', response);
-    } else {
-      console.warn('封面详情响应为空');
-      throw new Error('封面详情响应为空');
     }
   } catch (error) {
-    console.error('获取封面详情失败:', {
-      coverId,
-      error: error.message,
-      stack: error.stack
-    });
-    
-    // 根据错误类型提供不同的降级处理
-    if (error.message && error.message.includes('请求失败')) {
-      console.log('API请求失败，使用默认封面信息');
-    } else if (error.message && error.message.includes('网络')) {
-      console.log('网络错误，使用默认封面信息');
-    } else {
-      console.log('未知错误，使用默认封面信息');
-    }
-    
+    console.error('获取封面详情失败:', error);
     // API调用失败时，使用coverId作为img_name创建基本的封面信息
     if (coverId) {
       coverDetail.value = {
         img_name: `${coverId}.png`,
-        id: coverId,
-        fallback: true // 标记这是降级数据
+        id: coverId
       };
-      console.log('已设置默认封面信息:', coverDetail.value);
     } else {
       coverDetail.value = null;
     }
@@ -697,13 +803,6 @@ const loadCoverDetail = async (coverId) => {
 const getCoverUrl = () => {
   if (!coverDetail.value?.img_name) return '';
   return `http://127.0.0.1:8089/media/images/${coverDetail.value.img_name}`;
-};
-
-const getVideoCoverUrl = (video) => {
-  if (!video?.cover_path) {
-    return '';
-  }
-  return video.cover_path;
 };
 
 // 处理封面文件变化
@@ -736,433 +835,6 @@ const handleCoverChange = (event) => {
 
 const handleFullscreenChange = (event) => {
   console.log('全屏状态变化:', event);
-};
-
-const handlePublish = async () => {
-  if (!selectedVideo.value || selectedPlatforms.value.length === 0) {
-    message.warning('请选择要发布的平台');
-    return;
-  }
-  
-  let loadingMessage = null;
-  
-  try {
-    // 检查是否包含抖音平台
-    const hasDouyin = selectedPlatforms.value.some(platform => platform === 'douyin');
-    // 检查是否包含小红书平台
-    const hasRednote = selectedPlatforms.value.some(platform => platform === 'xiaohongshu');
-    
-    if (hasDouyin) {
-      // 转换数据格式
-      const douyinData = convertToDouyinFormat(selectedVideo.value, editableVideo.value);
-      
-      // 验证数据完整性
-      const validation = validatePublishData(douyinData, 'douyin');
-      
-      if (!validation.isValid) {
-        message.error(`发布数据验证失败: ${validation.errors.join(', ')}`);
-        return;
-      }
-      
-      // 显示警告信息
-      if (validation.warnings.length > 0) {
-        message.warning(`注意: ${validation.warnings.join(', ')}`);
-      }
-      
-      loadingMessage = message.loading('正在发布到抖音平台...', 0);
-      
-      try {
-        const douyinResult = await publishToDouyin(douyinData);
-        
-        if (douyinResult && douyinResult.success) {
-          message.success('抖音发布成功!');
-        } else {
-          const errorMsg = douyinResult?.message || '发布失败，请检查网络连接或稍后重试';
-          message.error(`抖音发布失败: ${errorMsg}`);
-        }
-      } catch (douyinError) {
-        console.error('抖音发布API调用失败:', douyinError);
-        
-        // 根据错误类型提供不同的提示
-        let errorMessage = '抖音发布失败';
-        if (douyinError.message) {
-          if (douyinError.message.includes('网络')) {
-            errorMessage = '网络连接失败，请检查网络后重试';
-          } else if (douyinError.message.includes('权限')) {
-            errorMessage = '发布权限不足，请检查账号授权';
-          } else if (douyinError.message.includes('格式')) {
-            errorMessage = '视频格式不支持，请检查视频文件';
-          } else {
-            errorMessage = `抖音发布失败: ${douyinError.message}`;
-          }
-        }
-        
-        message.error(errorMessage);
-      }
-    }
-    
-    if (hasRednote) {
-      // 转换数据格式
-      const rednoteData = convertToRednoteFormat(selectedVideo.value, editableVideo.value);
-      
-      // 验证数据完整性
-      const validation = validatePublishData(rednoteData, 'xiaohongshu');
-      
-      if (!validation.isValid) {
-        message.error(`小红书发布数据验证失败: ${validation.errors.join(', ')}`);
-        return;
-      }
-      
-      // 显示警告信息
-      if (validation.warnings.length > 0) {
-        message.warning(`小红书注意: ${validation.warnings.join(', ')}`);
-      }
-      
-      loadingMessage = message.loading('正在发布到小红书平台...', 0);
-      
-      try {
-        const rednoteResult = await publishToRednote(rednoteData);
-        
-        if (rednoteResult && rednoteResult.success) {
-          message.success('小红书发布成功!');
-        } else {
-          const errorMsg = rednoteResult?.message || '发布失败，请检查网络连接或稍后重试';
-          message.error(`小红书发布失败: ${errorMsg}`);
-        }
-      } catch (rednoteError) {
-        console.error('小红书发布API调用失败:', rednoteError);
-        
-        // 根据错误类型提供不同的提示
-        let errorMessage = '小红书发布失败';
-        if (rednoteError.message) {
-          if (rednoteError.message.includes('网络')) {
-            errorMessage = '网络连接失败，请检查网络后重试';
-          } else if (rednoteError.message.includes('权限')) {
-            errorMessage = '发布权限不足，请检查账号授权';
-          } else if (rednoteError.message.includes('格式')) {
-            errorMessage = '视频格式不支持，请检查视频文件';
-          } else {
-            errorMessage = `小红书发布失败: ${rednoteError.message}`;
-          }
-        }
-        
-        message.error(errorMessage);
-      }
-    }
-    
-    // 检查是否包含百家号平台
-    const hasBaijiahao = selectedPlatforms.value.some(platform => platform === 'baijiahao');
-    
-    if (hasBaijiahao) {
-      // 转换数据格式
-      const baijiahaoData = convertToBaijiahaoFormat(selectedVideo.value, editableVideo.value);
-      
-      // 验证数据完整性
-      const validation = validatePublishData(baijiahaoData, 'baijiahao');
-      
-      if (!validation.isValid) {
-        message.error(`百家号发布数据验证失败: ${validation.errors.join(', ')}`);
-        return;
-      }
-      
-      // 显示警告信息
-      if (validation.warnings.length > 0) {
-        message.warning(`百家号注意: ${validation.warnings.join(', ')}`);
-      }
-      
-      loadingMessage = message.loading('正在发布到百家号平台...', 0);
-      
-      try {
-        const baijiahaoResult = await VideoBaijiahao({
-          data: baijiahaoData,
-          platform: 'baijiahao'
-        });
-        
-        if (baijiahaoResult && baijiahaoResult.success) {
-          message.success('百家号发布成功!');
-        } else {
-          const errorMsg = baijiahaoResult?.message || '发布失败，请检查网络连接或稍后重试';
-          message.error(`百家号发布失败: ${errorMsg}`);
-        }
-      } catch (baijiahaoError) {
-        console.error('百家号发布API调用失败:', baijiahaoError);
-        
-        // 根据错误类型提供不同的提示
-        let errorMessage = '百家号发布失败';
-        if (baijiahaoError.message) {
-          if (baijiahaoError.message.includes('网络')) {
-            errorMessage = '网络连接失败，请检查网络后重试';
-          } else if (baijiahaoError.message.includes('权限')) {
-            errorMessage = '发布权限不足，请检查账号授权';
-          } else if (baijiahaoError.message.includes('格式')) {
-            errorMessage = '视频格式不支持，请检查视频文件';
-          } else {
-            errorMessage = `百家号发布失败: ${baijiahaoError.message}`;
-          }
-        }
-        
-        message.error(errorMessage);
-      }
-    }
-     
-     // 检查是否包含B站平台
-     const hasBilibili = selectedPlatforms.value.some(platform => platform === 'bilibili');
-     
-     if (hasBilibili) {
-       // 转换数据格式
-       const bilibiliData = convertToBilibiliFormat(selectedVideo.value, editableVideo.value);
-       
-       // 验证数据完整性
-       const validation = validatePublishData(bilibiliData, 'bilibili');
-       
-       if (!validation.isValid) {
-         message.error(`B站发布数据验证失败: ${validation.errors.join(', ')}`);
-         return;
-       }
-       
-       // 显示警告信息
-       if (validation.warnings.length > 0) {
-         message.warning(`B站注意: ${validation.warnings.join(', ')}`);
-       }
-       
-       loadingMessage = message.loading('正在发布到B站平台...', 0);
-       
-       try {
-         const bilibiliResult = await VideoBilibili({
-           data: bilibiliData,
-           platform: 'bilibili'
-         });
-         
-         if (bilibiliResult && bilibiliResult.success) {
-           message.success('B站发布成功!');
-         } else {
-           const errorMsg = bilibiliResult?.message || '发布失败，请检查网络连接或稍后重试';
-           message.error(`B站发布失败: ${errorMsg}`);
-         }
-       } catch (bilibiliError) {
-         console.error('B站发布API调用失败:', bilibiliError);
-         
-         // 根据错误类型提供不同的提示
-         let errorMessage = 'B站发布失败';
-         if (bilibiliError.message) {
-           if (bilibiliError.message.includes('网络')) {
-             errorMessage = '网络连接失败，请检查网络后重试';
-           } else if (bilibiliError.message.includes('权限')) {
-             errorMessage = '发布权限不足，请检查账号授权';
-           } else if (bilibiliError.message.includes('格式')) {
-             errorMessage = '视频格式不支持，请检查视频文件';
-           } else {
-             errorMessage = `B站发布失败: ${bilibiliError.message}`;
-           }
-         }
-         
-         message.error(errorMessage);
-       }
-     }
-      
-      // 检查是否包含头条号平台
-      const hasToutiao = selectedPlatforms.value.some(platform => platform === 'toutiao');
-      
-      if (hasToutiao) {
-        // 转换数据格式
-        const toutiaoData = convertToToutiaoFormat(selectedVideo.value, editableVideo.value);
-        
-        // 验证数据完整性
-        const validation = validatePublishData(toutiaoData, 'toutiao');
-        
-        if (!validation.isValid) {
-          message.error(`头条号发布数据验证失败: ${validation.errors.join(', ')}`);
-          return;
-        }
-        
-        // 显示警告信息
-        if (validation.warnings.length > 0) {
-          message.warning(`头条号注意: ${validation.warnings.join(', ')}`);
-        }
-        
-        loadingMessage = message.loading('正在发布到头条号平台...', 0);
-        
-        try {
-          const toutiaoResult = await VideoToutiaohao({
-            data: toutiaoData,
-            platform: 'toutiao'
-          });
-          
-          if (toutiaoResult && toutiaoResult.success) {
-            message.success('头条号发布成功!');
-          } else {
-            const errorMsg = toutiaoResult?.message || '发布失败，请检查网络连接或稍后重试';
-            message.error(`头条号发布失败: ${errorMsg}`);
-          }
-        } catch (toutiaoError) {
-          console.error('头条号发布API调用失败:', toutiaoError);
-          
-          // 根据错误类型提供不同的提示
-          let errorMessage = '头条号发布失败';
-          if (toutiaoError.message) {
-            if (toutiaoError.message.includes('网络')) {
-              errorMessage = '网络连接失败，请检查网络后重试';
-            } else if (toutiaoError.message.includes('权限')) {
-              errorMessage = '发布权限不足，请检查账号授权';
-            } else if (toutiaoError.message.includes('格式')) {
-              errorMessage = '视频格式不支持，请检查视频文件';
-            } else {
-              errorMessage = `头条号发布失败: ${toutiaoError.message}`;
-            }
-          }
-          
-          message.error(errorMessage);
-        }
-      }
-      
-      // 检查是否包含微博平台
-      const hasWeibo = selectedPlatforms.value.some(platform => platform === 'weibo');
-      
-      if (hasWeibo) {
-        // 转换数据格式
-        const weiboData = convertToWeiboFormat(selectedVideo.value, editableVideo.value);
-        
-        // 验证数据完整性
-        const validation = validatePublishData(weiboData, 'weibo');
-        
-        if (!validation.isValid) {
-          message.error(`微博发布数据验证失败: ${validation.errors.join(', ')}`);
-          return;
-        }
-        
-        // 显示警告信息
-        if (validation.warnings.length > 0) {
-          message.warning(`微博注意: ${validation.warnings.join(', ')}`);
-        }
-        
-        loadingMessage = message.loading('正在发布到微博平台...', 0);
-        
-        try {
-          const weiboResult = await VideoWeibo({
-            data: weiboData,
-            platform: 'weibo'
-          });
-          
-          if (weiboResult && weiboResult.success) {
-            message.success('微博发布成功!');
-          } else {
-            const errorMsg = weiboResult?.message || '发布失败，请检查网络连接或稍后重试';
-            message.error(`微博发布失败: ${errorMsg}`);
-          }
-        } catch (weiboError) {
-          console.error('微博发布API调用失败:', weiboError);
-          
-          // 根据错误类型提供不同的提示
-          let errorMessage = '微博发布失败';
-          if (weiboError.message) {
-            if (weiboError.message.includes('网络')) {
-              errorMessage = '网络连接失败，请检查网络后重试';
-            } else if (weiboError.message.includes('权限')) {
-              errorMessage = '发布权限不足，请检查账号授权';
-            } else if (weiboError.message.includes('格式')) {
-              errorMessage = '视频格式不支持，请检查视频文件';
-            } else {
-              errorMessage = `微博发布失败: ${weiboError.message}`;
-            }
-          }
-          
-          message.error(errorMessage);
-        }
-      }
-      
-      // 检查是否包含微信视频号平台
-      const hasWeixinChannel = selectedPlatforms.value.some(platform => platform === 'wechat');
-      
-      if (hasWeixinChannel) {
-        // 转换数据格式
-        const weixinChannelData = convertToWeixinChannelFormat(selectedVideo.value, editableVideo.value);
-        
-        // 验证数据完整性
-        const validation = validatePublishData(weixinChannelData, 'wechat');
-        
-        if (!validation.isValid) {
-          message.error(`微信视频号发布数据验证失败: ${validation.errors.join(', ')}`);
-          return;
-        }
-        
-        // 显示警告信息
-        if (validation.warnings.length > 0) {
-          message.warning(`微信视频号注意: ${validation.warnings.join(', ')}`);
-        }
-        
-        loadingMessage = message.loading('正在发布到微信视频号平台...', 0);
-        
-        try {
-          const weixinChannelResult = await VideoWeiXinChannel({
-            data: weixinChannelData,
-            platform: 'wechat'
-          });
-          
-          if (weixinChannelResult && weixinChannelResult.success) {
-            message.success('微信视频号发布成功!');
-          } else {
-            const errorMsg = weixinChannelResult?.message || '发布失败，请检查网络连接或稍后重试';
-            message.error(`微信视频号发布失败: ${errorMsg}`);
-          }
-        } catch (weixinChannelError) {
-          console.error('微信视频号发布API调用失败:', weixinChannelError);
-          
-          // 根据错误类型提供不同的提示
-          let errorMessage = '微信视频号发布失败';
-          if (weixinChannelError.message) {
-            if (weixinChannelError.message.includes('网络')) {
-              errorMessage = '网络连接失败，请检查网络后重试';
-            } else if (weixinChannelError.message.includes('权限')) {
-              errorMessage = '发布权限不足，请检查账号授权';
-            } else if (weixinChannelError.message.includes('格式')) {
-              errorMessage = '视频格式不支持，请检查视频文件';
-            } else {
-              errorMessage = `微信视频号发布失败: ${weixinChannelError.message}`;
-            }
-          }
-          
-          message.error(errorMessage);
-        }
-      }
-      
-      // 处理其他平台
-      const otherPlatforms = selectedPlatforms.value.filter(platform => platform !== 'douyin' && platform !== 'xiaohongshu' && platform !== 'baijiahao' && platform !== 'bilibili' && platform !== 'toutiao' && platform !== 'weibo' && platform !== 'wechat');
-    if (otherPlatforms.length > 0) {
-      console.log('发布到其他平台:', {
-        video: selectedVideo.value,
-        platforms: otherPlatforms
-      });
-      
-      // 模拟其他平台发布
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      message.success(`视频已成功发布到 ${otherPlatforms.length} 个其他平台`);
-    }
-    
-    // 发布完成后关闭弹窗
-    setTimeout(() => {
-      closePublishModal();
-    }, 1500);
-    
-  } catch (error) {
-    console.error('发布过程中出现未预期的错误:', error);
-    
-    // 提供用户友好的错误信息
-    let userMessage = '发布失败，请稍后重试';
-    if (error.message) {
-      if (error.message.includes('数据格式转换失败')) {
-        userMessage = '视频数据格式有误，请检查视频信息';
-      } else if (error.message.includes('网络')) {
-        userMessage = '网络连接异常，请检查网络后重试';
-      }
-    }
-    
-    message.error(userMessage);
-  } finally {
-    // 清理加载状态
-    if (loadingMessage && typeof loadingMessage === 'function') {
-      loadingMessage();
-    }
-  }
 };
 
 // 表格列定义
@@ -1318,6 +990,382 @@ const handleDelete = async (row) => {
   } catch (error) {
     console.error('删除失败:', error);
     message.error('删除失败');
+  }
+};
+
+
+// 数据格式转换函数
+const convertToDouyinFormat = (videoData, editableData) => {
+  return {
+    title: editableData?.title || videoData.title,
+    description: editableData?.content || videoData.content || '',
+    videoUrl: videoData.video_path ? `http://127.0.0.1:8089/media/videos/${videoData.video_path}` : '',
+    coverUrl: videoData.cover_path ? `http://127.0.0.1:8089/media/images/${videoData.cover_path}` : '',
+    tags: editableData?.tags ? editableData.tags.split(',').map(tag => tag.trim()) : [],
+    category: editableData?.category || '娱乐'
+  };
+};
+
+const convertToRednoteFormat = (videoData, editableData) => {
+  return {
+    title: editableData?.title || videoData.title,
+    content: editableData?.content || videoData.content || '',
+    videoUrl: videoData.video_path ? `http://127.0.0.1:8089/media/videos/${videoData.video_path}` : '',
+    coverUrl: videoData.cover_path ? `http://127.0.0.1:8089/media/images/${videoData.cover_path}` : '',
+    tags: editableData?.tags ? editableData.tags.split(',').map(tag => tag.trim()) : [],
+    location: editableData?.location || '',
+    privacy: editableData?.privacy || 'public'
+  };
+};
+
+const convertToWeiboFormat = (videoData, editableData) => {
+  return {
+    content: `${editableData?.title || videoData.title}\n${editableData?.content || videoData.content || ''}`,
+    videoUrl: videoData.video_path ? `http://127.0.0.1:8089/media/videos/${videoData.video_path}` : '',
+    images: videoData.cover_path ? [`http://127.0.0.1:8089/media/images/${videoData.cover_path}`] : [],
+    topic: editableData?.topic || '',
+    location: editableData?.location || ''
+  };
+};
+
+const convertToBiliFormat = (videoData, editableData) => {
+  return {
+    title: editableData?.title || videoData.title,
+    desc: editableData?.content || videoData.content || '',
+    videoUrl: videoData.video_path ? `http://127.0.0.1:8089/media/videos/${videoData.video_path}` : '',
+    cover: videoData.cover_path ? `http://127.0.0.1:8089/media/images/${videoData.cover_path}` : '',
+    tags: editableData?.tags ? editableData.tags.split(',').map(tag => tag.trim()) : [],
+    tid: editableData?.category || 160, // 默认生活分区
+    copyright: editableData?.copyright || 1, // 1-自制，2-转载
+    source: editableData?.source || ''
+  };
+};
+
+// 数据验证函数
+const validatePublishData = (data, platform) => {
+  const errors = [];
+  
+  if (!data.title || data.title.trim() === '') {
+    errors.push('标题不能为空');
+  }
+  
+  if (!data.videoUrl) {
+    errors.push('视频文件不存在');
+  }
+  
+  // 平台特定验证
+  switch (platform) {
+    case '抖音':
+      if (data.title && data.title.length > 55) {
+        errors.push('抖音标题不能超过55个字符');
+      }
+      if (data.description && data.description.length > 2000) {
+        errors.push('抖音描述不能超过2000个字符');
+      }
+      break;
+    case '小红书':
+      if (data.title && data.title.length > 20) {
+        errors.push('小红书标题不能超过20个字符');
+      }
+      break;
+    case 'B站':
+      if (data.title && data.title.length > 80) {
+        errors.push('B站标题不能超过80个字符');
+      }
+      if (data.desc && data.desc.length > 250) {
+        errors.push('B站简介不能超过250个字符');
+      }
+      break;
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+// 抖音发布函数
+const publishToDouyin = async (douyinData) => {
+  try {
+    console.log('开始发布到抖音:', douyinData);
+    
+    // 使用新的扩展发布方式
+    const result = await publishToDouyinWithExtension(douyinData);
+    
+    if (result.success) {
+      return {
+        success: true,
+        message: result.message || '抖音发布成功',
+        data: result.data
+      };
+    } else {
+      throw new Error(result.message || '抖音发布失败');
+    }
+  } catch (error) {
+    console.error('抖音发布错误:', error);
+    throw new Error(`抖音发布失败: ${error.message}`);
+  }
+};
+
+// 小红书发布函数
+const publishToRednote = async (videoData, editableData) => {
+  try {
+    console.log('开始发布到小红书:', { videoData, editableData });
+    
+    // 使用多平台发布扩展API
+    const result = await publishViaExtension('小红书', videoData, editableData);
+    return result;
+  } catch (error) {
+    console.error('小红书发布错误:', error);
+    throw new Error(`小红书发布失败: ${error.message}`);
+  }
+};
+
+// 微博发布函数
+const publishToWeibo = async (videoData, editableData) => {
+  try {
+    console.log('开始发布到微博:', { videoData, editableData });
+    
+    // 使用多平台发布扩展API
+    const result = await publishViaExtension('微博', videoData, editableData);
+    return result;
+  } catch (error) {
+    console.error('微博发布错误:', error);
+    throw new Error(`微博发布失败: ${error.message}`);
+  }
+};
+
+// B站发布函数
+const publishToBili = async (videoData, editableData) => {
+  try {
+    console.log('开始发布到B站:', { videoData, editableData });
+    
+    // 使用多平台发布扩展API
+    const result = await publishViaExtension('B站', videoData, editableData);
+    return result;
+  } catch (error) {
+    console.error('B站发布错误:', error);
+    throw new Error(`B站发布失败: ${error.message}`);
+  }
+};
+
+// 生成跟踪ID
+const generateTraceId = () => {
+  return 'trace_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+};
+
+// 扩展通信工具函数
+const sendRequest = async (action, data = undefined, timeout = 5000) => {
+  const traceId = generateTraceId();
+
+  return new Promise((resolve, reject) => {
+    // 创建消息处理器
+    const messageHandler = (event) => {
+      if (event.data.type === 'response' && 
+          event.data.action === action && 
+          event.data.traceId === traceId) {
+        cleanup();
+        resolve(event.data.data);
+      }
+    };
+
+    // 创建超时处理器
+    let timeoutId;
+    if (timeout > 0) {
+      timeoutId = setTimeout(() => {
+        cleanup();
+        reject(new Error(`Request timeout after ${timeout}ms`));
+      }, timeout);
+    }
+
+    // 清理函数
+    const cleanup = () => {
+      window.removeEventListener('message', messageHandler);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+
+    // 添加事件监听器
+    window.addEventListener('message', messageHandler);
+
+    // 发送消息
+    window.postMessage({
+      type: 'request',
+      traceId,
+      action,
+      data,
+    }, '*');
+  });
+};
+
+// 检查扩展服务状态
+const checkServiceStatus = async (timeout = 5000) => {
+  try {
+    await sendRequest('MULTIPOST_EXTENSION_CHECK_SERVICE_STATUS', undefined, timeout);
+    return true;
+  } catch (error) {
+    console.error('Service check failed:', error);
+    return false;
+  }
+};
+
+// 请求域名授权
+const requestDomainTrust = async (timeout = 30000) => {
+  try {
+    return await sendRequest('MULTIPOST_EXTENSION_REQUEST_TRUST_DOMAIN', undefined, timeout);
+  } catch (error) {
+    console.error('Domain trust request failed:', error);
+    return { status: 'error', trusted: false };
+  }
+};
+
+// 获取可用平台列表
+const getAvailablePlatforms = async () => {
+  try {
+    return await sendRequest('MULTIPOST_EXTENSION_PLATFORMS');
+  } catch (error) {
+    console.error('Failed to get platforms:', error);
+    return [];
+  }
+};
+
+// 打开扩展选项页面
+const openOptions = async (timeout = 5000) => {
+  try {
+    await sendRequest('MULTIPOST_EXTENSION_OPEN_OPTIONS', undefined, timeout);
+    return true;
+  } catch (error) {
+    console.error('Failed to open extension options:', error);
+    return false;
+  }
+};
+
+// 根据类型获取平台信息
+const getPlatformInfos = async (type) => {
+  try {
+    const response = await sendRequest('MULTIPOST_EXTENSION_PLATFORMS');
+    if (!response) return [];
+    const platforms = Array.isArray(response) ? response : (response?.platforms ?? []);
+    return platforms.filter(platform => platform.type === type);
+  } catch (error) {
+    console.error('Failed to get platform infos:', error);
+    return [];
+  }
+};
+
+// 获取账号信息
+const getAccountInfos = async () => {
+  try {
+    const response = await sendRequest('MULTIPOST_EXTENSION_GET_ACCOUNT_INFOS');
+    return response?.accountInfo || {};
+  } catch (error) {
+    console.error('Failed to get account infos:', error);
+    return {};
+  }
+};
+
+// 链接扩展客户端
+const linkExtensionClient = async (apiKey, timeout = 30000) => {
+  try {
+    return await sendRequest('MULTIPOST_EXTENSION_LINK_EXTENSION', { apiKey }, timeout);
+  } catch (error) {
+    console.error('Failed to link extension client:', error);
+    return { confirm: false };
+  }
+};
+
+// 请求刷新账号信息
+const requestRefreshAccountInfo = async (isFocused = false) => {
+  try {
+    return await sendRequest('MULTIPOST_EXTENSION_REFRESH_ACCOUNT_INFOS', { isFocused });
+  } catch (error) {
+    console.error('Failed to refresh account info:', error);
+    return null;
+  }
+};
+
+// 通用扩展API发布函数
+const publishViaExtension = async (platform, videoData, editableData) => {
+  try {
+    console.log(`开始通过扩展发布到${platform}:`, { videoData, editableData });
+    
+    // 检查扩展服务状态
+    const serviceStatus = await checkServiceStatus();
+    if (!serviceStatus) {
+      throw new Error('多平台发布扩展未运行或不可用，请确保扩展已安装并启用');
+    }
+
+    // 请求域名授权
+    const trustResult = await requestDomainTrust();
+    if (!trustResult || !trustResult.trusted) {
+      // 如果授权失败，尝试打开扩展选项页面
+      await openOptions();
+      throw new Error('域名未获得扩展授权，请在扩展设置中添加信任域名后重试');
+    }
+
+    // 获取视频类型的平台信息
+    const platforms = await getPlatformInfos('VIDEO');
+    if (!platforms || platforms.length === 0) {
+      throw new Error('未找到可用的视频发布平台，请在扩展中配置视频平台账号');
+    }
+
+    // 平台映射
+    const platformMap = {
+      '抖音': 'VIDEO_DOUYIN',
+      '小红书': 'DYNAMIC_XIAOHONGSHU',
+      '微博': 'DYNAMIC_WEIBO', 
+      'B站': 'DYNAMIC_BILIBILI',
+      '头条号': 'DYNAMIC_TOUTIAO',
+      '微信视频号': 'VIDEO_WECHAT',
+      '百家号': 'DYNAMIC_BAIJIAHAO'
+    };
+    
+    const platformKey = platformMap[platform];
+    if (!platformKey) {
+      throw new Error(`不支持的平台: ${platform}`);
+    }
+    
+    // 查找目标平台
+    const targetPlatform = platforms.find(p => 
+      p.name && p.name === platformKey
+    );
+    
+    if (!targetPlatform) {
+      const availablePlatforms = platforms.map(p => p.name).join(', ');
+      throw new Error(`平台 ${platform} 不可用。可用视频平台: ${availablePlatforms}`);
+    }
+    
+    // 构建发布数据
+    const syncData = {
+      platforms: [{
+        name: platformKey,
+        extraConfig: {}
+      }],
+      isAutoPublish: true,
+      data: {
+        title: editableData?.title || videoData.title || '',
+        content: editableData?.content || videoData.content || '',
+        images: videoData.cover_path ? [`http://127.0.0.1:8089/media/images/${videoData.cover_path}`] : [],
+        videos: videoData.video_path ? [{
+          url: `http://127.0.0.1:8089/media/videos/${videoData.video_path}`,
+          cover: videoData.cover_path ? `http://127.0.0.1:8089/media/images/${videoData.cover_path}` : ''
+        }] : []
+      }
+    };
+    
+    // 使用sendRequest函数发布内容
+    const result = await sendRequest('MULTIPOST_EXTENSION_PUBLISH', syncData, 30000);
+    
+    if (result && result.success !== false) {
+      return { success: true, message: `${platform}发布成功`, data: result };
+    } else {
+      throw new Error(result?.message || `${platform}发布失败`);
+    }
+    
+  } catch (error) {
+    console.error(`${platform}发布错误:`, error);
+    throw new Error(`${platform}发布失败: ${error.message}`);
   }
 };
 </script>

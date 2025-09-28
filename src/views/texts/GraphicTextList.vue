@@ -81,9 +81,6 @@
               <a-button type="link" :disabled="record.status === 'published'" @click="handlePublish(record)">
                 发布
               </a-button>
-              <a-button type="link" @click="handlePublishToToutiao(record)" style="color: #ff6600;">
-                发布到头条
-              </a-button>
               <a-button type="link" danger @click="handleDelete(record)">删除</a-button>
             </div>
           </template>
@@ -214,9 +211,6 @@ import {
   uploadMarkdown,
   importFromUrl  // 新增URL导入API
 } from '@/api/modules/textApi';
-// 导入头条文章发布相关功能
-import { ArticleToutiao } from '@/utils/toutiaoArticleAutomation.js';
-import { publishArticleToToutiao } from '@/utils/toutiaoArticleApi.js';
 
 const router = useRouter();
 
@@ -321,38 +315,6 @@ const fetchData = async () => {
   }
 };
 
-// 过滤数据
-const filteredData = computed(() => {
-  let result = [...textList.value];
-
-  if (searchForm.name) {
-    result = result.filter(item =>
-      item.title.toLowerCase().includes(searchForm.name.toLowerCase())
-    );
-  }
-
-  if (searchForm.status !== undefined) {
-    result = result.filter(item => item.status === searchForm.status);
-  }
-
-  if (searchForm.origin !== undefined) {
-    result = result.filter(item => item.origin === searchForm.origin);
-  }
-
-  if (searchForm.dateRange && searchForm.dateRange.length === 2) {
-    const [start, end] = searchForm.dateRange;
-    result = result.filter(item => {
-      const createTime = dayjs(item.createTime);
-      return createTime.isAfter(start) && createTime.isBefore(end);
-    });
-  }
-
-  if (searchForm.account !== undefined) {
-    result = result.filter(item => item.account === searchForm.account);
-  }
-
-  return result;
-});
 
 // 当前页数据
 const currentPageData = computed(() => {
@@ -489,40 +451,6 @@ const handlePublish = async (record) => {
   }
 };
 
-// 发布到头条
-const handlePublishToToutiao = async (record) => {
-  try {
-    message.loading({ content: '正在发布到头条...', key: 'publishToutiao', duration: 0 });
-    
-    // 构建发布数据
-    const publishData = {
-      origin: {
-        title: record.title,
-        htmlContent: record.content,
-        textContent: record.content.replace(/<[^>]*>/g, ''), // 移除HTML标签
-        tags: record.tags || [],
-        cover: record.cover || null
-      },
-      data: {
-        title: record.title,
-        htmlContent: record.content,
-        textContent: record.content.replace(/<[^>]*>/g, ''),
-        tags: record.tags || [],
-        cover: record.cover || null
-      },
-      isAutoPublish: true
-    };
-    
-    // 调用后端API发布到头条
-    await publishArticleToToutiao(publishData);
-    
-    message.success({ content: '发布到头条成功', key: 'publishToutiao' });
-  } catch (error) {
-    console.error('发布到头条失败:', error);
-    message.error({ content: error.message || '发布到头条失败', key: 'publishToutiao' });
-  }
-};
-
 // 导入图文
 // 添加导入相关的响应式数据
 const importForm = reactive({
@@ -548,6 +476,59 @@ const handleImport = () => {
   urlPreview.title = '';
   urlPreview.content = '';
   importModalVisible.value = true;
+};
+
+// 处理文件选择
+const handleFileSelect = (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    // 检查文件类型
+    const allowedTypes = ['.md', '.markdown'];
+    const fileName = file.name.toLowerCase();
+    const isValidType = allowedTypes.some(type => fileName.endsWith(type));
+    
+    if (!isValidType) {
+      message.error('请选择 .md 或 .markdown 格式的文件');
+      event.target.value = ''; // 清空input
+      return;
+    }
+    
+    importForm.file = file;
+    
+    // 如果标题为空，使用文件名作为默认标题
+    if (!importForm.title.trim()) {
+      const nameWithoutExt = file.name.replace(/\.(md|markdown)$/i, '');
+      importForm.title = nameWithoutExt;
+    }
+  }
+};
+
+// 处理文件拖拽
+const handleFileDrop = (event) => {
+  event.preventDefault();
+  const files = event.dataTransfer.files;
+  
+  if (files.length > 0) {
+    const file = files[0];
+    
+    // 检查文件类型
+    const allowedTypes = ['.md', '.markdown'];
+    const fileName = file.name.toLowerCase();
+    const isValidType = allowedTypes.some(type => fileName.endsWith(type));
+    
+    if (!isValidType) {
+      message.error('请选择 .md 或 .markdown 格式的文件');
+      return;
+    }
+    
+    importForm.file = file;
+    
+    // 如果标题为空，使用文件名作为默认标题
+    if (!importForm.title.trim()) {
+      const nameWithoutExt = file.name.replace(/\.(md|markdown)$/i, '');
+      importForm.title = nameWithoutExt;
+    }
+  }
 };
 
 // URL导入表单数据
@@ -598,51 +579,7 @@ const cancelUrlImport = () => {
   urlImportForm.origin = 'toutiao';  // 重置为默认值
 };
 
-// 新增：导入类型切换处理
-const handleImportTypeChange = (activeKey) => {
-  importType.value = activeKey;
-  // 切换时清空相关数据
-  if (activeKey === 'file') {
-    importForm.url = '';
-    urlPreview.loading = false;
-    urlPreview.title = '';
-    urlPreview.content = '';
-  } else {
-    importForm.file = null;
-  }
-};
 
-// 新增：URL输入失焦处理
-const handleUrlBlur = async () => {
-  if (!importForm.url.trim()) {
-    urlPreview.loading = false;
-    urlPreview.title = '';
-    urlPreview.content = '';
-    return;
-  }
-  
-  try {
-    urlPreview.loading = true;
-    const response = await previewUrl(importForm.url.trim());
-    
-    if (response && response.data) {
-      urlPreview.title = response.data.title || '';
-      urlPreview.content = response.data.content || '';
-      
-      // 如果标题为空，使用预览的标题
-      if (!importForm.title && urlPreview.title) {
-        importForm.title = urlPreview.title;
-      }
-    }
-  } catch (error) {
-    console.error('获取URL预览失败:', error);
-    message.warning('无法获取URL内容预览，但仍可尝试导入');
-    urlPreview.title = '';
-    urlPreview.content = '';
-  } finally {
-    urlPreview.loading = false;
-  }
-};
 
 // 修改确认导入方法
 const confirmImport = async () => {
