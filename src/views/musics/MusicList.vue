@@ -617,7 +617,8 @@ const filteredMusics = computed(() => {
 
     // 标签查询过滤
     if (searchType.value === 'tag' && selectedTags.value.length > 0) {
-      return selectedTags.value.some(tagId => music.tags.includes(tagId));
+      return music.tags && Array.isArray(music.tags) && 
+             selectedTags.value.some(tagId => music.tags.includes(tagId));
     }
 
     return true;

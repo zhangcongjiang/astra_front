@@ -309,8 +309,6 @@ import { getImageDetail } from '@/api/modules/imageApi.js';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import dayjs from 'dayjs';
 import UserSelect from '@/components/UserSelect.vue'
-import { publishToDouyinWithExtension } from '@/utils/extensionPublisher';
-
 
 // 加载状态
 const loading = ref(false);
@@ -522,13 +520,11 @@ const formatTime = (time) => {
 
 // 获取视频URL
 const getVideoUrl = (video) => {
-  console.log('getVideoUrl调用:', video);
   if (!video?.video_path) {
     console.log('视频路径为空');
     return '';
   }
-  console.log('返回视频URL:', video.video_path);
-  // video_path已经是完整路径，直接返回
+
   return video.video_path;
 };
 
@@ -601,156 +597,8 @@ const showPublishModal = async (video) => {
 
 
 const handlePublish = async () => {
-  try {
-    if (!selectedVideo.value) {
-      ElMessage.error('请选择要发布的视频');
-      return;
-    }
-
-    if (selectedPlatforms.value.length === 0) {
-      ElMessage.error('请选择至少一个发布平台');
-      return;
-    }
-
-    // 显示发布进度
-    const loadingMessage = ElMessage({
-      message: '正在发布视频...',
-      type: 'info',
-      duration: 0,
-      showClose: false
-    });
-
-    const publishResults = [];
-    const videoData = selectedVideo.value;
-
-    // 遍历选中的平台进行发布
-    for (const platform of selectedPlatforms.value) {
-      try {
-        console.log(`开始发布到${platform}`);
-        
-        let result;
-        switch (platform) {
-          case 'douyin':
-            // 转换数据格式
-            const douyinData = convertToDouyinFormat(videoData, editableVideo.value);
-            
-            // 验证数据
-            const validation = validatePublishData(douyinData, '抖音');
-            if (!validation.isValid) {
-              throw new Error(`抖音发布数据验证失败: ${validation.errors.join(', ')}`);
-            }
-            
-            // 发布到抖音
-            result = await publishToDouyin(douyinData);
-            break;
-            
-          case 'xiaohongshu':
-            // 小红书发布逻辑
-            result = await publishToRednote(videoData, editableVideo.value);
-            break;
-            
-          case 'weibo':
-            // 微博发布逻辑
-            result = await publishToWeibo(videoData, editableVideo.value);
-            break;
-            
-          case 'bilibili':
-            // B站发布逻辑
-            result = await publishToBili(videoData, editableVideo.value);
-            break;
-            
-          default:
-            // 使用扩展API发布到其他平台
-            result = await publishViaExtension(platform, videoData, editableVideo.value);
-            break;
-        }
-        
-        publishResults.push({
-          platform,
-          success: result.success,
-          message: result.message,
-          data: result.data
-        });
-        
-        console.log(`${platform}发布结果:`, result);
-        
-      } catch (error) {
-        console.error(`${platform}发布失败:`, error);
-        
-        // 特殊处理抖音发布错误
-        let errorMessage = error.message || `${platform}发布失败`;
-        if (platform === 'douyin' && error.message && error.message.includes('请在新打开的抖音创作者页面中重新执行发布操作')) {
-          errorMessage = '抖音发布需要在创作者页面进行，已为您打开新窗口，请在新页面中重新点击发布按钮';
-          // 显示操作提示
-          ElMessageBox.alert(
-            '抖音发布需要在官方创作者页面进行操作。我们已经为您打开了抖音创作者页面，请按照以下步骤操作：\n\n1. 切换到新打开的抖音创作者页面\n2. 确保已登录您的抖音账号\n3. 在该页面中重新点击发布按钮\n\n如果页面没有自动打开，请手动访问：https://creator.douyin.com',
-            '抖音发布提示',
-            {
-              confirmButtonText: '我知道了',
-              type: 'warning',
-              dangerouslyUseHTMLString: false
-            }
-          );
-        }
-        
-        publishResults.push({
-          platform,
-          success: false,
-          message: errorMessage,
-          error: error
-        });
-      }
-    }
-    
-    // 关闭加载提示
-    loadingMessage.close();
-    
-    // 显示发布结果
-    const successCount = publishResults.filter(r => r.success).length;
-    const totalCount = publishResults.length;
-    const douyinResult = publishResults.find(r => r.platform === 'douyin');
-    
-    if (successCount === totalCount) {
-      ElMessage.success(`所有平台发布成功！(${successCount}/${totalCount})`);
-    } else if (successCount > 0) {
-      // 检查是否包含抖音发布失败
-      if (douyinResult && !douyinResult.success && douyinResult.message.includes('创作者页面')) {
-        ElMessage({
-          message: `部分平台发布成功 (${successCount}/${totalCount})，抖音需要在创作者页面操作`,
-          type: 'warning',
-          duration: 6000,
-          showClose: true
-        });
-      } else {
-        ElMessage.warning(`部分平台发布成功 (${successCount}/${totalCount})`);
-      }
-    } else {
-      // 检查是否全部失败都是因为抖音创作者页面问题
-      if (totalCount === 1 && douyinResult && douyinResult.message.includes('创作者页面')) {
-        ElMessage({
-          message: '抖音发布需要在创作者页面进行，请在新打开的页面中重新操作',
-          type: 'info',
-          duration: 6000,
-          showClose: true
-        });
-      } else {
-        ElMessage.error('所有平台发布失败，请检查网络连接和平台设置');
-      }
-    }
-    
-    // 显示详细结果
-    console.log('发布结果汇总:', publishResults);
-    
-    // 关闭发布弹窗
-    closePublishModal();
-    
-    // 刷新视频列表
-    await loadVideoList();
-    
-  } catch (error) {
-    console.error('发布过程中出现错误:', error);
-    ElMessage.error(`发布失败: ${error.message || '未知错误'}`);
-  }
+  ElMessage.info('发布功能暂未实现');
+  
 }
 const closePublishModal = () => {
   publishModalVisible.value = false;
@@ -996,22 +844,85 @@ const handleDelete = async (row) => {
 
 // 数据格式转换函数
 const convertToDouyinFormat = (videoData, editableData) => {
+  // 将相对路径转换为绝对路径
+  const convertToAbsolutePath = (relativePath) => {
+    if (!relativePath) return '';
+    
+    // 如果已经是绝对路径或HTTP URL，直接返回
+    if (relativePath.startsWith('http') || relativePath.startsWith('F:') || relativePath.startsWith('/F:')) {
+      return relativePath;
+    }
+    
+    // 如果是相对路径（如 /media/videos/xxx.mp4），转换为绝对路径
+    if (relativePath.startsWith('/media/')) {
+      return `F:\\pycharm_workspace\\astra${relativePath.replace(/\//g, '\\')}`;
+    }
+    
+    // 如果只是文件名，添加完整路径
+    if (!relativePath.includes('/') && !relativePath.includes('\\')) {
+      return `F:\\pycharm_workspace\\astra\\media\\videos\\${relativePath}`;
+    }
+    
+    return relativePath;
+  };
+
+  const videoUrl = videoData.video_path ? convertToAbsolutePath(videoData.video_path) : '';
+  const coverUrl = videoData.cover_path ? convertToAbsolutePath(videoData.cover_path.replace('videos', 'images')) : '';
+  
+  // 从视频路径中提取文件名
+  const videoFileName = videoData.video_path ? videoData.video_path.split(/[/\\]/).pop() : 'video.mp4';
+  
+  console.log('原始视频路径:', videoData.video_path);
+  console.log('转换后视频URL:', videoUrl);
+  console.log('原始封面路径:', videoData.cover_path);
+  console.log('转换后封面URL:', coverUrl);
+  
+  // 返回扩展期望的数据格式
   return {
-    title: editableData?.title || videoData.title,
-    description: editableData?.content || videoData.content || '',
-    videoUrl: videoData.video_path ? `http://127.0.0.1:8089/media/videos/${videoData.video_path}` : '',
-    coverUrl: videoData.cover_path ? `http://127.0.0.1:8089/media/images/${videoData.cover_path}` : '',
+    title: editableData?.title || videoData.title || '默认标题',
+    content: editableData?.content || videoData.content || '', // 使用content而不是description
+    videoUrl: videoUrl,
+    coverUrl: coverUrl,
+    video: {
+      name: videoFileName,
+      url: videoUrl,
+      type: 'video/mp4',
+      size: videoData.file_size || 1024000, // 使用实际文件大小或默认值
+      originUrl: videoUrl
+    },
     tags: editableData?.tags ? editableData.tags.split(',').map(tag => tag.trim()) : [],
     category: editableData?.category || '娱乐'
   };
 };
 
 const convertToRednoteFormat = (videoData, editableData) => {
+  // 将相对路径转换为绝对路径
+  const convertToAbsolutePath = (relativePath) => {
+    if (!relativePath) return '';
+    
+    // 如果已经是绝对路径或HTTP URL，直接返回
+    if (relativePath.startsWith('http') || relativePath.startsWith('F:') || relativePath.startsWith('/F:')) {
+      return relativePath;
+    }
+    
+    // 如果是相对路径（如 /media/videos/xxx.mp4），转换为绝对路径
+    if (relativePath.startsWith('/media/')) {
+      return `F:\\pycharm_workspace\\astra${relativePath.replace(/\//g, '\\')}`;
+    }
+    
+    // 如果只是文件名，添加完整路径
+    if (!relativePath.includes('/') && !relativePath.includes('\\')) {
+      return `F:\\pycharm_workspace\\astra\\media\\videos\\${relativePath}`;
+    }
+    
+    return relativePath;
+  };
+
   return {
     title: editableData?.title || videoData.title,
     content: editableData?.content || videoData.content || '',
-    videoUrl: videoData.video_path ? `http://127.0.0.1:8089/media/videos/${videoData.video_path}` : '',
-    coverUrl: videoData.cover_path ? `http://127.0.0.1:8089/media/images/${videoData.cover_path}` : '',
+    videoUrl: videoData.video_path ? convertToAbsolutePath(videoData.video_path) : '',
+    coverUrl: videoData.cover_path ? convertToAbsolutePath(videoData.cover_path.replace('videos', 'images')) : '',
     tags: editableData?.tags ? editableData.tags.split(',').map(tag => tag.trim()) : [],
     location: editableData?.location || '',
     privacy: editableData?.privacy || 'public'
@@ -1019,21 +930,65 @@ const convertToRednoteFormat = (videoData, editableData) => {
 };
 
 const convertToWeiboFormat = (videoData, editableData) => {
+  // 将相对路径转换为绝对路径
+  const convertToAbsolutePath = (relativePath) => {
+    if (!relativePath) return '';
+    
+    // 如果已经是绝对路径或HTTP URL，直接返回
+    if (relativePath.startsWith('http') || relativePath.startsWith('F:') || relativePath.startsWith('/F:')) {
+      return relativePath;
+    }
+    
+    // 如果是相对路径（如 /media/videos/xxx.mp4），转换为绝对路径
+    if (relativePath.startsWith('/media/')) {
+      return `F:\\pycharm_workspace\\astra${relativePath.replace(/\//g, '\\')}`;
+    }
+    
+    // 如果只是文件名，添加完整路径
+    if (!relativePath.includes('/') && !relativePath.includes('\\')) {
+      return `F:\\pycharm_workspace\\astra\\media\\videos\\${relativePath}`;
+    }
+    
+    return relativePath;
+  };
+
   return {
     content: `${editableData?.title || videoData.title}\n${editableData?.content || videoData.content || ''}`,
-    videoUrl: videoData.video_path ? `http://127.0.0.1:8089/media/videos/${videoData.video_path}` : '',
-    images: videoData.cover_path ? [`http://127.0.0.1:8089/media/images/${videoData.cover_path}`] : [],
+    videoUrl: videoData.video_path ? convertToAbsolutePath(videoData.video_path) : '',
+    images: videoData.cover_path ? [convertToAbsolutePath(videoData.cover_path.replace('videos', 'images'))] : [],
     topic: editableData?.topic || '',
     location: editableData?.location || ''
   };
 };
 
 const convertToBiliFormat = (videoData, editableData) => {
+  // 将相对路径转换为绝对路径
+  const convertToAbsolutePath = (relativePath) => {
+    if (!relativePath) return '';
+    
+    // 如果已经是绝对路径或HTTP URL，直接返回
+    if (relativePath.startsWith('http') || relativePath.startsWith('F:') || relativePath.startsWith('/F:')) {
+      return relativePath;
+    }
+    
+    // 如果是相对路径（如 /media/videos/xxx.mp4），转换为绝对路径
+    if (relativePath.startsWith('/media/')) {
+      return `F:\\pycharm_workspace\\astra${relativePath.replace(/\//g, '\\')}`;
+    }
+    
+    // 如果只是文件名，添加完整路径
+    if (!relativePath.includes('/') && !relativePath.includes('\\')) {
+      return `F:\\pycharm_workspace\\astra\\media\\videos\\${relativePath}`;
+    }
+    
+    return relativePath;
+  };
+
   return {
     title: editableData?.title || videoData.title,
     desc: editableData?.content || videoData.content || '',
-    videoUrl: videoData.video_path ? `http://127.0.0.1:8089/media/videos/${videoData.video_path}` : '',
-    cover: videoData.cover_path ? `http://127.0.0.1:8089/media/images/${videoData.cover_path}` : '',
+    videoUrl: videoData.video_path ? convertToAbsolutePath(videoData.video_path) : '',
+    cover: videoData.cover_path ? convertToAbsolutePath(videoData.cover_path.replace('videos', 'images')) : '',
     tags: editableData?.tags ? editableData.tags.split(',').map(tag => tag.trim()) : [],
     tid: editableData?.category || 160, // 默认生活分区
     copyright: editableData?.copyright || 1, // 1-自制，2-转载
@@ -1089,6 +1044,15 @@ const publishToDouyin = async (douyinData) => {
   try {
     console.log('开始发布到抖音:', douyinData);
     
+    // 使用正确的协议检查扩展状态
+    const isExtensionAvailable = await checkExtensionStatus();
+    
+    if (!isExtensionAvailable) {
+      throw new Error('扩展不可用: 请确保浏览器扩展已安装并启用; 请刷新页面重试');
+    }
+    
+    console.log('扩展检查通过，开始发布...');
+    
     // 使用新的扩展发布方式
     const result = await publishToDouyinWithExtension(douyinData);
     
@@ -1102,9 +1066,64 @@ const publishToDouyin = async (douyinData) => {
       throw new Error(result.message || '抖音发布失败');
     }
   } catch (error) {
-    console.error('抖音发布错误:', error);
-    throw new Error(`抖音发布失败: ${error.message}`);
+    console.error('抖音发布失败:', error);
+    throw error;
   }
+};
+
+// 检查扩展状态 - 使用正确的通信协议
+const checkExtensionStatus = () => {
+  return new Promise((resolve) => {
+    const traceId = 'check-' + Date.now();
+    const message = {
+      type: 'request',
+      traceId: traceId,
+      action: 'MULTIPOST_EXTENSION_CHECK_SERVICE_STATUS',
+      data: {}
+    };
+    
+    console.log('检查扩展状态:', message);
+    
+    // 设置响应监听器
+    const responseHandler = (event) => {
+      // 忽略回显消息，只处理响应消息
+      if (event.data && event.data.traceId === traceId && event.data.type === 'response') {
+        console.log('收到扩展状态响应:', event.data);
+        
+        if (event.data.success && event.data.data && event.data.data.extensionId) {
+          console.log('✅ 扩展可用，ID:', event.data.data.extensionId);
+          resolve(true);
+        } else {
+          console.log('❌ 扩展不可用:', event.data.message || '未知错误');
+          resolve(false);
+        }
+        
+        window.removeEventListener('message', responseHandler);
+      } else if (event.data && event.data.traceId === traceId && event.data.type === 'request') {
+        // 这是回显消息，忽略
+        console.log('收到回显消息，忽略...');
+      }
+    };
+    
+    window.addEventListener('message', responseHandler);
+    
+    // 发送消息
+    try {
+      window.postMessage(message);
+      console.log('扩展状态检查消息已发送');
+      
+      // 设置超时
+      setTimeout(() => {
+        window.removeEventListener('message', responseHandler);
+        console.log('❌ 扩展状态检查超时 - 扩展可能未安装或未启用');
+        resolve(false);
+      }, 3000);
+      
+    } catch (error) {
+      console.error('发送扩展状态检查消息失败:', error);
+      resolve(false);
+    }
+  });
 };
 
 // 小红书发布函数

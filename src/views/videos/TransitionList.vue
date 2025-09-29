@@ -195,6 +195,7 @@ const filteredData = computed(() => {
     // 标签查询过滤
     if (searchType.value === 'tag' && selectedTags.value.length > 0) {
         result = result.filter(item =>
+            item.tags && Array.isArray(item.tags) && 
             selectedTags.value.some(tagId => item.tags.includes(tagId))
         )
     }

@@ -85,16 +85,38 @@
           <!-- 快捷操作按钮 -->
           <div class="preview-controls">
             <a-button-group size="small">
+              <!-- 编辑按钮 - 在预览模式下显示 -->
               <a-button 
-                v-if="editorSpan === 0"
+                v-if="!isEditMode"
+                @click="toggleEditMode"
+                type="primary"
+                title="编辑"
+              >
+                <EditOutlined />
+                编辑
+              </a-button>
+              <!-- 返回预览按钮 - 在编辑模式下显示 -->
+              <a-button 
+                v-if="isEditMode"
+                @click="toggleEditMode"
+                type="default"
+                title="返回预览"
+              >
+                <EyeOutlined />
+                预览
+              </a-button>
+              <!-- 原有的显示编辑器按钮 - 仅在编辑模式且编辑器隐藏时显示 -->
+              <a-button 
+                v-if="isEditMode && editorSpan === 0"
                 @click="showEditor"
                 type="text"
                 title="显示编辑器"
               >
                 <EditOutlined />
               </a-button>
+              <!-- 隐藏编辑器按钮 - 仅在编辑模式且预览区域不是全屏时显示 -->
               <a-button 
-                v-if="previewSpan < 24"
+                v-if="isEditMode && previewSpan < 24"
                 @click="hideEditor"
                 type="text"
                 title="隐藏编辑器"
@@ -115,8 +137,8 @@
       </a-col>
     </a-row>
 
-    <!-- 编辑器隐藏时的快捷显示按钮 -->
-    <div v-if="editorSpan === 0" class="show-editor-btn">
+    <!-- 编辑器隐藏时的快捷显示按钮 - 仅在编辑模式下显示 -->
+    <div v-if="isEditMode && editorSpan === 0" class="show-editor-btn">
       <a-button 
         @click="showEditor"
         type="primary"
@@ -151,8 +173,9 @@ const route = useRoute();
 const router = useRouter();
 
 // 布局控制
-const editorSpan = ref(12);
-const previewSpan = ref(12);
+const isEditMode = ref(false); // 新增：编辑模式状态
+const editorSpan = ref(0); // 默认隐藏编辑器
+const previewSpan = ref(24); // 默认全屏预览
 const isResizing = ref(false);
 const startX = ref(0);
 const startEditorSpan = ref(12);
@@ -209,13 +232,24 @@ const resetLayout = () => {
 
 // 显示/隐藏编辑器
 const showEditor = () => {
+  isEditMode.value = true;
   editorSpan.value = 12;
   previewSpan.value = 12;
 };
 
 const hideEditor = () => {
+  isEditMode.value = false;
   editorSpan.value = 0;
   previewSpan.value = 24;
+};
+
+// 切换编辑模式
+const toggleEditMode = () => {
+  if (isEditMode.value) {
+    hideEditor();
+  } else {
+    showEditor();
+  }
 };
 
 // 获取图文详情

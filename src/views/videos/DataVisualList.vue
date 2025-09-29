@@ -223,7 +223,8 @@ const filteredTemplates = computed(() => {
         }
 
         if (searchType.value === 'tag' && selectedTags.value.length > 0) {
-            return selectedTags.value.some(tagId => template.tags.includes(tagId));
+            return template.tags && Array.isArray(template.tags) && 
+                   selectedTags.value.some(tagId => template.tags.includes(tagId));
         }
 
         return true;
