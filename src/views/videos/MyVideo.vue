@@ -119,6 +119,18 @@
                       </div>
                     </div>
                   </div>
+
+                  <!-- 视频大小和生成耗时一行 -->
+                  <div class="meta-row">
+                    <div class="meta-item">
+                      <span class="label">大小:</span>
+                       <span class="value">{{ formatBytes(video.size) }}</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="label">耗时:</span>
+                       <span class="value">{{ formatCost(video.cost) }}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -240,8 +252,6 @@ import {
   GlobalOutlined,
   PlayCircleOutlined,
   WechatOutlined,
-  HeartOutlined,
-  FileTextOutlined,
   WeiboOutlined,
   CheckCircleFilled
 } from '@ant-design/icons-vue';
@@ -424,6 +434,34 @@ const formatTime = (time) => {
   return dayjs(time).format('YYYY-MM-DD HH:mm:ss');
 };
 
+// 将字节转换为友好显示（KB/MB/GB），保留两位小数
+const formatBytes = (bytes) => {
+  if (bytes == null || isNaN(bytes)) return '未知';
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let value = bytes / 1024; // KB
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  return `${value.toFixed(2)} ${units[unitIndex]}`;
+};
+
+// 将秒转换为 时:分:秒 或 x小时y分z秒 的友好显示
+const formatCost = (seconds) => {
+  if (seconds == null || isNaN(seconds)) return '未知';
+  const s = Math.floor(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const parts = [];
+  if (h) parts.push(`${h}小时`);
+  if (m) parts.push(`${m}分`);
+  if (sec || parts.length === 0) parts.push(`${sec}秒`);
+  return parts.join('');
+};
+
 // 获取视频URL
 const getVideoUrl = (video) => {
   if (!video?.video_path) {
@@ -578,7 +616,7 @@ const handlePublish = async () => {
           url: httpVideoUrl,
           originUrl: absVideoUrl,
           type: 'video/mp4',
-          size: 2015548,
+          size: editableVideo.value?.size || selectedVideo.value?.size || 0,
         },
         tags: (editableVideo.value?.tags || '').split(' ').map(t => t.trim()).filter(Boolean)
       }
@@ -1073,7 +1111,8 @@ const guessPlatformColor = (p) => {
 .video-player video {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   border-radius: 6px;
   background-color: #000;
 }

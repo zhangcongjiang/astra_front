@@ -43,9 +43,6 @@
               </n-button>
             </div>
           </n-descriptions-item>
-          <n-descriptions-item label="创建者">
-            {{ videoDetail.username || videoDetail.creator || '未知用户' }}
-          </n-descriptions-item>
           <n-descriptions-item label="视频类型">
             <n-tag type="info">{{ getVideoTypeText(videoDetail.video_type) }}</n-tag>
           </n-descriptions-item>
@@ -54,6 +51,12 @@
           </n-descriptions-item>
           <n-descriptions-item label="创建时间">
             {{ formatTime(videoDetail.create_time) }}
+          </n-descriptions-item>
+          <n-descriptions-item label="视频大小">
+            {{ formatBytes(videoDetail.size || videoDetail.file_size) }}
+          </n-descriptions-item>
+          <n-descriptions-item label="生成耗时">
+            {{ formatCost(videoDetail.cost) }}
           </n-descriptions-item>
         </n-descriptions>
         
@@ -344,6 +347,26 @@ const getVideoTypeText = (type) => {
 // 格式化时间
 const formatTime = (time) => {
   return dayjs(time).format('YYYY-MM-DD HH:mm:ss');
+};
+// 新增：格式化字节大小（B/KB/MB/GB）
+const formatBytes = (bytes) => {
+  if (bytes === undefined || bytes === null) return '未知';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  if (bytes < k) return `${bytes} B`;
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+};
+// 新增：格式化耗时（小时/分钟/秒）
+const formatCost = (seconds) => {
+  if (seconds === undefined || seconds === null) return '未知';
+  const s = Math.max(0, Math.round(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  if (h > 0) return `${h}小时${m}分${ss}秒`;
+  if (m > 0) return `${m}分${ss}秒`;
+  return `${ss}秒`;
 };
 
 // 获取封面详情
