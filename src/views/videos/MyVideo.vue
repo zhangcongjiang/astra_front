@@ -21,19 +21,15 @@
             <a-select-option value="Fail">失败</a-select-option>
           </a-select>
         </a-form-item>
-        
+
         <a-form-item label="用户">
-          <UserSelect 
-            v-model="basicForm.creator" 
-            placeholder="选择用户" 
-            width="120px"
-          />
+          <UserSelect v-model="basicForm.creator" placeholder="选择用户" width="120px" />
         </a-form-item>
         <a-form-item label="创作时间">
           <a-range-picker v-model:value="basicForm.dateRange" :show-time="{ format: 'HH:mm' }" format="YYYY-MM-DD HH:mm"
             :placeholder="['开始时间', '结束时间']" @change="handleDateChange" />
         </a-form-item>
-        
+
         <a-form-item>
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="resetBasicSearch">重置</a-button>
@@ -51,21 +47,13 @@
                 <!-- 视频封面或播放器 -->
                 <div class="video-cover">
                   <!-- 普通视频且生成成功时显示视频播放器 -->
-                  <div v-if="video.video_type === 'Regular' && video.result === 'Success' && video.video_path" class="video-player">
-                    <video 
-                      :key="video.id" 
-                      :src="getVideoUrl(video)" 
-                      controls 
-                      preload="metadata" 
-                      @error="handleVideoError"
-                      @fullscreenchange="handleFullscreenChange"
-                      @loadstart="handleVideoLoadStart"
-                      @loadedmetadata="handleVideoLoadedMetadata"
-                      @canplay="handleVideoCanPlay"
-                      @click="handleVideoClick"
-                      @play="handleVideoPlay"
-                      @pause="handleVideoPause"
-                    >
+                  <div v-if="video.video_type === 'Regular' && video.result === 'Success' && video.video_path"
+                    class="video-player">
+                    <video :key="video.id" :src="getVideoUrl(video)" controls preload="metadata"
+                      @error="handleVideoError" @fullscreenchange="handleFullscreenChange"
+                      @loadstart="handleVideoLoadStart" @loadedmetadata="handleVideoLoadedMetadata"
+                      @canplay="handleVideoCanPlay" @click="handleVideoClick" @play="handleVideoPlay"
+                      @pause="handleVideoPause">
                       您的浏览器不支持视频播放
                     </video>
                   </div>
@@ -73,30 +61,32 @@
                   <div v-else class="cover-placeholder">
                     <video-camera-outlined style="font-size: 48px; color: #ccc;" />
                   </div>
-                  
+
                   <!-- 状态提示信息 -->
-                  <div class="status-tip" :class="{ 'pointer-events-none': video.video_type === 'Regular' && video.result === 'Success' }">
+                  <div class="status-tip"
+                    :class="{ 'pointer-events-none': video.video_type === 'Regular' && video.result === 'Success' }">
                     <!-- 生成中状态 -->
-                     <div v-if="video.result === 'Processing'" class="tip-text processing">
-                       视频正在急速生成中...
-                     </div>
-                    
+                    <div v-if="video.result === 'Processing'" class="tip-text processing">
+                      视频正在急速生成中...
+                    </div>
+
                     <!-- 生成失败状态 -->
                     <div v-else-if="video.result === 'Fail'" class="tip-text failed">
                       视频生成失败，请重试
                     </div>
-                    
+
                     <!-- 剪映视频成功状态 -->
-                     <div v-else-if="video.video_type === 'JianYing' && video.result === 'Success'" class="tip-text jianying">
-                       剪映视频请打开剪映播放
-                     </div>
+                    <div v-else-if="video.video_type === 'JianYing' && video.result === 'Success'"
+                      class="tip-text jianying">
+                      剪映视频请打开剪映播放
+                    </div>
                   </div>
                 </div>
-                
+
                 <!-- 视频信息 -->
                 <div class="video-info">
                   <div class="video-title">{{ video.title }}</div>
-                  
+
                   <!-- 用户和创建时间一行 -->
                   <div class="meta-row">
                     <div class="meta-item">
@@ -108,7 +98,7 @@
                       <span class="value">{{ formatTime(video.create_time) }}</span>
                     </div>
                   </div>
-                  
+
                   <!-- 视频类型和生成状态一行 -->
                   <div class="meta-row">
                     <div class="meta-item">
@@ -122,7 +112,8 @@
                           {{ getStatusInfo(video.result).text }}
                         </a-tag>
                         <div v-else class="progress-container">
-                          <a-progress :percent="Math.round((video.process || 0) * 100)" size="small" :show-info="false" />
+                          <a-progress :percent="Math.round((video.process || 0) * 100)" size="small"
+                            :show-info="false" />
                           <span class="progress-text">{{ Math.round((video.process || 0) * 100) }}%</span>
                         </div>
                       </div>
@@ -130,19 +121,14 @@
                   </div>
                 </div>
               </div>
-              
+
               <template #actions>
-                <a-button 
-                  v-if="video.video_type === 'Regular' && video.result === 'Success' && video.video_path" 
-                  
-                  type="primary"
-                  size="small" 
-                  @click="showPublishModal(video)"
-                >
+                <a-button v-if="video.video_type === 'Regular' && video.result === 'Success' && video.video_path"
+                  type="primary" size="small" @click="showPublishModal(video)">
                   发布
                 </a-button>
-                <a-button type="default"  size="small" @click="showDetail(video)">详情</a-button>
-                
+                <a-button type="default" size="small" @click="showDetail(video)">详情</a-button>
+
                 <a-button type="danger" size="small" @click="handleDelete(video)">删除</a-button>
               </template>
             </a-card>
@@ -154,15 +140,9 @@
     <!-- 分页组件 -->
     <Pagination v-model:current="pagination.current" v-model:pageSize="pagination.pageSize" :total="pagination.total"
       @change="handlePageChange" />
-      
+
     <!-- 发布弹窗 -->
-    <a-modal 
-      v-model:open="publishModalVisible" 
-      title="发布视频" 
-      width="800px"
-      :footer="null"
-      @cancel="closePublishModal"
-    >
+    <a-modal v-model:open="publishModalVisible" title="发布视频" width="800px" :footer="null" @cancel="closePublishModal">
       <div class="publish-modal-content">
         <!-- 视频信息部分 -->
         <div class="video-info-section">
@@ -170,88 +150,57 @@
           <div class="video-info-content">
             <div class="cover-section">
               <div class="cover-preview">
-                 <img 
-                   v-if="editableVideo.coverPath && editableVideo.coverPath.startsWith('data:')" 
-                   :src="editableVideo.coverPath" 
-                   class="cover-image"
-                   alt="封面"
-                 />
-                 <img 
-                    v-else-if="coverDetail && getCoverUrl()" 
-                    :src="getCoverUrl()" 
-                    class="cover-image"
-                    alt="封面"
-                    @click="showImagePreview"
-                    style="cursor: pointer;"
-                  />
-                 <div v-else class="cover-placeholder">
-                   <video-camera-outlined style="font-size: 32px; color: #ccc;" />
-                   <span>暂无封面</span>
-                 </div>
-               </div>
-               <div class="cover-actions">
-                 <input 
-                   ref="coverInput" 
-                   type="file" 
-                   accept="image/*" 
-                   style="display: none" 
-                   @change="handleCoverChange"
-                 />
-                 <a-button size="small" @click="$refs.coverInput.click()">
-                   {{ editableVideo.coverPath ? '替换封面' : '上传封面' }}
-                 </a-button>
-               </div>
+                <img v-if="editableVideo.coverPath && editableVideo.coverPath.startsWith('data:')"
+                  :src="editableVideo.coverPath" class="cover-image" alt="封面" />
+                <img v-else-if="coverDetail && getCoverUrl()" :src="getCoverUrl()" class="cover-image" alt="封面"
+                  @click="showImagePreview" style="cursor: pointer;" />
+                <div v-else class="cover-placeholder">
+                  <video-camera-outlined style="font-size: 32px; color: #ccc;" />
+                  <span>暂无封面</span>
+                </div>
+              </div>
+              <div class="cover-actions">
+                <input ref="coverInput" type="file" accept="image/*" style="display: none"
+                  @change="handleCoverChange" />
+                <a-button size="small" @click="$refs.coverInput.click()">
+                  {{ editableVideo.coverPath ? '替换封面' : '上传封面' }}
+                </a-button>
+              </div>
             </div>
             <div class="video-details">
               <div class="detail-item">
                 <span class="detail-label">标题：</span>
-                <a-input 
-                  v-model:value="editableVideo.title" 
-                  placeholder="请输入视频标题"
-                  class="detail-input"
-                />
+                <a-input v-model:value="editableVideo.title" placeholder="请输入视频标题" class="detail-input" />
               </div>
               <div class="detail-item">
-                 <span class="detail-label">内容：</span>
-                 <a-textarea 
-                   v-model:value="editableVideo.content" 
-                   placeholder="请输入视频内容描述"
-                   :rows="3"
-                   class="detail-input"
-                 />
-               </div>
-               <div class="detail-item">
-                 <span class="detail-label">标签：</span>
-                 <a-input 
-                   v-model:value="editableVideo.tags" 
-                   placeholder="请输入标签，多个标签用逗号分隔"
-                   class="detail-input"
-                 />
-               </div>
+                <span class="detail-label">内容：</span>
+                <a-textarea v-model:value="editableVideo.content" placeholder="请输入视频内容描述" :rows="3"
+                  class="detail-input" />
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">标签：</span>
+                <a-input v-model:value="editableVideo.tags" placeholder="请输入标签，多个标签用逗号分隔" class="detail-input" />
+              </div>
             </div>
           </div>
         </div>
-        
+
         <!-- 平台选择部分 -->
         <div class="platform-section">
           <div class="platform-header" style="margin-bottom:8px; display:flex; align-items:center; gap:12px;">
-             <h3 style="margin:0;">选择发布平台</h3>
-             <div class="auto-publish" style="display:flex; align-items:center; gap:8px;">
-               <span>直接发布</span>
-               <a-switch v-model:checked="isAutoPublish" size="small" />
-             </div>
-           </div>
-           <div class="platform-grid">
-            <div 
-              v-for="p in dynamicPlatforms" 
-              :key="p.name"
-              class="platform-item"
-              :class="{ active: selectedPlatforms.includes(p.name) }"
-              @click="togglePlatform(p.name)"
-            >
+            <h3 style="margin:0;">选择发布平台</h3>
+            <div class="auto-publish" style="display:flex; align-items:center; gap:8px;">
+              <span>直接发布</span>
+              <a-switch v-model:checked="isAutoPublish" size="small" />
+            </div>
+          </div>
+          <div class="platform-grid">
+            <div v-for="p in dynamicPlatforms" :key="p.name" class="platform-item"
+              :class="{ active: selectedPlatforms.includes(p.name) }" @click="togglePlatform(p.name)">
               <div class="platform-icon">
                 <img v-if="p.faviconUrl" :src="p.faviconUrl" alt="" style="width:24px;height:24px;" />
-                <component v-else :is="guessPlatformIcon(p)" :style="{ fontSize: '24px', color: guessPlatformColor(p) }" />
+                <component v-else :is="guessPlatformIcon(p)"
+                  :style="{ fontSize: '24px', color: guessPlatformColor(p) }" />
               </div>
               <div class="platform-name">{{ p.platformName || p.name }}</div>
               <div class="platform-check" v-if="selectedPlatforms.includes(p.name)">
@@ -261,37 +210,22 @@
             </div>
           </div>
         </div>
-        
+
         <!-- 操作按钮 -->
         <div class="modal-actions">
           <a-button @click="closePublishModal">取消</a-button>
-          <a-button 
-            type="primary" 
-            :disabled="selectedPlatforms.length === 0"
-            @click="handlePublish"
-          >
+          <a-button type="primary" :disabled="selectedPlatforms.length === 0" @click="handlePublish">
             发布到选中平台 ({{ selectedPlatforms.length }})
           </a-button>
         </div>
       </div>
     </a-modal>
-    
+
     <!-- 图片预览模态框 -->
-    <a-modal 
-      v-model:open="imagePreviewVisible" 
-      title="封面预览" 
-      width="90%"
-      style="max-width: 1200px;"
-      :footer="null"
-      centered
-    >
+    <a-modal v-model:open="imagePreviewVisible" title="封面预览" width="90%" style="max-width: 1200px;" :footer="null"
+      centered>
       <div class="image-preview-container">
-        <img 
-          v-if="coverDetail && getCoverUrl()" 
-          :src="getCoverUrl()" 
-          alt="封面预览" 
-          class="preview-image"
-        />
+        <img v-if="coverDetail && getCoverUrl()" :src="getCoverUrl()" alt="封面预览" class="preview-image" />
       </div>
     </a-modal>
   </div>
@@ -301,7 +235,7 @@
 import { ref, computed, reactive, onMounted, watch } from 'vue';
 import { h } from 'vue';
 import { NDataTable, NCard, NButton, NProgress, NTag, useDialog, useMessage } from 'naive-ui';
-import { 
+import {
   VideoCameraOutlined,
   GlobalOutlined,
   PlayCircleOutlined,
@@ -312,13 +246,13 @@ import {
   CheckCircleFilled
 } from '@ant-design/icons-vue';
 import Pagination from '@/components/Pagination.vue';
-import { getVideoList,deleteVideo } from '@/api/modules/videoApi.js';
+import { getVideoList, deleteVideo } from '@/api/modules/videoApi.js';
 import { getImageDetail } from '@/api/modules/imageApi.js';
 import { ElMessage } from 'element-plus';
 import dayjs from 'dayjs';
 import UserSelect from '@/components/UserSelect.vue'
 
-import { 
+import {
   checkServiceStatus as extCheckServiceStatus,
   openOptions as extOpenOptions,
   funcPublish as extFuncPublish,
@@ -386,7 +320,7 @@ const loadVideoList = async () => {
     if (response.code === 0) {
       videoList.value = response.data.results || [];
       pagination.total = response.data.count || 0;
-      
+
       // 调试：打印视频数据
       console.log('获取到的视频列表:', videoList.value);
       videoList.value.forEach((video, index) => {
@@ -550,7 +484,7 @@ const showPublishModal = async (video) => {
   selectedVideo.value = video;
   selectedPlatforms.value = [];
   coverDetail.value = null;
-  
+
   // 初始化可编辑的视频信息
   editableVideo.value = {
     title: video.title || '',
@@ -558,12 +492,12 @@ const showPublishModal = async (video) => {
     coverPath: video.cover_path || '',
     tags: video.tags || ''
   };
-  
+
   // 如果视频有封面ID，加载封面详情
   if (video.cover) {
     await loadCoverDetail(video.cover);
   }
-  
+
   publishModalVisible.value = true;
 };
 
@@ -591,60 +525,64 @@ const handlePublish = async () => {
       ElMessage.info('请在扩展设置页授权当前域名后，系统将自动继续');
     }
 
-    // const platforms = await getPlatformInfos('VIDEO');
     const selectedSet = new Set(selectedPlatforms.value);
     const targetPlatforms = (dynamicPlatforms.value || []).filter(p => selectedSet.has(p.name));
-    console.log('选中的平台:', selectedPlatforms.value, '\n匹配到的平台:', targetPlatforms.map(p => ({ name: p.name, injectUrl: p.injectUrl, homeUrl: p.homeUrl })));
+    console.log('选中的平台:', selectedPlatforms.value, '\n匹配到的平台:', targetPlatforms.map(p => ({ name: p.name })));
     if (!targetPlatforms.length) {
       ElMessage.error('未匹配到选中的平台，请先在列表中选择平台后重试');
       return;
     }
 
-
     await new Promise(r => setTimeout(r, 1000));
 
-    const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, injectUrl: p.injectUrl, extraConfig: {} }));
+    const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, platformName: p.platformName, injectUrl: p.injectUrl, faviconUrl: p.faviconUrl, accountKey: p.accountKey, extraConfig: {} }));
 
-     // 生成 HTTP 可访问的 URL，供页面和扩展 fetch
-     const convertToHttpUrl = (p) => {
-       if (!p) return '';
-       if (p.startsWith('http')) return p;
-       // /media/... 相对路径 -> 本地服务 http://127.0.0.1:8089/media/...
-       if (p.startsWith('/media/')) return `http://127.0.0.1:8089${p}`;
-       // 绝对 Windows 路径 -> 取文件名，拼到 /media/videos/
-       const fileName = p.split(/[\\/]/).pop();
-       if (fileName) return `http://127.0.0.1:8089/media/videos/${fileName}`;
-       return p;
-     };
-     const httpVideoUrl = convertToHttpUrl(selectedVideo.value?.video_path || selectedVideo.value?.videoUrl || '');
-     const absVideoUrl = (() => {
-       const p = selectedVideo.value?.video_path || selectedVideo.value?.videoUrl || '';
-       if (!p) return '';
-       if (p.startsWith('http') || /^[A-Za-z]:/.test(p) || p.startsWith('/F:')) return p;
-       if (p.startsWith('/media/')) return `F:\\pycharm_workspace\\astra${p.replace(/\//g, '\\')}`;
-       const fileName = p.split(/[\\/]/).pop();
-       if (fileName && !p.includes('\\') && !p.includes('/')) return `F:\\pycharm_workspace\\astra\\media\\videos\\${fileName}`;
-       return p;
-     })();
-     console.log('发布使用的 HTTP 视频URL:', httpVideoUrl);
-     const syncData = {
-       platforms: syncPlatforms,
-       isAutoPublish: isAutoPublish.value,
-       data: {
-         title: editableVideo.value?.title || selectedVideo.value?.title || '未命名视频',
-         content: editableVideo.value?.content || '',
-         video: {
-            name: selectedVideo.value?.title || 'video.mp4',
-            url: httpVideoUrl,
-            originUrl: absVideoUrl,
-            type: 'video/mp4',
-            // size: selectedVideo.value?.size || selectedVideo.value?.file_size || 0,
-            size:2058858,
-           
-          },
-         tags: (editableVideo.value?.tags || '').split(' ').map(t => t.trim()).filter(Boolean)
-       }
-     };
+    // 生成 HTTP 可访问的 URL，供页面和扩展 fetch
+    const convertToHttpUrl = (p) => {
+      if (!p) return '';
+      if (p.startsWith('http')) return p;
+      // /media/... 相对路径 -> 本地服务 http://127.0.0.1:8089/media/...
+      if (p.startsWith('/media/')) return `http://127.0.0.1:8089${p}`;
+      // 绝对 Windows 路径 -> 取文件名，拼到 /media/videos/
+      const fileName = p.split(/[\\/]/).pop();
+      if (fileName) return `http://127.0.0.1:8089/media/videos/${fileName}`;
+      return p;
+    };
+    const httpVideoUrl = convertToHttpUrl(selectedVideo.value?.video_path || selectedVideo.value?.videoUrl || '');
+    const absVideoUrl = (() => {
+      const p = selectedVideo.value?.video_path || selectedVideo.value?.videoUrl || '';
+      if (!p) return '';
+      if (p.startsWith('http') || /^[A-Za-z]:/.test(p) || p.startsWith('/F:')) return p;
+      if (p.startsWith('/media/')) return `F:\\pycharm_workspace\\astra${p.replace(/\//g, '\\')}`;
+      const fileName = p.split(/[\\/]/).pop();
+      if (fileName && !p.includes('\\') && !p.includes('/')) return `F:\\pycharm_workspace\\astra\\media\\videos\\${fileName}`;
+      return p;
+    })();
+    console.log('发布使用的 HTTP 视频URL:', httpVideoUrl);
+    const fileName = (() => {
+      const p = selectedVideo.value?.video_path || selectedVideo.value?.videoUrl || '';
+      const n = p.split(/[\\/]/).pop();
+      if (n) return n;
+      const t = editableVideo.value?.title || selectedVideo.value?.title;
+      if (t) return t.endsWith('.mp4') ? t : `${t}.mp4`;
+      return 'video.mp4';
+    })();
+    const syncData = {
+      platforms: syncPlatforms,
+      isAutoPublish: isAutoPublish.value,
+      data: {
+        title: editableVideo.value?.title || selectedVideo.value?.title || '未命名视频',
+        content: editableVideo.value?.content || '',
+        video: {
+          name: fileName,
+          url: httpVideoUrl,
+          originUrl: absVideoUrl,
+          type: 'video/mp4',
+          size: 2015548,
+        },
+        tags: (editableVideo.value?.tags || '').split(' ').map(t => t.trim()).filter(Boolean)
+      }
+    };
 
     console.log('发送扩展发布请求 syncData:', JSON.stringify(syncData, null, 2));
     await extFuncPublish(syncData);
@@ -717,20 +655,20 @@ const handleCoverChange = (event) => {
       message.error('请选择图片文件');
       return;
     }
-    
+
     // 验证文件大小（限制为5MB）
     if (file.size > 5 * 1024 * 1024) {
       message.error('图片大小不能超过5MB');
       return;
     }
-    
+
     // 创建预览URL
     const reader = new FileReader();
     reader.onload = (e) => {
       editableVideo.value.coverPath = e.target.result;
     };
     reader.readAsDataURL(file);
-    
+
     // 这里可以添加上传到服务器的逻辑
     // uploadCoverToServer(file);
   }
@@ -740,113 +678,6 @@ const handleFullscreenChange = (event) => {
   console.log('全屏状态变化:', event);
 };
 
-// 表格列定义
-const columns = [
-  {
-    title: '序号',
-    key: 'index',
-    width: 60,
-    align: 'center',
-    render: (row, index) => (pagination.current - 1) * pagination.pageSize + index + 1
-  },
-  {
-    title: '标题',
-    key: 'title',
-    width: 200
-  },
-  {
-    title: '用户',  
-    key: 'username', 
-    width: 100,
-    align: 'center',
-    render: (row) => row.username || '未知用户'  // 显示username字段
-  },
-  {
-    title: '视频类型',
-    key: 'video_type',
-    width: 100,
-    align: 'center',
-    render: (row) => getVideoTypeText(row.video_type)
-  },
-  {
-    title: '状态',
-    key: 'status',
-    width: 200,
-    align: 'center',
-    render: (row) => {
-      const statusInfo = getStatusInfo(row.result);
-
-      if (row.result === 'Process') {
-        // 生成中显示进度条和百分比
-        console.log("生成进度：", row.process);
-        const percentage = Math.round((row.process || 0) * 100);
-        return h('div', {
-          style: {
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px'
-          }
-        }, [
-          h(NProgress, {
-            percentage: percentage,
-            status: 'active',
-            showIndicator: false,
-            color: '#18a058',
-            railColor: '#f0f0f0',
-            style: 'width: 120px; flex-shrink: 0;'
-          }),
-          h('span', {
-            style: {
-              fontSize: '12px',
-              color: '#666',
-              minWidth: '35px',
-              textAlign: 'left'
-            }
-          }, `${percentage}%`)
-        ]);
-      } else {
-        // 成功或失败显示状态标签
-        return h('div', {
-          style: {
-            display: 'flex',
-            justifyContent: 'center'
-          }
-        }, [
-          h(NTag, {
-            type: statusInfo.type
-          }, () => statusInfo.text)
-        ]);
-      }
-    }
-  },
-  {
-    title: '创建时间',
-    key: 'create_time',
-    width: 180,
-    render: (row) => {
-      return dayjs(row.create_time).format('YYYY-MM-DD HH:mm:ss');
-    }
-  },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 200,
-    render: (row) => [
-      h(NButton, {
-        type: 'primary',
-        size: 'small',
-        onClick: () => showDetail(row)
-      }, () => '详情'),
-      h(NButton, {
-        type: 'error',
-        size: 'small',
-        style: { marginLeft: '8px' },
-        onClick: () => handleDelete(row)
-      }, () => '删除')
-    ]
-  }
-];
 
 // 组件挂载时加载数据
 onMounted(() => {
@@ -880,13 +711,13 @@ const handleDelete = async (row) => {
       onNegativeClick: () => resolve(false)
     });
   });
-  
+
   if (!confirmed) return;
-  
+
   try {
     // 调用删除API
     await deleteVideo(row.id);
-    
+
     message.success('删除成功');
     // 重新加载列表
     loadVideoList();
@@ -934,35 +765,168 @@ const openOptions = async (timeout = 5000) => {
   }
 };
 
-// 根据类型获取平台信息
-const getPlatformInfos = async (type) => {
-  try {
-    return await extGetPlatformInfos(type);
-  } catch (error) {
-    console.error('Failed to get platforms:', error);
-    return [];
-  }
-};
-
-// 获取账号信息
-const getAccountInfos = async () => {
-  try {
-    return await extGetAccountInfos();
-  } catch (error) {
-    console.error('Failed to get account infos:', error);
-    return {};
-  }
-};
-
 
 
 const dynamicPlatforms = ref([]);
-const accountInfosMap = reactive({});
 // 本地自定义平台列表（可按需修改 injectUrl/homeUrl/icon 等）
 const localPlatforms = [
-  { name: 'VIDEO_DOUYIN', platformName: '抖音', injectUrl: 'https://creator.douyin.com/creator-micro/content/upload', faviconUrl: 'https://lf1-cdn-tos.bytegoofy.com/goofy/ies/douyin_web/public/favicon.ico', },
-  { name: 'VIDEO_REDNOTE', platformName: '小红书', injectUrl: 'https://creator.xiaohongshu.com/publish/publish?from=tab_switch&target=video', faviconUrl: 'https://www.xiaohongshu.com/favicon.ico', }
+  {
+    type: 'VIDEO',
+    name: 'VIDEO_BILIBILI',
+    homeUrl: 'https://member.bilibili.com/',
+    faviconUrl: 'https://static.hdslb.com/images/favicon.ico',
+    iconifyIcon: 'simple-icons:bilibili',
+    platformName: 'B站',
+    injectUrl: 'https://member.bilibili.com/platform/upload/video/frame',
+    tags: ['CN'],
+    accountKey: 'bilibili',
+  },
+  {
+    type: 'VIDEO',
+    name: 'VIDEO_DOUYIN',
+    homeUrl: 'https://creator.douyin.com/',
+    faviconUrl: 'https://lf1-cdn-tos.bytegoofy.com/goofy/ies/douyin_web/public/favicon.ico',
+    platformName: '抖音',
+    injectUrl: 'https://creator.douyin.com/creator-micro/content/upload',
+    tags: ['CN'],
+    accountKey: 'douyin',
+  },
+  {
+    type: 'VIDEO',
+    name: 'VIDEO_YOUTUBE',
+    homeUrl: 'https://studio.youtube.com/',
+    faviconUrl: 'https://www.youtube.com/favicon.ico',
+    platformName: '油管',
+    injectUrl: 'https://studio.youtube.com/',
+    tags: ['International'],
+    accountKey: 'youtube',
+  },
+  {
+    type: 'VIDEO',
+    name: 'VIDEO_REDNOTE',
+    homeUrl: 'https://creator.xiaohongshu.com',
+    faviconUrl: 'https://creator.xiaohongshu.com/favicon.ico',
+    iconifyIcon: 'simple-icons:xiaohongshu',
+    platformName: '小红书',
+    injectUrl: 'https://creator.xiaohongshu.com/publish/publish?from=tab_switch&target=video',
+    tags: ['CN'],
+    accountKey: 'rednote',
+  },
+  {
+    type: 'VIDEO',
+    name: 'VIDEO_TIKTOK',
+    homeUrl: 'https://www.tiktok.com/tiktokstudio',
+    faviconUrl: 'https://pic1.zhimg.com/80/v2-9ad49e8e52b473e4c366b69bc9653a45_1440w.png',
+    platformName: 'TIK-TOK',
+    injectUrl: 'https://www.tiktok.com/tiktokstudio/upload',
+    tags: ['International'],
+    accountKey: 'tiktok',
+  },
+  {
+    type: 'VIDEO',
+    name: 'VIDEO_WEIXINCHANNEL',
+    homeUrl: 'https://channels.weixin.qq.com/platform',
+    faviconUrl: 'https://res.wx.qq.com/t/wx_fed/finder/helper/finder-helper-web/res/favicon-v2.ico',
+    platformName: '微信视频号',
+    injectUrl: 'https://channels.weixin.qq.com/platform/post/create',
+    tags: ['CN'],
+    accountKey: 'weixinchannel',
+  },
+  {
+    type: 'VIDEO',
+    name: 'VIDEO_KUAISHOU',
+    homeUrl: 'https://cp.kuaishou.com/',
+    faviconUrl: 'https://www.kuaishou.com/favicon.ico',
+    platformName: '快手',
+    injectUrl: 'https://cp.kuaishou.com/article/publish/video',
+    tags: ['CN'],
+    accountKey: 'kuaishou',
+  },
+  {
+    type: 'VIDEO',
+    name: 'VIDEO_BAIJIAHAO',
+    homeUrl: 'https://baijiahao.baidu.com/',
+    faviconUrl: 'https://pic.rmb.bdstatic.com/10e1e2b43c35577e1315f0f6aad6ba24.vnd.microsoft.icon',
+    platformName: '百家号',
+    injectUrl: 'https://baijiahao.baidu.com/builder/rc/edit?type=videoV2',
+    tags: ['CN'],
+    accountKey: 'baijiahao',
+  },
+  {
+    type: 'VIDEO',
+    name: 'VIDEO_WEIBO',
+    homeUrl: 'https://weibo.com/',
+    faviconUrl: 'https://weibo.com/favicon.ico',
+    platformName: '微博',
+    injectUrl: 'https://weibo.com/upload/channel',
+    tags: ['CN'],
+    accountKey: 'weibo',
+  },
+  {
+    type: 'VIDEO',
+    name: 'VIDEO_OKJIKE',
+    homeUrl: 'https://web.okjike.com',
+    faviconUrl: 'https://web.okjike.com/favicon.ico',
+    platformName: 'OKJIKE',
+    injectUrl: 'https://web.okjike.com',
+    tags: ['CN'],
+    accountKey: 'okjike',
+  },
+   {
+    type: 'VIDEO',
+    name: 'VIDEO_BLUESKY',
+    homeUrl: 'https://bsky.app/',
+    faviconUrl: 'https://web-cdn.bsky.app/static/favicon-32x32.png',
+    platformName: 'BLUESKY',
+    injectUrl: 'https://bsky.app/',
+    tags: ['International'],
+    accountKey: 'bluesky',
+  },
+  {
+    type: 'VIDEO',
+    name: 'VIDEO_ZHIHU',
+    homeUrl: 'https://www.zhihu.com/',
+    faviconUrl: 'https://www.zhihu.com/favicon.ico',
+    platformName: '知乎',
+    injectUrl: 'https://www.zhihu.com/zvideo/upload-video',
+    tags: ['CN'],
+    accountKey: 'zhihu',
+  },
+   {
+    type: 'VIDEO',
+    name: 'VIDEO_EASTMONEY',
+    homeUrl: 'https://www.eastmoney.com/',
+    faviconUrl: 'https://mycaifuhao.eastmoney.com/public/publish/favicon.ico',
+    platformName: 'EASTMONEY',
+    injectUrl: 'https://mp.eastmoney.com/collect/pc_writer/index.html#/publish/video',
+    tags: ['CN'],
+    accountKey: 'eastmoney',
+  },
+  {
+    type: 'VIDEO',
+    name: 'VIDEO_XIAOHEIHE',
+    homeUrl: 'https://www.xiaoheihe.cn/',
+    faviconUrl: 'https://www.xiaoheihe.cn/favicon.ico',
+    platformName: '小黑盒',
+    injectUrl: 'https://www.xiaoheihe.cn/creator/editor/draft/video',
+    tags: ['CN'],
+    accountKey: 'xiaoheihe',
+  },
+ {
+    type: 'VIDEO',
+    name: 'VIDEO_TOUTIAOHAO',
+    homeUrl: 'https://www.toutiao.com/',
+    faviconUrl: 'https://sf1-cdn-tos.toutiaostatic.com/obj/ttfe/pgcfe/sz/mp_logo.png',
+    platformName: '今日头条',
+    injectUrl: 'https://mp.toutiao.com/profile_v4/xigua/upload-video',
+    tags: ['CN'],
+    accountKey: 'toutiaohao',
+  },
 ];
+
+// 初始化平台列表到 UI
+dynamicPlatforms.value = localPlatforms;
+
 const guessPlatformIcon = (p) => {
   const key = (p?.name || p?.platformName || '').toLowerCase();
   if (key.includes('douyin') || key.includes('抖音')) return PlayCircleOutlined;
@@ -983,65 +947,6 @@ const guessPlatformColor = (p) => {
   return '#666';
 };
 
-const providerToPlatformName = (provider) => {
-  const p = String(provider || '').toLowerCase();
-  if (p.includes('douyin')) return 'VIDEO_DOUYIN';
-  if (p.includes('bilibili')) return 'VIDEO_BILIBILI';
-  if (p.includes('weibo')) return 'VIDEO_WEIBO';
-  if (p.includes('wechat')) return 'VIDEO_WEIXINCHANNEL';
-  if (p.includes('toutiao')) return 'VIDEO_TOUTIAOHAO';
-  if (p.includes('kuaishou')) return 'VIDEO_KUAISHOU';
-  if (p.includes('xhs') || p.includes('xiaohongshu')) return 'VIDEO_REDNOTE';
-  if (p.includes('youtube')) return 'VIDEO_YOUTUBE';
-  if (p.includes('tiktok')) return 'VIDEO_TIKTOK';
-  if (p.includes('baijia')) return 'VIDEO_BAIJIAHAO';
-  if (p.includes('zhihu')) return 'VIDEO_ZHIHU';
-  if (p.includes('eastmoney')) return 'VIDEO_EASTMONEY';
-  if (p.includes('xiaoheihe')) return 'VIDEO_XIAOHEIHE';
-  if (p.includes('bsky') || p.includes('bluesky')) return 'VIDEO_BLUESKY';
-  if (p.includes('okjike') || p.includes('jike')) return 'VIDEO_OKJIKE';
-  return '';
-};
-
-const refreshPlatforms = async () => {
-  // 改为使用本地自定义平台而不是插件接口
-  dynamicPlatforms.value = localPlatforms;
-  const names = new Set(localPlatforms.map(x => x.name));
-  selectedPlatforms.value = selectedPlatforms.value.filter(n => names.has(n));
-};
-
-const refreshAccounts = async () => {
-  const infos = await getAccountInfos();
-  console.log('当前已登录账户信息(原始):', infos);
-  const map = {};
-  const entries = Object.entries(infos || {});
-  for (const [provider, acc] of entries) {
-    const name = providerToPlatformName(provider);
-    if (name) map[name] = acc;
-  }
-  Object.assign(accountInfosMap, map);
-  console.log('映射后的账户信息(accountInfosMap):', accountInfosMap);
-};
-
-const openPlatform = (p) => {
-  const url = p.injectUrl || p.homeUrl;
-  if (url) {
-    try {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    } catch (e) {
-      console.warn('打开平台页失败:', e);
-    }
-  }
-};
-
-watch(publishModalVisible, async (open) => {
-  if (open) {
-    console.log('发布弹窗打开，开始刷新平台与账户信息');
-    await refreshPlatforms();
-    await refreshAccounts();
-    console.log('刷新完成：dynamicPlatforms=', dynamicPlatforms.value, 'accountInfosMap=', accountInfosMap);
-  }
-});
 
 </script>
 
@@ -1059,6 +964,7 @@ watch(publishModalVisible, async (open) => {
   object-fit: contain;
   border-radius: 8px;
 }
+
 .graphic-list-container {
   padding: 20px;
   min-height: 100vh;
@@ -1318,11 +1224,11 @@ watch(publishModalVisible, async (open) => {
   .video-cover {
     height: 120px;
   }
-  
+
   .video-title {
     font-size: 14px;
   }
-  
+
   .meta-row {
     font-size: 12px;
   }
@@ -1504,21 +1410,21 @@ watch(publishModalVisible, async (open) => {
   .video-info-content {
     flex-direction: column;
   }
-  
+
   .cover-section {
     width: 100%;
   }
-  
+
   .cover-preview {
     width: 100%;
     height: 160px;
   }
-  
+
   .platform-grid {
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     gap: 8px;
   }
-  
+
   .platform-item {
     padding: 12px 8px;
   }
