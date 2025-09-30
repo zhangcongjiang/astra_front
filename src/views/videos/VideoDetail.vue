@@ -20,17 +20,26 @@
           <n-descriptions-item label="视频标题">
             <div class="title-with-copy">
               <span>{{ videoDetail.title }}</span>
+              <n-button size="small" type="primary" @click="openEditModal" class="action-btn">
+                <template #icon>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                  </svg>
+                </template>
+                编辑
+              </n-button>
               <n-button 
                 size="small" 
-                type="text" 
+                type="primary" 
                 @click="copyToClipboard(videoDetail.title, '标题')"
-                class="copy-btn"
+                class="action-btn"
               >
                 <template #icon>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
                   </svg>
                 </template>
+                复制标题
               </n-button>
             </div>
           </n-descriptions-item>
@@ -61,10 +70,31 @@
                   style="cursor: pointer;"
                 />
               </div>
-              
+              <div class="cover-actions">
+                <input ref="coverFileInput" type="file" accept="image/*" @change="onCoverFileChange" style="display:none" />
+                <n-button size="small" type="primary" @click="triggerCoverUpload" :loading="coverUploading" class="action-btn">
+                  <template #icon>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M5 20h14v-2H5v2zm7-9l5 5h-3v4h-4v-4H7l5-5zm0-9l-5 5h3v4h4V7h3l-5-5z"/>
+                    </svg>
+                  </template>
+                  替换封面
+                </n-button>
+              </div>
             </div>
             <div v-else class="no-cover">
               <n-text depth="3">暂无封面</n-text>
+              <div class="cover-actions">
+                <input ref="coverFileInput" type="file" accept="image/*" @change="onCoverFileChange" style="display:none" />
+                <n-button size="small" type="primary" @click="triggerCoverUpload" :loading="coverUploading" class="action-btn">
+                  <template #icon>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M5 20h14v-2H5v2zm7-9l5 5h-3v4h-4v-4H7l5-5zm0-9l-5 5h3v4h4V7h3l-5-5z"/>
+                    </svg>
+                  </template>
+                  上传封面
+                </n-button>
+              </div>
             </div>
           </n-tab-pane>
           
@@ -72,19 +102,29 @@
             <div v-if="videoDetail.content" class="content-section">
               <div class="content-header">
                 <span class="content-title">视频文案</span>
-                <n-button 
-                  size="small" 
-                  type="primary" 
-                  @click="copyToClipboard(videoDetail.content, '文案')"
-                  class="copy-btn-primary"
-                >
-                  <template #icon>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                    </svg>
-                  </template>
-                  复制文案
-                </n-button>
+                <div>
+                   <n-button size="small" type="primary" @click="openEditModal" class="action-btn" style="margin-right: 8px;">
+                     <template #icon>
+                       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                         <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                       </svg>
+                     </template>
+                     编辑文案
+                   </n-button>
+                   <n-button 
+                     size="small" 
+                     type="primary" 
+                     @click="copyToClipboard(videoDetail.content, '文案')"
+                     class="action-btn"
+                   >
+                     <template #icon>
+                       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                         <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                       </svg>
+                     </template>
+                     复制文案
+                   </n-button>
+                 </div>
               </div>
               <div class="content-container">
                 <pre>{{ videoDetail.content }}</pre>
@@ -140,6 +180,26 @@
       </div>
     </n-modal>
   </div>
+  <!-- 新增：编辑标题与文案的模态框 -->
+  <n-modal v-model:show="editVisible" preset="card" :mask-closable="false" style="width: 600px;">
+    <template #header>
+      <span>编辑视频信息</span>
+    </template>
+    <n-form label-placement="left" label-width="80">
+      <n-form-item label="标题">
+        <n-input v-model:value="editForm.title" placeholder="请输入标题" maxlength="80" show-count />
+      </n-form-item>
+      <n-form-item label="文案">
+        <n-input type="textarea" v-model:value="editForm.content" placeholder="请输入文案" rows="6" />
+      </n-form-item>
+    </n-form>
+    <template #footer>
+      <div class="modal-actions">
+        <n-button @click="closeEditModal" :disabled="editLoading">取消</n-button>
+        <n-button type="primary" @click="handleEditSubmit" :loading="editLoading">保存</n-button>
+      </div>
+    </template>
+  </n-modal>
 </template>
 
 <script setup>
@@ -157,9 +217,12 @@ import {
   NTabs,
   NTabPane,
   NModal,
+  NForm,
+  NFormItem,
+  NInput,
   useMessage 
 } from 'naive-ui';
-import { getVideoDetail, regenerateVideo } from '@/api/modules/videoApi.js';
+import { getVideoDetail, regenerateVideo, updateVideo, uploadVideoCover } from '@/api/modules/videoApi.js';
 import { getImageDetail } from '@/api/modules/imageApi.js';
 import dayjs from 'dayjs';
 
@@ -203,6 +266,45 @@ const videoDetail = ref(null);
 const coverDetail = ref(null);
 const activeTab = ref('cover');
 const imagePreviewVisible = ref(false);
+const editVisible = ref(false);
+const editLoading = ref(false);
+const editForm = ref({ title: '', content: '' });
+
+const openEditModal = () => {
+  if (!videoDetail.value) return;
+  editForm.value.title = videoDetail.value.title || '';
+  editForm.value.content = videoDetail.value.content || '';
+  editVisible.value = true;
+};
+const closeEditModal = () => { editVisible.value = false; };
+const handleEditSubmit = async () => {
+  if (!videoDetail.value?.id) {
+    message.error('视频ID缺失');
+    return;
+  }
+  if (!editForm.value.title || !editForm.value.title.trim()) {
+    message.warning('标题不能为空');
+    return;
+  }
+  editLoading.value = true;
+  try {
+    const resp = await updateVideo(videoDetail.value.id, editForm.value.title.trim(), editForm.value.content || '');
+    if (resp?.code === 0) {
+      message.success('更新成功');
+      // 更新本地详情以反映变更
+      videoDetail.value.title = editForm.value.title.trim();
+      videoDetail.value.content = editForm.value.content || '';
+      editVisible.value = false;
+    } else {
+      message.error(resp?.message || '更新失败');
+    }
+  } catch (e) {
+    console.error('更新视频失败:', e);
+    message.error('更新失败');
+  } finally {
+    editLoading.value = false;
+  }
+};
 
 // 格式化 parameters 数据
 const formattedParameters = computed(() => {
@@ -334,6 +436,53 @@ const loadVideoDetail = async () => {
 onMounted(() => {
   loadVideoDetail();
 });
+const coverUploading = ref(false);
+const coverFileInput = ref(null);
+const triggerCoverUpload = () => {
+  if (!videoDetail.value?.id) {
+    message.error('视频ID缺失');
+    return;
+  }
+  coverFileInput.value?.click();
+};
+const onCoverFileChange = async (e) => {
+  const file = e.target?.files?.[0];
+  if (!file) return;
+  // 前端快速校验（后端也会校验）
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+  if (!allowedTypes.includes(file.type)) {
+    message.warning('不支持的文件类型，请上传 JPG/PNG 图片');
+    e.target.value = '';
+    return;
+  }
+  const maxSize = 5 * 1024 * 1024;
+  if (file.size > maxSize) {
+    message.warning('文件大小不能超过5MB');
+    e.target.value = '';
+    return;
+  }
+  coverUploading.value = true;
+  try {
+    const resp = await uploadVideoCover(videoDetail.value.id, file);
+    if (resp?.code === 0) {
+      message.success('封面上传成功');
+      e.target.value = '';
+      // 重新拉取视频详情，确保拿到最新的 cover id
+      await loadVideoDetail();
+      // 如果有封面ID，刷新封面详情
+      if (videoDetail.value?.cover) {
+        await loadCoverDetail(videoDetail.value.cover);
+      }
+    } else {
+      message.error(resp?.message || '封面上传失败');
+    }
+  } catch (err) {
+    console.error('封面上传失败:', err);
+    message.error('封面上传失败');
+  } finally {
+    coverUploading.value = false;
+  }
+};
 </script>
 
 <style scoped>
@@ -517,11 +666,26 @@ onMounted(() => {
   font-size: 14px;
 }
 
-.copy-btn-primary {
+.action-btn {
   font-size: 12px;
 }
-
-.copy-btn-primary .n-button__icon {
+.action-btn .n-button__icon {
   margin-right: 4px;
 }
+.title-with-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.title-with-copy span {
+  flex: 1;
+  word-break: break-all;
+}
+
+.cover-actions { margin-top: 12px; display: flex; align-items: center; gap: 8px; }
+.title-with-copy span {
+  flex: 1;
+  word-break: break-all;
+}
+
 </style>

@@ -163,6 +163,34 @@ export const deleteVideo = async (video_id) => {
   }
 };
 
+export const updateVideo = async (video_id,title,content) => {
+  try {
+    const response = await request.post('/video/update/', {
+      video_id: video_id,
+      title: title,
+      content: content,
+    });
+    return response;
+  } catch (error) {
+    console.error('更新视频失败:', error);
+    throw error;
+  }
+};
+
+// 新增：上传/替换视频封面
+export const uploadVideoCover = async (videoId, file) => {
+  try {
+    const formData = new FormData();
+    formData.append('video_id', videoId);
+    formData.append('cover', file);
+    const response = await request.upload('/video/cover/upload/', formData);
+    return response;
+  } catch (error) {
+    console.error('上传视频封面失败:', error);
+    throw error;
+  }
+};
+
 
 /**
  * 上传视频素材

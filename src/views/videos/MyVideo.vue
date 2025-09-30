@@ -322,7 +322,7 @@ import {
 import Pagination from '@/components/Pagination.vue';
 import { getVideoList,deleteVideo } from '@/api/modules/videoApi.js';
 import { getImageDetail } from '@/api/modules/imageApi.js';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage } from 'element-plus';
 import dayjs from 'dayjs';
 import UserSelect from '@/components/UserSelect.vue'
 
@@ -330,14 +330,12 @@ import {
   checkServiceStatus as extCheckServiceStatus,
   openOptions as extOpenOptions,
   funcPublish as extFuncPublish,
-  funcGetPlatformInfos as extFuncGetPlatformInfos,
   funcGetPermission as extFuncGetPermission,
   getPlatformInfos as extGetPlatformInfos,
   getAccountInfos as extGetAccountInfos,
-  linkExtensionClient as extLinkExtensionClient,
-  requestRefreshAccountInfo as extRequestRefreshAccountInfo
+
 } from '@/utils/extensionMessaging.js';
-import { validateDouyinData } from '@/utils/platforms/douyin.js';
+
 const loading = ref(false);
 
 // 视频数据
@@ -655,31 +653,11 @@ const handlePublish = async () => {
       return;
     }
 
-    for (const p of targetPlatforms) {
-      const url = p.injectUrl || p.homeUrl;
-      if (url) {
-        try { window.open(url, '_blank', 'noopener,noreferrer'); } catch (_) {}
-      }
-    }
 
     await new Promise(r => setTimeout(r, 1000));
 
     const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, injectUrl: p.injectUrl, extraConfig: {} }));
-    // 将相对路径转换为绝对路径（供扩展识别本地文件）
-    const convertToAbsolutePath = (relativePath) => {
-      if (!relativePath) return '';
-      if (relativePath.startsWith('http') || relativePath.startsWith('F:') || relativePath.startsWith('/F:')) {
-        return relativePath;
-      }
-      if (relativePath.startsWith('/media/')) {
-        return `F:\\pycharm_workspace\\astra${relativePath.replace(/\//g, '\\')}`;
-      }
-      if (!relativePath.includes('/') && !relativePath.includes('\\')) {
-        return `F:\\pycharm_workspace\\astra\\media\\videos\\${relativePath}`;
-      }
-      return relativePath;
-    };
-    const absVideoUrl = convertToAbsolutePath(selectedVideo.value?.video_path || selectedVideo.value?.videoUrl || '');
+
      // 生成 HTTP 可访问的 URL，供页面和扩展 fetch
      const convertToHttpUrl = (p) => {
        if (!p) return '';
@@ -692,7 +670,6 @@ const handlePublish = async () => {
        return p;
      };
      const httpVideoUrl = convertToHttpUrl(selectedVideo.value?.video_path || selectedVideo.value?.videoUrl || '');
-     console.log('发布使用的本地视频绝对路径:', absVideoUrl);
      console.log('发布使用的 HTTP 视频URL:', httpVideoUrl);
      const syncData = {
        platforms: syncPlatforms,
@@ -705,9 +682,9 @@ const handlePublish = async () => {
            url: httpVideoUrl,
            type: 'video/mp4',
            size: selectedVideo.value?.size || selectedVideo.value?.file_size || 0,
-           originUrl: absVideoUrl
+          
          },
-         tags: (editableVideo.value?.tags || '').split(',').map(t => t.trim()).filter(Boolean)
+         tags: (editableVideo.value?.tags || '').split(' ').map(t => t.trim()).filter(Boolean)
        }
      };
 
@@ -962,248 +939,6 @@ const handleDelete = async (row) => {
 };
 
 
-// 数据格式转换函数（抖音）已封装至 '@/utils/platforms/douyin.js'，请使用 convertToDouyinFormat(videoData, editableData)
-
-const convertToRednoteFormat = (videoData, editableData) => {
-  // 将相对路径转换为绝对路径
-  const convertToAbsolutePath = (relativePath) => {
-    if (!relativePath) return '';
-    
-    // 如果已经是绝对路径或HTTP URL，直接返回
-    if (relativePath.startsWith('http') || relativePath.startsWith('F:') || relativePath.startsWith('/F:')) {
-      return relativePath;
-    }
-    
-    // 如果是相对路径（如 /media/videos/xxx.mp4），转换为绝对路径
-    if (relativePath.startsWith('/media/')) {
-      return `F:\\pycharm_workspace\\astra${relativePath.replace(/\//g, '\\')}`;
-    }
-    
-    // 如果只是文件名，添加完整路径
-    if (!relativePath.includes('/') && !relativePath.includes('\\')) {
-      return `F:\\pycharm_workspace\\astra\\media\\videos\\${relativePath}`;
-    }
-    
-    return relativePath;
-  };
-
-  return {
-    title: editableData?.title || videoData.title,
-    content: editableData?.content || videoData.content || '',
-    videoUrl: videoData.video_path ? convertToAbsolutePath(videoData.video_path) : '',
-    coverUrl: videoData.cover_path ? convertToAbsolutePath(videoData.cover_path.replace('videos', 'images')) : '',
-    tags: editableData?.tags ? editableData.tags.split(',').map(tag => tag.trim()) : [],
-    location: editableData?.location || '',
-    privacy: editableData?.privacy || 'public'
-  };
-};
-
-const convertToWeiboFormat = (videoData, editableData) => {
-  // 将相对路径转换为绝对路径
-  const convertToAbsolutePath = (relativePath) => {
-    if (!relativePath) return '';
-    
-    // 如果已经是绝对路径或HTTP URL，直接返回
-    if (relativePath.startsWith('http') || relativePath.startsWith('F:') || relativePath.startsWith('/F:')) {
-      return relativePath;
-    }
-    
-    // 如果是相对路径（如 /media/videos/xxx.mp4），转换为绝对路径
-    if (relativePath.startsWith('/media/')) {
-      return `F:\\pycharm_workspace\\astra${relativePath.replace(/\//g, '\\')}`;
-    }
-    
-    // 如果只是文件名，添加完整路径
-    if (!relativePath.includes('/') && !relativePath.includes('\\')) {
-      return `F:\\pycharm_workspace\\astra\\media\\videos\\${relativePath}`;
-    }
-    
-    return relativePath;
-  };
-
-  return {
-    content: `${editableData?.title || videoData.title}\n${editableData?.content || videoData.content || ''}`,
-    videoUrl: videoData.video_path ? convertToAbsolutePath(videoData.video_path) : '',
-    images: videoData.cover_path ? [convertToAbsolutePath(videoData.cover_path.replace('videos', 'images'))] : [],
-    topic: editableData?.topic || '',
-    location: editableData?.location || ''
-  };
-};
-
-const convertToBiliFormat = (videoData, editableData) => {
-  // 将相对路径转换为绝对路径
-  const convertToAbsolutePath = (relativePath) => {
-    if (!relativePath) return '';
-    
-    // 如果已经是绝对路径或HTTP URL，直接返回
-    if (relativePath.startsWith('http') || relativePath.startsWith('F:') || relativePath.startsWith('/F:')) {
-      return relativePath;
-    }
-    
-    // 如果是相对路径（如 /media/videos/xxx.mp4），转换为绝对路径
-    if (relativePath.startsWith('/media/')) {
-      return `F:\\pycharm_workspace\\astra${relativePath.replace(/\//g, '\\')}`;
-    }
-    
-    // 如果只是文件名，添加完整路径
-    if (!relativePath.includes('/') && !relativePath.includes('\\')) {
-      return `F:\\pycharm_workspace\\astra\\media\\videos\\${relativePath}`;
-    }
-    
-    return relativePath;
-  };
-
-  return {
-    title: editableData?.title || videoData.title,
-    desc: editableData?.content || videoData.content || '',
-    videoUrl: videoData.video_path ? convertToAbsolutePath(videoData.video_path) : '',
-    cover: videoData.cover_path ? convertToAbsolutePath(videoData.cover_path.replace('videos', 'images')) : '',
-    tags: editableData?.tags ? editableData.tags.split(',').map(tag => tag.trim()) : [],
-    tid: editableData?.category || 160, // 默认生活分区
-    copyright: editableData?.copyright || 1, // 1-自制，2-转载
-    source: editableData?.source || ''
-  };
-};
-
-// 数据验证函数
-const validatePublishData = (data, platform) => {
-  const errors = [];
-  
-  if (!data.title || data.title.trim() === '') {
-    errors.push('标题不能为空');
-  }
-  
-  if (!data.videoUrl) {
-    errors.push('视频文件不存在');
-  }
-  
-  // 平台特定验证
-  switch (platform) {
-    case '抖音': {
-      const douyinErrors = validateDouyinData(data);
-      errors.push(...douyinErrors);
-      break;
-    }
-    case '小红书':
-      if (data.title && data.title.length > 20) {
-        errors.push('小红书标题不能超过20个字符');
-      }
-      break;
-    case 'B站':
-      if (data.title && data.title.length > 80) {
-        errors.push('B站标题不能超过80个字符');
-      }
-      if (data.desc && data.desc.length > 250) {
-        errors.push('B站简介不能超过250个字符');
-      }
-      break;
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
-};
-
-
-
-// 检查扩展状态 - 使用正确的通信协议
-const checkExtensionStatus = () => {
-  return new Promise((resolve) => {
-    const traceId = 'check-' + Date.now();
-    const message = {
-      type: 'request',
-      traceId: traceId,
-      action: 'MULTIPOST_EXTENSION_CHECK_SERVICE_STATUS',
-      data: {}
-    };
-    
-    console.log('检查扩展状态:', message);
-    
-    // 设置响应监听器
-    const responseHandler = (event) => {
-      // 忽略回显消息，只处理响应消息
-      if (event.data && event.data.traceId === traceId && event.data.type === 'response') {
-        console.log('收到扩展状态响应:', event.data);
-        
-        if (event.data.success && event.data.data && event.data.data.extensionId) {
-          console.log('✅ 扩展可用，ID:', event.data.data.extensionId);
-          resolve(true);
-        } else {
-          console.log('❌ 扩展不可用:', event.data.message || '未知错误');
-          resolve(false);
-        }
-        
-        window.removeEventListener('message', responseHandler);
-      } else if (event.data && event.data.traceId === traceId && event.data.type === 'request') {
-        // 这是回显消息，忽略
-        console.log('收到回显消息，忽略...');
-      }
-    };
-    
-    window.addEventListener('message', responseHandler);
-    
-    // 发送消息
-    try {
-      window.postMessage(message);
-      console.log('扩展状态检查消息已发送');
-      
-      // 设置超时
-      setTimeout(() => {
-        window.removeEventListener('message', responseHandler);
-        console.log('❌ 扩展状态检查超时 - 扩展可能未安装或未启用');
-        resolve(false);
-      }, 3000);
-      
-    } catch (error) {
-      console.error('发送扩展状态检查消息失败:', error);
-      resolve(false);
-    }
-  });
-};
-
-// 小红书发布函数
-const publishToRednote = async (videoData, editableData) => {
-  try {
-    console.log('开始发布到小红书:', { videoData, editableData });
-    
-    // 使用多平台发布扩展API
-    const result = await publishViaExtension('小红书', videoData, editableData);
-    return result;
-  } catch (error) {
-    console.error('小红书发布错误:', error);
-    throw new Error(`小红书发布失败: ${error.message}`);
-  }
-};
-
-// 微博发布函数
-const publishToWeibo = async (videoData, editableData) => {
-  try {
-    console.log('开始发布到微博:', { videoData, editableData });
-    
-    // 使用多平台发布扩展API
-    const result = await publishViaExtension('微博', videoData, editableData);
-    return result;
-  } catch (error) {
-    console.error('微博发布错误:', error);
-    throw new Error(`微博发布失败: ${error.message}`);
-  }
-};
-
-// B站发布函数
-const publishToBili = async (videoData, editableData) => {
-  try {
-    console.log('开始发布到B站:', { videoData, editableData });
-    
-    // 使用多平台发布扩展API
-    const result = await publishViaExtension('B站', videoData, editableData);
-    return result;
-  } catch (error) {
-    console.error('B站发布错误:', error);
-    throw new Error(`B站发布失败: ${error.message}`);
-  }
-};
-
 
 
 // 检查扩展服务状态
@@ -1228,15 +963,6 @@ const requestDomainTrust = async (timeout = 30000) => {
   }
 };
 
-// 获取可用平台列表
-const getAvailablePlatforms = async () => {
-  try {
-    return await extFuncGetPlatformInfos();
-  } catch (error) {
-    console.error('Failed to get platforms:', error);
-    return [];
-  }
-};
 
 // 打开扩展选项页面
 const openOptions = async (timeout = 5000) => {
@@ -1270,116 +996,8 @@ const getAccountInfos = async () => {
   }
 };
 
-// 绑定扩展客户端
-const linkExtensionClient = async (apiKey, timeout = 30000) => {
-  try {
-    return await extLinkExtensionClient(apiKey, timeout);
-  } catch (error) {
-    console.error('Failed to link extension client:', error);
-    return { confirm: false };
-  }
-};
 
-// 请求刷新账号信息
-const requestRefreshAccountInfo = async (isFocused = false) => {
-  try {
-    return await extRequestRefreshAccountInfo(isFocused);
-  } catch (error) {
-    console.error('Failed to refresh account infos:', error);
-  }
-};
 
-// 通用扩展发布函数
-const publishViaExtension = async (platformName, videoData, editableData) => {
-  console.log('开始通过扩展发布到平台:', platformName);
-  const isServiceRunning = await checkServiceStatus();
-  if (!isServiceRunning) {
-    ElMessage.error('MultiPost扩展服务未运行，请先启动扩展');
-    return false;
-  }
-  const trustResp = await requestDomainTrust(30000);
-  if (!trustResp || trustResp.status !== 'ok' || !trustResp.trusted) {
-    ElMessage.error('扩展未授权当前域名，请在扩展中授予权限');
-    await openOptions();
-    return false;
-  }
-  const platforms = await getPlatformInfos('VIDEO');
-  if (!platforms || platforms.length === 0) {
-    ElMessage.error('扩展未提供视频类平台信息');
-    return false;
-  }
-  // 按平台名过滤平台列表（如果提供了 platformName）
-  const syncPlatforms = (platforms || []).filter(p => {
-    if (!platformName) return true;
-    const pl = String(platformName).toLowerCase();
-    const name = String(p?.name || '').toLowerCase();
-    const pname = String(p?.platformName || '').toLowerCase();
-    const provider = String(p?.accountInfo?.provider || '').toLowerCase();
-    const tags = Array.isArray(p?.tags) ? p.tags.map(t => String(t).toLowerCase()) : [];
-    const home = String(p?.homeUrl || '').toLowerCase();
-    const inject = String(p?.injectUrl || '').toLowerCase();
-    return (
-      name.includes(pl) || pname.includes(pl) || provider.includes(pl) || tags.includes(pl) ||
-      home.includes(pl) || inject.includes(pl)
-    );
-  });
-  if (!syncPlatforms.length) {
-    console.warn('未根据平台名匹配到平台，使用全部平台作为回退');
-  }
-  // 将相对路径转换为绝对路径（供扩展识别本地文件）
-  const convertToAbsolutePath = (relativePath) => {
-    if (!relativePath) return '';
-    if (relativePath.startsWith('http') || relativePath.startsWith('F:') || relativePath.startsWith('/F:')) {
-      return relativePath;
-    }
-    if (relativePath.startsWith('/media/')) {
-      return `F:\\pycharm_workspace\\astra${relativePath.replace(/\//g, '\\')}`;
-    }
-    if (!relativePath.includes('/') && !relativePath.includes('\\')) {
-      return `F:\\pycharm_workspace\\astra\\media\\videos\\${relativePath}`;
-    }
-    return relativePath;
-  };
-  const absVideoUrl = convertToAbsolutePath(videoData?.video_path || videoData?.videoUrl || '');
-  const convertToHttpUrl = (p) => {
-    if (!p) return '';
-    if (p.startsWith('http')) return p;
-    if (p.startsWith('/media/')) return `http://127.0.0.1:8089${p}`;
-    const fileName = p.split(/[\\/]/).pop();
-    if (fileName) return `http://127.0.0.1:8089/media/videos/${fileName}`;
-    return p;
-  };
-  const httpVideoUrl = convertToHttpUrl(videoData?.video_path || videoData?.videoUrl || '');
-  console.log('publishViaExtension 使用的本地视频绝对路径:', absVideoUrl);
-  console.log('publishViaExtension 使用的 HTTP 视频URL:', httpVideoUrl);
-  const syncData = {
-    platforms: syncPlatforms.length ? syncPlatforms : (platforms || []),
-    isAutoPublish: false,
-    data: {
-      title: editableData?.title || videoData?.title || '未命名视频',
-      content: editableData?.content || '',
-      video: {
-        name: videoData?.title || 'video.mp4',
-        url: httpVideoUrl,
-        type: 'video/mp4',
-        size: videoData?.size || videoData?.file_size || 0,
-        originUrl: absVideoUrl
-      },
-      tags: (editableData?.tags || '').split(',').map(t => t.trim()).filter(Boolean)
-    }
-  };
-  try {
-    await extFuncPublish(syncData);
-    ElMessage.success(`发布请求已发送到扩展: ${platformName}`);
-    return true;
-  } catch (error) {
-    console.error('扩展发布失败:', error);
-    ElMessage.error('扩展发布失败，请检查扩展状态');
-    return false;
-  }
-};
-
-// 动态平台与账号信息，用于发布弹窗
 const dynamicPlatforms = ref([]);
 const accountInfosMap = reactive({});
 
