@@ -234,13 +234,14 @@
         
         <!-- 平台选择部分 -->
         <div class="platform-section">
-          <h3>选择发布平台</h3>
-          <div style="margin-bottom:8px; display:flex; gap:8px; align-items:center;">
-            <a-button size="small" @click="refreshPlatforms">刷新平台</a-button>
-            <a-button size="small" @click="refreshAccounts">刷新账号</a-button>
-            <span style="color:#999; font-size:12px;">注：若未显示已登录，请点击“打开发布页”到目标站点登录后再刷新。</span>
-          </div>
-          <div class="platform-grid">
+          <div class="platform-header" style="margin-bottom:8px; display:flex; align-items:center; gap:12px;">
+             <h3 style="margin:0;">选择发布平台</h3>
+             <div class="auto-publish" style="display:flex; align-items:center; gap:8px;">
+               <span>直接发布</span>
+               <a-switch v-model:checked="isAutoPublish" size="small" />
+             </div>
+           </div>
+           <div class="platform-grid">
             <div 
               v-for="p in dynamicPlatforms" 
               :key="p.name"
@@ -249,23 +250,14 @@
               @click="togglePlatform(p.name)"
             >
               <div class="platform-icon">
-                <component :is="guessPlatformIcon(p)" :style="{ fontSize: '24px', color: guessPlatformColor(p) }" />
+                <img v-if="p.faviconUrl" :src="p.faviconUrl" alt="" style="width:24px;height:24px;" />
+                <component v-else :is="guessPlatformIcon(p)" :style="{ fontSize: '24px', color: guessPlatformColor(p) }" />
               </div>
               <div class="platform-name">{{ p.platformName || p.name }}</div>
               <div class="platform-check" v-if="selectedPlatforms.includes(p.name)">
                 <check-circle-filled style="color: #52c41a; font-size: 16px;" />
               </div>
-              <div class="platform-account">
-                <template v-if="accountInfosMap[p.name]">
-                  <span class="login-ok">已登录：{{ accountInfosMap[p.name].username }}</span>
-                </template>
-                <template v-else>
-                  <span class="login-miss">未登录</span>
-                </template>
-              </div>
-              <div class="platform-actions">
-                <a-button size="small" @click.stop="openPlatform(p)">打开发布页</a-button>
-              </div>
+              <!-- 删除账号状态与打开发布页按钮 -->
             </div>
           </div>
         </div>
@@ -371,52 +363,7 @@ const editableVideo = ref({
   coverPath: '',
   tags: ''
 });
-
-// 平台列表
-const platforms = ref([
-  {
-    key: 'toutiao',
-    name: '头条号',
-    icon: GlobalOutlined,
-    color: '#ff6600'
-  },
-  {
-    key: 'douyin',
-    name: '抖音',
-    icon: PlayCircleOutlined,
-    color: '#000000'
-  },
-  {
-    key: 'wechat',
-    name: '微信视频号',
-    icon: WechatOutlined,
-    color: '#07c160'
-  },
-  {
-    key: 'xiaohongshu',
-    name: '小红书',
-    icon: HeartOutlined,
-    color: '#ff2442'
-  },
-  {
-    key: 'baijiahao',
-    name: '百家号',
-    icon: FileTextOutlined,
-    color: '#3385ff'
-  },
-  {
-    key: 'bilibili',
-    name: 'B站',
-    icon: PlayCircleOutlined,
-    color: '#00a1d6'
-  },
-  {
-    key: 'weibo',
-    name: '微博',
-    icon: WeiboOutlined,
-    color: '#e6162d'
-  }
-]);
+const isAutoPublish = ref(false);
 
 
 const loadVideoList = async () => {
@@ -644,12 +591,12 @@ const handlePublish = async () => {
       ElMessage.info('请在扩展设置页授权当前域名后，系统将自动继续');
     }
 
-    const platforms = await getPlatformInfos('VIDEO');
+    // const platforms = await getPlatformInfos('VIDEO');
     const selectedSet = new Set(selectedPlatforms.value);
-    const targetPlatforms = (platforms || []).filter(p => selectedSet.has(p.name));
+    const targetPlatforms = (dynamicPlatforms.value || []).filter(p => selectedSet.has(p.name));
     console.log('选中的平台:', selectedPlatforms.value, '\n匹配到的平台:', targetPlatforms.map(p => ({ name: p.name, injectUrl: p.injectUrl, homeUrl: p.homeUrl })));
     if (!targetPlatforms.length) {
-      ElMessage.error('未匹配到选中的平台，请点击“刷新平台”后重试');
+      ElMessage.error('未匹配到选中的平台，请先在列表中选择平台后重试');
       return;
     }
 
@@ -670,20 +617,31 @@ const handlePublish = async () => {
        return p;
      };
      const httpVideoUrl = convertToHttpUrl(selectedVideo.value?.video_path || selectedVideo.value?.videoUrl || '');
+     const absVideoUrl = (() => {
+       const p = selectedVideo.value?.video_path || selectedVideo.value?.videoUrl || '';
+       if (!p) return '';
+       if (p.startsWith('http') || /^[A-Za-z]:/.test(p) || p.startsWith('/F:')) return p;
+       if (p.startsWith('/media/')) return `F:\\pycharm_workspace\\astra${p.replace(/\//g, '\\')}`;
+       const fileName = p.split(/[\\/]/).pop();
+       if (fileName && !p.includes('\\') && !p.includes('/')) return `F:\\pycharm_workspace\\astra\\media\\videos\\${fileName}`;
+       return p;
+     })();
      console.log('发布使用的 HTTP 视频URL:', httpVideoUrl);
      const syncData = {
        platforms: syncPlatforms,
-       isAutoPublish: false,
+       isAutoPublish: isAutoPublish.value,
        data: {
          title: editableVideo.value?.title || selectedVideo.value?.title || '未命名视频',
          content: editableVideo.value?.content || '',
          video: {
-           name: selectedVideo.value?.title || 'video.mp4',
-           url: httpVideoUrl,
-           type: 'video/mp4',
-           size: selectedVideo.value?.size || selectedVideo.value?.file_size || 0,
-          
-         },
+            name: selectedVideo.value?.title || 'video.mp4',
+            url: httpVideoUrl,
+            originUrl: absVideoUrl,
+            type: 'video/mp4',
+            // size: selectedVideo.value?.size || selectedVideo.value?.file_size || 0,
+            size:2058858,
+           
+          },
          tags: (editableVideo.value?.tags || '').split(' ').map(t => t.trim()).filter(Boolean)
        }
      };
@@ -1000,7 +958,11 @@ const getAccountInfos = async () => {
 
 const dynamicPlatforms = ref([]);
 const accountInfosMap = reactive({});
-
+// 本地自定义平台列表（可按需修改 injectUrl/homeUrl/icon 等）
+const localPlatforms = [
+  { name: 'VIDEO_DOUYIN', platformName: '抖音', injectUrl: 'https://creator.douyin.com/creator-micro/content/upload', faviconUrl: 'https://lf1-cdn-tos.bytegoofy.com/goofy/ies/douyin_web/public/favicon.ico', },
+  { name: 'VIDEO_REDNOTE', platformName: '小红书', injectUrl: 'https://creator.xiaohongshu.com/publish/publish?from=tab_switch&target=video', faviconUrl: 'https://www.xiaohongshu.com/favicon.ico', }
+];
 const guessPlatformIcon = (p) => {
   const key = (p?.name || p?.platformName || '').toLowerCase();
   if (key.includes('douyin') || key.includes('抖音')) return PlayCircleOutlined;
@@ -1042,9 +1004,9 @@ const providerToPlatformName = (provider) => {
 };
 
 const refreshPlatforms = async () => {
-  const plats = await getPlatformInfos('VIDEO');
-  dynamicPlatforms.value = plats || [];
-  const names = new Set((plats || []).map(x => x.name));
+  // 改为使用本地自定义平台而不是插件接口
+  dynamicPlatforms.value = localPlatforms;
+  const names = new Set(localPlatforms.map(x => x.name));
   selectedPlatforms.value = selectedPlatforms.value.filter(n => names.has(n));
 };
 
