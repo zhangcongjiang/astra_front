@@ -18,7 +18,6 @@
                     <a-form-item label="来源">
                         <a-select v-model:value="basicForm.origin" placeholder="选择来源" style="width: 150px" allowClear>
                             <a-select-option value="INDEX_TTS">INDEX-TTS</a-select-option>
-                            <a-select-option value="EDGE_TTS">EDGE-TTS</a-select-option>
                         </a-select>
                     </a-form-item>
                     <a-form-item>
@@ -61,8 +60,8 @@
                 </template>
                 <template #origin="{ record }">
                     <div style="text-align: center;">
-                        <a-tag :color="record.origin === 'INDEX_TTS' ? 'blue' : 'green'">
-                            {{ record.origin === 'INDEX_TTS' ? 'INDEX-TTS' : 'EDGE-TTS' }}
+                        <a-tag color="blue">
+                            INDEX-TTS
                         </a-tag>
                     </div>
                 </template>
@@ -129,27 +128,6 @@
             <a-form-item label="朗读者姓名" required>
                 <a-input v-model:value="addSpeakerForm.name" placeholder="请输入朗读者姓名" />
             </a-form-item>
-            <a-form-item label="来源" required>
-                <a-radio-group v-model:value="addSpeakerForm.origin">
-                    <a-radio value="INDEX_TTS">INDEX-TTS</a-radio>
-                    <a-radio value="EDGE_TTS">EDGE-TTS</a-radio>
-                </a-radio-group>
-            </a-form-item>
-            <!-- EDGE-TTS 专用参数 -->
-            <template v-if="addSpeakerForm.origin === 'EDGE_TTS'">
-                <a-form-item label="语速调节">
-                    <a-input-number v-model:value="addSpeakerForm.voice_rate" :min="-50" :max="100" :step="10" addon-after="%" placeholder="0" style="width: 100%" />
-                    <div style="font-size: 12px; color: #999; margin-top: 4px;">调节语音播放速度，范围：-50% 到 100%</div>
-                </a-form-item>
-                <a-form-item label="音量调节">
-                    <a-input-number v-model:value="addSpeakerForm.volume" :min="-50" :max="100" :step="10" addon-after="%" placeholder="0" style="width: 100%" />
-                    <div style="font-size: 12px; color: #999; margin-top: 4px;">调节音量大小，范围：-50% 到 100%</div>
-                </a-form-item>
-                <a-form-item label="音调调节">
-                    <a-input-number v-model:value="addSpeakerForm.voice_pitch" :min="-50" :max="50" :step="5" addon-after="Hz" placeholder="0" style="width: 100%" />
-                    <div style="font-size: 12px; color: #999; margin-top: 4px;">调节音调高低，范围：-50Hz 到 50Hz</div>
-                </a-form-item>
-            </template>
             <a-form-item label="音频文件" required>
                 <a-upload
                     v-model:file-list="addSpeakerForm.fileList"
@@ -197,7 +175,6 @@ const TAG_CATEGORY = 'SPEAKER';
 // 基础查询表单
 const basicForm = reactive({
     reader: '',
-    origin: undefined,
 });
 
 // 标签数据
@@ -311,7 +288,6 @@ const fetchSpeakerList = async () => {
             page: pagination.current,
             pageSize: pagination.pageSize,
             name: basicForm.reader,
-            origin: basicForm.origin,
         };
 
         if (selectedTags.value.length > 0) {
@@ -363,9 +339,6 @@ const addSpeakerLoading = ref(false);
 const addSpeakerForm = reactive({
     name: '',
     origin: 'INDEX_TTS',
-    voice_rate: 0,
-    volume: 0,
-    voice_pitch: 0,
     fileList: []
 });
 
@@ -548,9 +521,6 @@ const closeAddSpeakerModal = () => {
     addSpeakerModalVisible.value = false;
     addSpeakerForm.name = '';
     addSpeakerForm.origin = 'INDEX_TTS';
-    addSpeakerForm.voice_rate = 0;
-    addSpeakerForm.volume = 0;
-    addSpeakerForm.voice_pitch = 0;
     addSpeakerForm.fileList = [];
 };
 
@@ -588,18 +558,7 @@ const handleAddSpeaker = async () => {
     try {
         const formData = new FormData();
         formData.append('name', addSpeakerForm.name.trim());
-        formData.append('origin', addSpeakerForm.origin);
-        // EDGE-TTS 专用参数
-        if (addSpeakerForm.origin === 'EDGE_TTS') {
-            // 格式化参数为带符号和单位的字符串
-            const voiceRate = addSpeakerForm.voice_rate >= 0 ? `+${addSpeakerForm.voice_rate}%` : `${addSpeakerForm.voice_rate}%`;
-            const volume = addSpeakerForm.volume >= 0 ? `+${addSpeakerForm.volume}%` : `${addSpeakerForm.volume}%`;
-            const voicePitch = addSpeakerForm.voice_pitch >= 0 ? `+${addSpeakerForm.voice_pitch}Hz` : `${addSpeakerForm.voice_pitch}Hz`;
-            
-            formData.append('voice_rate', voiceRate);
-            formData.append('volume', volume);
-            formData.append('voice_pitch', voicePitch);
-        }
+        formData.append('origin', 'INDEX_TTS');
         formData.append('audio_file', addSpeakerForm.fileList[0].originFileObj);
 
         const response = await addSpeaker(formData);
