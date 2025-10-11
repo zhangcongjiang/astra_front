@@ -191,7 +191,13 @@
               </div>
               <div class="detail-item">
                 <span class="detail-label">标签：</span>
-                <a-input v-model:value="editableVideo.tags" placeholder="请输入标签，多个标签用逗号分隔" class="detail-input" />
+                <a-select
+                  v-model:value="editableVideo.tagList"
+                  mode="tags"
+                  :tokenSeparators="[' ']"
+                  placeholder="请输入标签，多个标签之间用空格分隔"
+                  style="width: 100%"
+                />
               </div>
             </div>
           </div>
@@ -226,7 +232,7 @@
         <!-- 操作按钮 -->
         <div class="modal-actions">
           <a-button @click="closePublishModal">取消</a-button>
-          <a-button type="primary" :disabled="selectedPlatforms.length === 0" @click="handlePublish">
+          <a-button type="primary" :disabled="selectedPlatforms.length === 0 || !hasTags" @click="handlePublish">
             发布到选中平台 ({{ selectedPlatforms.length }})
           </a-button>
         </div>
@@ -305,10 +311,12 @@ const editableVideo = ref({
   title: '',
   content: '',
   coverPath: '',
-  tags: ''
+  tagList: []
 });
 const isAutoPublish = ref(false);
-
+// 标签工具与必填校验
+const toTagList = (val) => Array.isArray(val) ? val : String(val || '').split(' ').map(t => t.trim()).filter(Boolean);
+const hasTags = computed(() => (editableVideo.value?.tagList || []).filter(t => t && t.trim()).length > 0);
 
 const loadVideoList = async () => {
   try {
@@ -528,7 +536,7 @@ const showPublishModal = async (video) => {
     title: video.title || '',
     content: video.content || '',
     coverPath: video.cover_path || '',
-    tags: video.tags || ''
+    tagList: toTagList(video.tags)
   };
 
   // 如果视频有封面ID，加载封面详情
@@ -547,6 +555,10 @@ const handlePublish = async () => {
   }
   if (!selectedPlatforms.value.length) {
     ElMessage.warning('请选择至少一个平台');
+    return;
+  }
+  if (!hasTags.value) {
+    ElMessage.warning('请至少输入一个标签');
     return;
   }
   try {
@@ -618,7 +630,7 @@ const handlePublish = async () => {
           type: 'video/mp4',
           size: editableVideo.value?.size || selectedVideo.value?.size || 0,
         },
-        tags: (editableVideo.value?.tags || '').split(' ').map(t => t.trim()).filter(Boolean)
+        tags: (editableVideo.value?.tagList || []).map(t => t.trim()).filter(Boolean)
       }
     };
 
