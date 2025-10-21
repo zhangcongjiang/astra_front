@@ -195,8 +195,9 @@
                   v-model:value="editableVideo.tagList"
                   mode="tags"
                   :tokenSeparators="[' ']"
-                  placeholder="请输入标签，多个标签之间用空格分隔"
+                  placeholder="请输入标签，多个标签之间用空格分隔（最多5个）"
                   style="width: 100%"
+                  @change="handleTagChange"
                 />
               </div>
             </div>
@@ -315,8 +316,22 @@ const editableVideo = ref({
 });
 const isAutoPublish = ref(false);
 // 标签工具与必填校验
-const toTagList = (val) => Array.isArray(val) ? val : String(val || '').split(' ').map(t => t.trim()).filter(Boolean);
+const MAX_TAGS = 5;
+const toTagList = (val) =>
+  (Array.isArray(val) ? val : String(val || '').split(' '))
+    .map(t => t.trim())
+    .filter(Boolean)
+    .slice(0, MAX_TAGS);
 const hasTags = computed(() => (editableVideo.value?.tagList || []).filter(t => t && t.trim()).length > 0);
+const handleTagChange = (value) => {
+  const list = (value || []).map(t => String(t).trim()).filter(Boolean);
+  if (list.length > MAX_TAGS) {
+    editableVideo.value.tagList = list.slice(0, MAX_TAGS);
+    ElMessage.warning(`最多只能添加${MAX_TAGS}个标签`);
+  } else {
+    editableVideo.value.tagList = list;
+  }
+};
 
 const loadVideoList = async () => {
   try {
@@ -562,6 +577,10 @@ const handlePublish = async () => {
     return;
   }
   try {
+    // 点击发布后立即关闭弹窗并提示发布中
+    publishModalVisible.value = false;
+    ElMessage.info('作品发布中');
+
     const serviceResp = await checkServiceStatus();
     if (!serviceResp) {
       ElMessage.error('扩展服务未运行，请先启动扩展');
@@ -626,18 +645,18 @@ const handlePublish = async () => {
         video: {
           name: fileName,
           url: httpVideoUrl,
-          originUrl: absVideoUrl,
           type: 'video/mp4',
           size: editableVideo.value?.size || selectedVideo.value?.size || 0,
         },
-        tags: (editableVideo.value?.tagList || []).map(t => t.trim()).filter(Boolean)
+        cover: getCoverPublishInfo(),
+        tags: (editableVideo.value?.tagList || []).map(t => t.trim()).filter(Boolean).slice(0, MAX_TAGS)
       }
     };
 
     console.log('发送扩展发布请求 syncData:', JSON.stringify(syncData, null, 2));
     await extFuncPublish(syncData);
     ElMessage.success(`发布请求已发送到扩展（${syncPlatforms.length}个平台），请在新标签页查看扩展自动填充`);
-    publishModalVisible.value = false;
+    // 弹窗已在点击发布时关闭，无需再次关闭
   } catch (e) {
     console.error('发布异常:', e);
     ElMessage.error(e?.message || '发布异常');
@@ -696,6 +715,24 @@ const getCoverUrl = () => {
   return `http://127.0.0.1:8089/media/images/${coverDetail.value.img_name}`;
 };
 
+// 构造封面发布信息
+const getCoverPublishInfo = () => {
+  // 简化为仅依赖后端返回的封面详情（cover 为图片 ID，经 loadCoverDetail 获取）
+  if (!coverDetail.value || !getCoverUrl()) return null;
+  const name = coverDetail.value.img_name || 'cover.png';
+  const url = getCoverUrl();
+  const fmt = (coverDetail.value.spec?.format || '').toLowerCase();
+  const type = fmt
+    ? (fmt === 'jpg' || fmt === 'jpeg' ? 'image/jpeg'
+      : fmt === 'png' ? 'image/png'
+      : fmt === 'gif' ? 'image/gif'
+      : fmt === 'webp' ? 'image/webp'
+      : `image/${fmt}`)
+    : inferMimeFromName(name);
+  const size = coverDetail.value.spec?.size || 0;
+  return { 'name':name, "url":url, "type":type, "size":size };
+};
+
 // 处理封面文件变化
 const handleCoverChange = (event) => {
   const file = event.target.files[0];
@@ -716,6 +753,10 @@ const handleCoverChange = (event) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       editableVideo.value.coverPath = e.target.result;
+      // 保存文件元信息用于发布
+      editableVideo.value.coverFileName = file.name;
+      editableVideo.value.coverFileType = file.type;
+      editableVideo.value.coverFileSize = file.size;
     };
     reader.readAsDataURL(file);
 
@@ -820,6 +861,39 @@ const openOptions = async (timeout = 5000) => {
 const dynamicPlatforms = ref([]);
 // 本地自定义平台列表（可按需修改 injectUrl/homeUrl/icon 等）
 const localPlatforms = [
+
+  {
+    type: 'VIDEO',
+    name: 'VIDEO_DOUYIN',
+    homeUrl: 'https://creator.douyin.com/',
+    faviconUrl: 'https://lf1-cdn-tos.bytegoofy.com/goofy/ies/douyin_web/public/favicon.ico',
+    platformName: '抖音',
+    injectUrl: 'https://creator.douyin.com/creator-micro/content/upload',
+    tags: ['CN'],
+    accountKey: 'douyin',
+  },
+  
+  {
+    type: 'VIDEO',
+    name: 'VIDEO_REDNOTE',
+    homeUrl: 'https://creator.xiaohongshu.com',
+    faviconUrl: 'https://creator.xiaohongshu.com/favicon.ico',
+    iconifyIcon: 'simple-icons:xiaohongshu',
+    platformName: '小红书',
+    injectUrl: 'https://creator.xiaohongshu.com/publish/publish?from=tab_switch&target=video',
+    tags: ['CN'],
+    accountKey: 'rednote',
+  },
+   {
+    type: 'VIDEO',
+    name: 'VIDEO_TOUTIAOHAO',
+    homeUrl: 'https://www.toutiao.com/',
+    faviconUrl: 'https://sf1-cdn-tos.toutiaostatic.com/obj/ttfe/pgcfe/sz/mp_logo.png',
+    platformName: '今日头条',
+    injectUrl: 'https://mp.toutiao.com/profile_v4/xigua/upload-video',
+    tags: ['CN'],
+    accountKey: 'toutiaohao',
+  },
   {
     type: 'VIDEO',
     name: 'VIDEO_BILIBILI',
@@ -833,47 +907,6 @@ const localPlatforms = [
   },
   {
     type: 'VIDEO',
-    name: 'VIDEO_DOUYIN',
-    homeUrl: 'https://creator.douyin.com/',
-    faviconUrl: 'https://lf1-cdn-tos.bytegoofy.com/goofy/ies/douyin_web/public/favicon.ico',
-    platformName: '抖音',
-    injectUrl: 'https://creator.douyin.com/creator-micro/content/upload',
-    tags: ['CN'],
-    accountKey: 'douyin',
-  },
-  {
-    type: 'VIDEO',
-    name: 'VIDEO_YOUTUBE',
-    homeUrl: 'https://studio.youtube.com/',
-    faviconUrl: 'https://www.youtube.com/favicon.ico',
-    platformName: '油管',
-    injectUrl: 'https://studio.youtube.com/',
-    tags: ['International'],
-    accountKey: 'youtube',
-  },
-  {
-    type: 'VIDEO',
-    name: 'VIDEO_REDNOTE',
-    homeUrl: 'https://creator.xiaohongshu.com',
-    faviconUrl: 'https://creator.xiaohongshu.com/favicon.ico',
-    iconifyIcon: 'simple-icons:xiaohongshu',
-    platformName: '小红书',
-    injectUrl: 'https://creator.xiaohongshu.com/publish/publish?from=tab_switch&target=video',
-    tags: ['CN'],
-    accountKey: 'rednote',
-  },
-  {
-    type: 'VIDEO',
-    name: 'VIDEO_TIKTOK',
-    homeUrl: 'https://www.tiktok.com/tiktokstudio',
-    faviconUrl: 'https://pic1.zhimg.com/80/v2-9ad49e8e52b473e4c366b69bc9653a45_1440w.png',
-    platformName: 'TIK-TOK',
-    injectUrl: 'https://www.tiktok.com/tiktokstudio/upload',
-    tags: ['International'],
-    accountKey: 'tiktok',
-  },
-  {
-    type: 'VIDEO',
     name: 'VIDEO_WEIXINCHANNEL',
     homeUrl: 'https://channels.weixin.qq.com/platform',
     faviconUrl: 'https://res.wx.qq.com/t/wx_fed/finder/helper/finder-helper-web/res/favicon-v2.ico',
@@ -882,16 +915,7 @@ const localPlatforms = [
     tags: ['CN'],
     accountKey: 'weixinchannel',
   },
-  {
-    type: 'VIDEO',
-    name: 'VIDEO_KUAISHOU',
-    homeUrl: 'https://cp.kuaishou.com/',
-    faviconUrl: 'https://www.kuaishou.com/favicon.ico',
-    platformName: '快手',
-    injectUrl: 'https://cp.kuaishou.com/article/publish/video',
-    tags: ['CN'],
-    accountKey: 'kuaishou',
-  },
+
   {
     type: 'VIDEO',
     name: 'VIDEO_BAIJIAHAO',
@@ -911,6 +935,16 @@ const localPlatforms = [
     injectUrl: 'https://weibo.com/upload/channel',
     tags: ['CN'],
     accountKey: 'weibo',
+  },
+    {
+    type: 'VIDEO',
+    name: 'VIDEO_KUAISHOU',
+    homeUrl: 'https://cp.kuaishou.com/',
+    faviconUrl: 'https://www.kuaishou.com/favicon.ico',
+    platformName: '快手',
+    injectUrl: 'https://cp.kuaishou.com/article/publish/video',
+    tags: ['CN'],
+    accountKey: 'kuaishou',
   },
   {
     type: 'VIDEO',
@@ -962,15 +996,26 @@ const localPlatforms = [
     tags: ['CN'],
     accountKey: 'xiaoheihe',
   },
- {
+
+  {
     type: 'VIDEO',
-    name: 'VIDEO_TOUTIAOHAO',
-    homeUrl: 'https://www.toutiao.com/',
-    faviconUrl: 'https://sf1-cdn-tos.toutiaostatic.com/obj/ttfe/pgcfe/sz/mp_logo.png',
-    platformName: '今日头条',
-    injectUrl: 'https://mp.toutiao.com/profile_v4/xigua/upload-video',
-    tags: ['CN'],
-    accountKey: 'toutiaohao',
+    name: 'VIDEO_YOUTUBE',
+    homeUrl: 'https://studio.youtube.com/',
+    faviconUrl: 'https://www.youtube.com/favicon.ico',
+    platformName: '油管',
+    injectUrl: 'https://studio.youtube.com/',
+    tags: ['International'],
+    accountKey: 'youtube',
+  },
+    {
+    type: 'VIDEO',
+    name: 'VIDEO_TIKTOK',
+    homeUrl: 'https://www.tiktok.com/tiktokstudio',
+    faviconUrl: 'https://pic1.zhimg.com/80/v2-9ad49e8e52b473e4c366b69bc9653a45_1440w.png',
+    platformName: 'TIK-TOK',
+    injectUrl: 'https://www.tiktok.com/tiktokstudio/upload',
+    tags: ['International'],
+    accountKey: 'tiktok',
   },
 ];
 
