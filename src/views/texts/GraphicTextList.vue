@@ -254,6 +254,7 @@ import Pagination from '@/components/Pagination.vue';
 import UserSelect from '@/components/UserSelect.vue';
 import { 
   getTextList, 
+  getTextDetail,
   deleteText, 
   downloadText, 
   uploadMarkdown,
@@ -276,10 +277,53 @@ import DOMPurify from 'dompurify';
 
 // 初始化 MarkdownIt 实例与摘要生成方法
 const md = new MarkdownIt({ linkify: true, breaks: true });
+const staticBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8089';
 const makeDigest = (markdown) => {
   const safeHtml = DOMPurify.sanitize(md.render(markdown || ''));
   const text = safeHtml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
   return text.slice(0, 160);
+};
+// 将 /media/... 路径转换为可访问的 HTTP URL
+const convertToHttpUrl = (p) => {
+  if (!p) return '';
+  if (p.startsWith('http')) return p;
+  if (p.startsWith('/media/')) return `${staticBaseUrl}${p}`;
+  const fileName = p.split(/[\\/]/).pop();
+  if (fileName) return `${staticBaseUrl}/media/images/${fileName}`;
+  return p;
+};
+// 从 Markdown 中提取本地图片，生成 FileData 数组
+const extractLocalImages = (markdown) => {
+  const files = [];
+  if (!markdown) return files;
+  const added = new Set();
+  const addByPath = (path) => {
+    if (!path) return;
+    // 仅处理 /media/images/ 开头的路径
+    const match = path.match(/\/media\/images\/([^?#)\"\s]+)/);
+    if (!match) return;
+    const name = decodeURIComponent(match[1]);
+    if (added.has(name)) return;
+    added.add(name);
+    files.push({
+      name,
+      url: convertToHttpUrl(`/media/images/${name}`),
+      type: inferMimeFromName(name),
+      size: 0,
+    });
+  };
+  // ![alt](/media/images/file.png)
+  const mdImgRe = /!\[[^\]]*\]\(([^)]+)\)/g;
+  let m;
+  while ((m = mdImgRe.exec(markdown)) !== null) {
+    addByPath(m[1]);
+  }
+  // <img src="/media/images/file.png">
+  const htmlImgRe = /src=\"([^\"]+)\"/g;
+  while ((m = htmlImgRe.exec(markdown)) !== null) {
+    addByPath(m[1]);
+  }
+  return files;
 };
 
 const router = useRouter();
@@ -662,6 +706,14 @@ const handlePublish = async (record) => {
   try {
     selectedText.value = record;
     selectedPlatforms.value = [];
+    // 若列表项不含 content（Markdown），则拉取详情
+    if (!record.content || record.content.trim() === '') {
+      const resp = await getTextDetail(record.id);
+      const detail = resp?.data || resp?.results || resp;
+      if (detail && typeof detail.content === 'string') {
+        selectedText.value = { ...record, content: detail.content };
+      }
+    }
     // 预加载封面详情
     if (record.coverId && !coverDetails[record.id]) {
       await loadCoverDetailForText(record);
@@ -711,10 +763,33 @@ const confirmPublish = async () => {
     const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, platformName: p.platformName, injectUrl: p.injectUrl, faviconUrl: p.faviconUrl, accountKey: p.accountKey, extraConfig: {} }));
     const cover = getTextCoverPublishInfo(selectedText.value);
 
-    const markdown = selectedText.value.content || '';
-    const html = DOMPurify.sanitize(md.render(markdown));
+    // 兜底：确保有 Markdown 内容
+    let markdown = selectedText.value.content || '';
+    if (!markdown || markdown.trim() === '') {
+      try {
+        const resp = await getTextDetail(selectedText.value.id);
+        const detail = resp?.data || resp?.results || resp;
+        if (detail && typeof detail.content === 'string') {
+          markdown = detail.content;
+        }
+      } catch (e) {
+        console.warn('兜底拉取详情失败：', e);
+      }
+    }
+    const rawHtml = md.render(markdown);
+    // 将 HTML 中的本地媒体路径转换为可访问的 HTTP URL
+    const html = DOMPurify.sanitize(
+      rawHtml.replace(/src=\"(\/media\/[^\"]+)\"/g, (m, p1) => `src=\"${convertToHttpUrl(p1)}\"`)
+    );
     const digest = makeDigest(markdown);
-    const images = Array.isArray(selectedText.value.images) ? selectedText.value.images : [];
+    // 从 Markdown 中提取本地图片，生成可上传的 FileData 列表，并合并已有 images
+    const baseImages = Array.isArray(selectedText.value.images) ? selectedText.value.images : [];
+    const extractedImages = extractLocalImages(markdown);
+    const imageMap = new Map();
+    const pushImage = (img) => { if (!img) return; const key = img.name || img.url; if (!imageMap.has(key)) imageMap.set(key, img); };
+    baseImages.forEach(pushImage);
+    extractedImages.forEach(pushImage);
+    const images = Array.from(imageMap.values());
 
     const syncData = {
       platforms: syncPlatforms,
