@@ -1119,6 +1119,10 @@ const buildFinalParams = (rawFormData) => {
     if (rawFormData.template_id) {
         finalParams.template_id = rawFormData.template_id;
     }
+    // Explicitly include fixed title field even if it's filtered from formDefinition
+    if ('title' in rawFormData) {
+        finalParams.title = rawFormData.title;
+    }
 
     for (const key in rawFormData) {
         // Skip template_id as it's already handled

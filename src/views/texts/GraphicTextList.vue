@@ -58,6 +58,13 @@
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'title'">
             <div class="title-content">
+              <img
+                v-if="record.coverId && getTextCoverUrl(record)"
+                :src="getTextCoverUrl(record)"
+                class="cover-thumb"
+                alt="封面"
+                @click.stop="showRowImagePreview(record)"
+              />
               <span class="title-text">{{ record.title }}</span>
             </div>
           </template>
@@ -87,7 +94,49 @@
         </template>
       </a-table>
     </div>
-    
+
+    <!-- 图片预览模态框 -->
+    <a-modal v-model:open="imagePreviewVisible" title="封面预览" width="90%" style="max-width: 1200px;" :footer="null">
+      <img v-if="previewImageUrl" :src="previewImageUrl" alt="封面预览" class="preview-image" />
+    </a-modal>
+
+    <!-- 新增：发布弹窗 -->
+    <a-modal v-model:open="publishModalVisible" title="发布图文" width="800px" :footer="null" @cancel="closePublishModal">
+      <div class="publish-modal-content">
+        <!-- 平台选择部分 -->
+        <div class="platform-section">
+          <div class="platform-header" style="margin-bottom:8px; display:flex; align-items:center; gap:12px;">
+            <h3 style="margin:0;">选择发布平台</h3>
+            <div class="auto-publish" style="display:flex; align-items:center; gap:8px;">
+              <span>直接发布</span>
+              <a-switch v-model:checked="isAutoPublish" size="small" />
+            </div>
+          </div>
+          <div class="platform-grid">
+            <div v-for="p in dynamicPlatforms" :key="p.name" class="platform-item"
+                 :class="{ active: selectedPlatforms.includes(p.name) }"
+                 @click="togglePlatform(p.name)">
+              <div class="platform-icon">
+                <img v-if="p.faviconUrl" :src="p.faviconUrl" alt="" style="width:24px;height:24px;" />
+              </div>
+              <div class="platform-name">{{ p.platformName || p.name }}</div>
+              <div class="platform-check" v-if="selectedPlatforms.includes(p.name)">
+                <CheckCircleFilled style="color: #52c41a; font-size: 16px;" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="modal-actions">
+          <a-button @click="closePublishModal">取消</a-button>
+          <a-button type="primary" :disabled="selectedPlatforms.length === 0" @click="confirmPublish">
+            发布到选中平台 ({{ selectedPlatforms.length }})
+          </a-button>
+        </div>
+      </div>
+    </a-modal>
+
     <div class="pagination">
       <Pagination 
         v-model:current="pagination.current" 
@@ -196,21 +245,42 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, h } from 'vue';
+import { ref, reactive, computed, onMounted, h, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
 import { PlusOutlined } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
 import Pagination from '@/components/Pagination.vue';
-import UserSelect from '@/components/UserSelect.vue'; // 添加这行导入
-// 导入图文相关的API
+import UserSelect from '@/components/UserSelect.vue';
 import { 
   getTextList, 
   deleteText, 
   downloadText, 
   uploadMarkdown,
-  importFromUrl  // 新增URL导入API
+  importFromUrl
 } from '@/api/modules/textApi';
+import { getImageDetail } from '@/api/modules/imageApi.js';
+import { CheckCircleFilled } from '@ant-design/icons-vue';
+// 恢复：引入扩展消息方法
+import {
+  checkServiceStatus as extCheckServiceStatus,
+  openOptions as extOpenOptions,
+  funcPublish as extFuncPublish,
+  funcGetPermission as extFuncGetPermission,
+  getPlatformInfos as extGetPlatformInfos,
+  getAccountInfos as extGetAccountInfos,
+} from '@/utils/extensionMessaging.js';
+// 新增：Markdown 渲染与 HTML 净化
+import MarkdownIt from 'markdown-it';
+import DOMPurify from 'dompurify';
+
+// 初始化 MarkdownIt 实例与摘要生成方法
+const md = new MarkdownIt({ linkify: true, breaks: true });
+const makeDigest = (markdown) => {
+  const safeHtml = DOMPurify.sanitize(md.render(markdown || ''));
+  const text = safeHtml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  return text.slice(0, 160);
+};
 
 const router = useRouter();
 
@@ -242,59 +312,137 @@ const searchForm = reactive({
   origin: undefined  // 新增来源筛选
 });
 
+// 封面详情缓存与预览状态
+const coverDetails = reactive({}); // 以 record.id 为键存储封面详情
+const imagePreviewVisible = ref(false);
+const previewImageUrl = ref('');
+
 // 图文数据
 const textList = ref([]);
 const loading = ref(false);
+// 新增：发布相关状态
+const publishModalVisible = ref(false);
+const selectedText = ref(null);
+const selectedPlatforms = ref([]);
+const dynamicPlatforms = ref([]);
+const isAutoPublish = ref(false);
+// 文章平台列表（根据用户提供配置）
+const localPlatforms = [
+  {
+    type: 'ARTICLE',
+    name: 'ARTICLE_BAIJIAHAO',
+    homeUrl: 'https://baijiahao.baidu.com/',
+    faviconUrl: 'https://pic.rmb.bdstatic.com/10e1e2b43c35577e1315f0f6aad6ba24.vnd.microsoft.icon',
+    platformName: '百家号',
+    injectUrl: 'https://baijiahao.baidu.com/builder/rc/edit?type=news',
+    tags: ['CN'],
+    accountKey: 'baijiahao',
+  },
+  {
+    type: 'ARTICLE',
+    name: 'ARTICLE_TOUTIAO',
+    homeUrl: 'https://mp.toutiao.com/',
+    faviconUrl: 'https://sf1-cdn-tos.toutiaostatic.com/obj/ttfe/pgcfe/sz/mp_logo.png',
+    platformName: '今日头条',
+    injectUrl: 'https://mp.toutiao.com/profile_v4/graphic/publish',
+    tags: ['CN'],
+    accountKey: 'toutiao',
+  },
+  {
+    type: 'ARTICLE',
+    name: 'ARTICLE_WEIXIN',
+    homeUrl: 'https://mp.weixin.qq.com/',
+    faviconUrl: 'https://mp.weixin.qq.com/favicon.ico',
+    platformName: '微信公众号',
+    injectUrl: 'https://mp.weixin.qq.com/',
+    tags: ['CN'],
+    accountKey: 'weixin',
+  },
+  {
+    type: 'ARTICLE',
+    name: 'ARTICLE_BILIBILI',
+    homeUrl: 'https://www.bilibili.com/',
+    faviconUrl: 'https://www.bilibili.com/favicon.ico',
+    platformName: 'B站专栏',
+    injectUrl: 'https://member.bilibili.com/article-text/home?newEditor=-1',
+    tags: ['CN'],
+    accountKey: 'bilibili',
+  },
+  {
+    type: 'ARTICLE',
+    name: 'ARTICLE_WEIBO',
+    homeUrl: 'https://weibo.com/',
+    faviconUrl: 'https://weibo.com/favicon.ico',
+    platformName: '微博',
+    injectUrl: 'https://card.weibo.com/article/v3/editor',
+    tags: ['CN'],
+    accountKey: 'weibo',
+  },
+];
+
+onMounted(() => {
+  // 初始化平台到 UI
+  dynamicPlatforms.value = localPlatforms;
+});
+
+// 新增：平台选择与扩展授权辅助函数
+const togglePlatform = (platformKey) => {
+  const index = selectedPlatforms.value.indexOf(platformKey);
+  if (index > -1) {
+    selectedPlatforms.value.splice(index, 1);
+  } else {
+    selectedPlatforms.value.push(platformKey);
+  }
+};
+
+const openOptions = async (timeout = 5000) => {
+  try {
+    const resp = await extOpenOptions(timeout);
+    return resp;
+  } catch (error) {
+    console.error('Failed to open extension options:', error);
+    return null;
+  }
+};
+
+const requestDomainTrust = async (timeout = 5000) => {
+  try {
+    const resp = await extFuncGetPermission(timeout);
+    return resp;
+  } catch (error) {
+    console.error('Domain trust request failed:', error);
+    return { status: 'error', trusted: false };
+  }
+};
 
 // 获取图文列表数据
 const fetchData = async () => {
   try {
     loading.value = true;
-    
-    // 构建查询参数
     const params = {
       page: pagination.current,
       pageSize: pagination.pageSize
     };
-    
     // 添加搜索条件
-    if (searchForm.name) {
-      params.title = searchForm.name;
-    }
-    
-    if (searchForm.account) {
-      // 注意：这里需要传递用户ID，不是用户名
-      // 如果UserSelect组件返回的是用户名，需要转换为用户ID
-      params.creator = searchForm.account; // 需要根据实际情况调整
-    }
-    
-    if (searchForm.status !== undefined) {
-      params.publish = searchForm.status === 'published';
-    }
-    
-    if (searchForm.origin !== undefined) {
-      params.origin = searchForm.origin;
-    }
-    
+    if (searchForm.name) params.title = searchForm.name;
+    if (searchForm.account) params.creator = searchForm.account;
+    if (searchForm.status !== undefined) params.publish = searchForm.status === 'published';
+    if (searchForm.origin !== undefined) params.origin = searchForm.origin;
     if (searchForm.dateRange && searchForm.dateRange.length === 2) {
       const [start, end] = searchForm.dateRange;
       params.start_time = start.format('YYYY-MM-DDTHH:mm:ss');
       params.end_time = end.format('YYYY-MM-DDTHH:mm:ss');
     }
-    
+
     const response = await getTextList(params);
-    
-    console.log('API响应数据:', response);
-    
-    // 处理响应数据
+
     let dataList = [];
-    
     if (response && response.data && response.data.results) {
       dataList = response.data.results;
       pagination.total = response.data.count || dataList.length;
     }
-    
-    // 转换数据格式
+
+    // 转换数据格式，加入 coverId
     textList.value = dataList.map(item => ({
       id: item.id,
       title: item.title || '无标题',
@@ -302,9 +450,9 @@ const fetchData = async () => {
       status: item.publish ? 'published' : 'unpublished',
       createTime: item.create_time || new Date().toISOString(),
       account: item.username,
-      origin: item.origin || '未知来源'
+      origin: item.origin || '未知来源',
+      coverId: item.cover_id || null
     }));
-    
   } catch (error) {
     console.error('获取图文列表失败:', error);
     message.error('获取图文列表失败');
@@ -322,6 +470,76 @@ const currentPageData = computed(() => {
   const end = start + pagination.pageSize;
   return textList.value.slice(start, end);
 });
+
+// 监听当前页数据，预取封面详情
+watch(currentPageData, (rows) => {
+  rows.forEach((record) => {
+    if (record.coverId && !coverDetails[record.id]) {
+      loadCoverDetailForText(record);
+    }
+  });
+}, { immediate: true });
+
+// 加载某条图文的封面详情
+const loadCoverDetailForText = async (record) => {
+  const coverId = record.coverId;
+  if (!coverId) return;
+  try {
+    const response = await getImageDetail(coverId);
+    coverDetails[record.id] = response?.data || response;
+  } catch (error) {
+    console.error('获取封面详情失败:', error);
+    if (coverId) {
+      coverDetails[record.id] = { img_name: `${coverId}.png`, id: coverId };
+    }
+  }
+};
+
+// 生成封面图片 URL
+const getTextCoverUrl = (record) => {
+  const detail = coverDetails[record.id];
+  if (!detail?.img_name) return '';
+  return `http://127.0.0.1:8089/media/images/${detail.img_name}`;
+};
+
+// 新增：封面发布信息
+const inferMimeFromName = (name) => {
+  const ext = (name || '').split('.').pop()?.toLowerCase();
+  if (!ext) return 'image/png';
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'gif') return 'image/gif';
+  if (ext === 'webp') return 'image/webp';
+  return `image/${ext}`;
+};
+
+const getTextCoverPublishInfo = (record) => {
+  const detail = coverDetails[record.id];
+  const url = getTextCoverUrl(record);
+  if (!detail || !url) return null;
+  const name = detail.img_name || 'cover.png';
+  const fmt = (detail?.spec?.format || '').toLowerCase();
+  const type = fmt
+    ? (fmt === 'jpg' || fmt === 'jpeg' ? 'image/jpeg'
+      : fmt === 'png' ? 'image/png'
+      : fmt === 'gif' ? 'image/gif'
+      : fmt === 'webp' ? 'image/webp'
+      : `image/${fmt}`)
+    : inferMimeFromName(name);
+  const size = detail?.spec?.size || 0;
+  return { name, url, type, size };
+};
+// 显示当前行的图片预览
+const showRowImagePreview = async (record) => {
+  if (!getTextCoverUrl(record) && record.coverId) {
+    await loadCoverDetailForText(record);
+  }
+  const url = getTextCoverUrl(record);
+  if (url) {
+    previewImageUrl.value = url;
+    imagePreviewVisible.value = true;
+  }
+};
 
 // 唯一账号列表
 // 移除 uniqueAccounts 计算属性，因为现在使用 UserSelect 组件
@@ -442,42 +660,94 @@ const handleDownload = async (record) => {
 // 发布图文
 const handlePublish = async (record) => {
   try {
-    // 这里需要根据后端API添加发布接口
-    record.status = 'published';
-    message.success('发布成功');
-    fetchData();
+    selectedText.value = record;
+    selectedPlatforms.value = [];
+    // 预加载封面详情
+    if (record.coverId && !coverDetails[record.id]) {
+      await loadCoverDetailForText(record);
+    }
+    publishModalVisible.value = true;
   } catch (error) {
-    message.error('发布失败');
+    console.error('打开发布弹窗失败:', error);
+    message.error('打开发布弹窗失败');
   }
 };
 
-// 导入图文
-// 添加导入相关的响应式数据
-const importForm = reactive({
-  title: '',
-  file: null,
-  url: ''  // 新增URL字段
-});
-const importModalVisible = ref(false);
-const importType = ref('file');  // 新增导入类型：'file' 或 'url'
-const urlPreview = reactive({  // 新增URL预览数据
-  loading: false,
-  title: '',
-  content: ''
-});
+// 新增：执行发布
+const confirmPublish = async () => {
+  if (!selectedText.value) {
+    message.warning('未选择图文');
+    return;
+  }
+  if (!selectedPlatforms.value.length) {
+    message.warning('请选择至少一个平台');
+    return;
+  }
+  try {
+    publishModalVisible.value = false;
+    message.info('作品发布中');
 
-// 导入图文 - 修改为显示自定义对话框
-const handleImport = () => {
-  importForm.title = '';
-  importForm.file = null;
-  importForm.url = '';  // 重置URL
-  importType.value = 'file';  // 默认选择文件导入
-  urlPreview.loading = false;  // 重置预览状态
-  urlPreview.title = '';
-  urlPreview.content = '';
-  importModalVisible.value = true;
+    const serviceResp = await extCheckServiceStatus();
+    if (!serviceResp) {
+      message.error('扩展服务未运行，请先启动扩展');
+      return;
+    }
+
+    const trustResp = await requestDomainTrust(5000);
+    if (!trustResp || trustResp.status !== 'ok' || !trustResp.trusted) {
+      await openOptions();
+      message.info('请在扩展设置页授权当前域名后，系统将自动继续');
+    }
+
+    const selectedSet = new Set(selectedPlatforms.value);
+    const targetPlatforms = (dynamicPlatforms.value || []).filter(p => selectedSet.has(p.name));
+    if (!targetPlatforms.length) {
+      message.error('未匹配到选中的平台');
+      return;
+    }
+
+    await new Promise(r => setTimeout(r, 1000));
+
+    const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, platformName: p.platformName, injectUrl: p.injectUrl, faviconUrl: p.faviconUrl, accountKey: p.accountKey, extraConfig: {} }));
+    const cover = getTextCoverPublishInfo(selectedText.value);
+
+    const markdown = selectedText.value.content || '';
+    const html = DOMPurify.sanitize(md.render(markdown));
+    const digest = makeDigest(markdown);
+    const images = Array.isArray(selectedText.value.images) ? selectedText.value.images : [];
+
+    const syncData = {
+      platforms: syncPlatforms,
+      isAutoPublish: isAutoPublish.value,
+      data: {
+        title: selectedText.value.title || '未命名图文',
+        digest,
+        cover,
+        htmlContent: html,
+        markdownContent: markdown,
+        images
+      }
+    };
+
+    console.log('发送扩展发布请求 syncData:', JSON.stringify(syncData, null, 2));
+    await extFuncPublish(syncData);
+    message.success(`发布请求已发送到扩展（${syncPlatforms.length}个平台），请在新标签页查看扩展自动填充`);
+    fetchData();
+  } catch (e) {
+    console.error('发布异常:', e);
+    message.error(e?.message || '发布异常');
+  } finally {
+    selectedText.value = null;
+    selectedPlatforms.value = [];
+  }
 };
 
+// 新增：关闭发布弹窗
+const closePublishModal = () => {
+  publishModalVisible.value = false;
+  selectedText.value = null;
+  selectedPlatforms.value = [];
+};
 // 处理文件选择
 const handleFileSelect = (event) => {
   const file = event.target.files[0];
@@ -700,6 +970,317 @@ onMounted(() => {
   align-items: center;
 }
 
+.title-text {
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.text-content {
+  max-height: 120px;
+  overflow: hidden;
+  position: relative;
+}
+
+.content-preview {
+  max-height: 100px;
+  overflow: hidden;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.button-group {
+  display: flex;
+  gap: 8px;
+}
+
+.search-area {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+}
+
+.search-area .ant-form {
+  flex: 1;
+  margin-right: 16px;
+}
+
+.pagination {
+  margin-top: 16px;
+  text-align: right;
+}
+
+:deep(.ant-table-row) {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+:deep(.ant-table-row:hover) {
+  background-color: #fafafa;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.ant-table-cell) {
+  padding: 16px !important;
+}
+
+.upload-area {
+  width: 100%;
+}
+
+.upload-dragger {
+  border: 2px dashed #d9d9d9;
+  border-radius: 6px;
+  background: #fafafa;
+  text-align: center;
+  padding: 40px 20px;
+  transition: border-color 0.3s;
+  cursor: pointer;
+}
+
+.upload-dragger:hover {
+  border-color: #1890ff;
+}
+
+.upload-dragger.dragover {
+  border-color: #1890ff;
+  background: #e6f7ff;
+}
+
+.upload-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.upload-hint p {
+  margin: 4px 0;
+  color: #666;
+}
+
+.file-selected {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: #f0f9ff;
+  border-radius: 4px;
+  border: 1px solid #91d5ff;
+}
+
+.file-selected span {
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.url-preview {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 12px;
+  background-color: #fafafa;
+}
+
+.preview-title {
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: #262626;
+}
+
+.preview-content {
+  color: #595959;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.ant-tabs-content {
+  padding-top: 16px;
+}
+
+/* 追加封面缩略图与预览样式 */
+.cover-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-right: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.preview-image {
+  width: 100%;
+  max-height: calc(90vh - 120px);
+  object-fit: contain;
+}
+
+/* 保留并复用现有样式 */
+.title-content {
+  display: flex;
+  align-items: center;
+}
+.title-text {
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.text-content {
+  max-height: 120px;
+  overflow: hidden;
+  position: relative;
+}
+
+.content-preview {
+  max-height: 100px;
+  overflow: hidden;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.button-group {
+  display: flex;
+  gap: 8px;
+}
+
+.search-area {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+}
+
+.search-area .ant-form {
+  flex: 1;
+  margin-right: 16px;
+}
+
+.pagination {
+  margin-top: 16px;
+  text-align: right;
+}
+
+:deep(.ant-table-row) {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+:deep(.ant-table-row:hover) {
+  background-color: #fafafa;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.ant-table-cell) {
+  padding: 16px !important;
+}
+
+.upload-area {
+  width: 100%;
+}
+
+.upload-dragger {
+  border: 2px dashed #d9d9d9;
+  border-radius: 6px;
+  background: #fafafa;
+  text-align: center;
+  padding: 40px 20px;
+  transition: border-color 0.3s;
+  cursor: pointer;
+}
+
+.upload-dragger:hover {
+  border-color: #1890ff;
+}
+
+.upload-dragger.dragover {
+  border-color: #1890ff;
+  background: #e6f7ff;
+}
+
+.upload-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.upload-hint p {
+  margin: 4px 0;
+  color: #666;
+}
+
+.file-selected {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: #f0f9ff;
+  border-radius: 4px;
+  border: 1px solid #91d5ff;
+}
+
+.file-selected span {
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.url-preview {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 12px;
+  background-color: #fafafa;
+}
+
+.preview-title {
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: #262626;
+}
+
+.preview-content {
+  color: #595959;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.ant-tabs-content {
+  padding-top: 16px;
+}
+
+/* 保障平台卡片为横向网格排列 */
+.platform-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+/* 其余样式保留 */
+.title-content {
+  display: flex;
+  align-items: center;
+}
 .title-text {
   font-weight: 500;
   color: rgba(0, 0, 0, 0.85);
