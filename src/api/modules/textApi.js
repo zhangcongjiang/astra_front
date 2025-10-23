@@ -147,3 +147,18 @@ export const importFromUrl = async (url, origin) => {
     }
 };
 
+
+// 新增：替换图文封面
+export const replaceTextCover = async (text_id, cover_id) => {
+    try {
+        const response = await request.post('/text/cover/replace/', {
+            text_id,
+            cover_id
+        });
+        return response;
+    } catch (error) {
+        console.error('替换封面失败:', error);
+        throw error;
+    }
+};
+

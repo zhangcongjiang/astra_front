@@ -56,8 +56,9 @@
         rowKey="id"
         :customRow="handleRowClick">
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'title'">
-            <div class="title-content">
+          <!-- 新增：封面列渲染 -->
+          <template v-if="column.key === 'cover'">
+            <div class="cover-cell">
               <img
                 v-if="record.coverId && getTextCoverUrl(record)"
                 :src="getTextCoverUrl(record)"
@@ -65,6 +66,13 @@
                 alt="封面"
                 @click.stop="showRowImagePreview(record)"
               />
+              <div v-else class="cover-thumb cover-empty">无封面</div>
+            </div>
+          </template>
+          
+          <!-- 修改：标题列仅显示标题文本，不再包含封面缩略图 -->
+          <template v-if="column.key === 'title'">
+            <div class="title-content">
               <span class="title-text">{{ record.title }}</span>
             </div>
           </template>
@@ -88,6 +96,8 @@
               <a-button type="link" :disabled="record.status === 'published'" @click="handlePublish(record)">
                 发布
               </a-button>
+              <!-- 新增：替换封面入口 -->
+              <a-button type="link" @click.stop="openCoverReplace(record)">替换封面</a-button>
               <a-button type="link" danger @click="handleDelete(record)">删除</a-button>
             </div>
           </template>
@@ -99,7 +109,33 @@
     <a-modal v-model:open="imagePreviewVisible" title="封面预览" width="90%" style="max-width: 1200px;" :footer="null">
       <img v-if="previewImageUrl" :src="previewImageUrl" alt="封面预览" class="preview-image" />
     </a-modal>
-
+    
+    <!-- 新增：封面替换选择弹窗 -->
+    <a-modal
+      v-model:open="coverReplaceModalVisible"
+      title="选择封面图片"
+      width="800px"
+      :footer="null"
+      @cancel="cancelCoverReplace"
+    >
+      <a-spin :spinning="coverReplaceLoading">
+        <div v-if="coverReplaceImages.length > 0" class="cover-select-grid">
+          <div
+            v-for="img in coverReplaceImages"
+            :key="img.resource_id || img.id"
+            class="cover-select-item"
+          >
+            <img :src="img.url" :alt="img.name" style="width: 140px; height: 100px; object-fit: cover; border-radius: 4px;" />
+            <div style="margin-top: 8px;">{{ img.name }}</div>
+            <div class="cover-select-actions">
+              <a-button size="small" type="primary" @click="confirmCoverReplace(img)">设为封面</a-button>
+              <a-button size="small" @click="previewImageUrl = img.url; imagePreviewVisible = true;">预览</a-button>
+            </div>
+          </div>
+        </div>
+        <div v-else style="text-align: center; color: #999; padding: 24px;">暂无图片，请先向该文章关联图片</div>
+      </a-spin>
+    </a-modal>
     <!-- 新增：发布弹窗 -->
     <a-modal v-model:open="publishModalVisible" title="发布图文" width="800px" :footer="null" @cancel="closePublishModal">
       <div class="publish-modal-content">
@@ -258,9 +294,11 @@ import {
   deleteText, 
   downloadText, 
   uploadMarkdown,
-  importFromUrl
+  importFromUrl,
+  replaceTextCover
 } from '@/api/modules/textApi';
 import { getImageDetail } from '@/api/modules/imageApi.js';
+import { getAssetCollectionDetail } from '@/api/modules/assetApi.js';
 import { CheckCircleFilled } from '@ant-design/icons-vue';
 // 恢复：引入扩展消息方法
 import {
@@ -543,7 +581,71 @@ const loadCoverDetailForText = async (record) => {
 const getTextCoverUrl = (record) => {
   const detail = coverDetails[record.id];
   if (!detail?.img_name) return '';
-  return `http://127.0.0.1:8089/media/images/${detail.img_name}`;
+  return `${staticBaseUrl}/media/images/${detail.img_name}`;
+};
+
+// 新增：封面替换弹窗状态与方法
+const coverReplaceModalVisible = ref(false);
+const coverReplaceLoading = ref(false);
+const coverReplaceImages = ref([]);
+const coverReplaceRecord = ref(null);
+
+// 打开封面替换弹窗，加载资产内图片
+const openCoverReplace = async (record) => {
+  coverReplaceRecord.value = record;
+  coverReplaceModalVisible.value = true;
+  coverReplaceLoading.value = true;
+  try {
+    const resp = await getAssetCollectionDetail(record.id);
+    const rawImages = (resp?.data?.images || resp?.images || []);
+    coverReplaceImages.value = rawImages
+      .filter(item => item.asset_type === 'image')
+      .map(item => ({
+        id: item.id,
+        resource_id: item.resource_id,
+        name: item?.resource_detail?.name || item.resource_id,
+        url: item?.resource_detail?.url,
+        width: item?.resource_detail?.width,
+        height: item?.resource_detail?.height,
+        format: item?.resource_detail?.format
+      }));
+  } catch (error) {
+    console.error('加载资产图片失败:', error);
+    message.error('加载资产图片失败');
+    coverReplaceImages.value = [];
+  } finally {
+    coverReplaceLoading.value = false;
+  }
+};
+
+// 取消封面替换
+const cancelCoverReplace = () => {
+  coverReplaceModalVisible.value = false;
+  coverReplaceImages.value = [];
+  coverReplaceRecord.value = null;
+};
+
+// 确认替换封面
+const confirmCoverReplace = async (img) => {
+  if (!coverReplaceRecord.value || !img) return;
+  try {
+    coverReplaceLoading.value = true;
+    const resp = await replaceTextCover(coverReplaceRecord.value.id, img.resource_id);
+    if (resp?.code === 0) {
+      message.success('封面替换成功');
+      // 更新行数据的封面ID并刷新封面详情
+      coverReplaceRecord.value.coverId = img.resource_id;
+      await loadCoverDetailForText(coverReplaceRecord.value);
+      coverReplaceModalVisible.value = false;
+    } else {
+      message.error(resp?.message || resp?.msg || '封面替换失败');
+    }
+  } catch (error) {
+    console.error('封面替换失败:', error);
+    message.error('封面替换失败');
+  } finally {
+    coverReplaceLoading.value = false;
+  }
 };
 
 // 新增：封面发布信息
@@ -600,6 +702,14 @@ const columns = [
     width: '50px',
     align: 'center',
     customRender: ({ index }) => (pagination.current - 1) * pagination.pageSize + index + 1,
+  },
+  // 新增：封面列，位于序号与标题之间
+  {
+    title: '封面',
+    dataIndex: 'cover',
+    key: 'cover',
+    width: '90px',
+    align: 'center',
   },
   {
     title: '图文标题',
@@ -1494,5 +1604,26 @@ onMounted(() => {
 
 .ant-tabs-content {
   padding-top: 16px;
+}
+
+/* 新增：封面选择弹窗的网格样式 */
+.cover-select-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+.cover-select-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 12px;
+}
+.cover-select-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
 }
 </style>
