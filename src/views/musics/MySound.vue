@@ -73,7 +73,12 @@
           </template>
 
           <template v-if="column.key === 'video_id'">
-            <a-tag color="blue">{{ record.video_id || '无关联视频' }}</a-tag>
+            <template v-if="record.video_id">
+              <a-tag color="blue" style="cursor: pointer;" @click="goToVideoDetail(record.video_id)">{{ record.video_id }}</a-tag>
+            </template>
+            <template v-else>
+              <a-tag color="default">无关联视频</a-tag>
+            </template>
           </template>
 
           <template v-if="column.key === 'username'">
@@ -142,6 +147,7 @@ import dayjs from 'dayjs';
 import Pagination from '@/components/Pagination.vue';
 import UserSelect from '@/components/UserSelect.vue';  // 添加这行
 import { getTtsList, ttsPlay } from '@/api/modules/voiceApi';
+import { useRouter } from 'vue-router';
 
 // 搜索表单
 const searchForm = reactive({
@@ -393,6 +399,15 @@ const onAudioError = () => {
 onMounted(() => {
   fetchTtsList();
 });
+const router = useRouter();
+
+const goToVideoDetail = (id) => {
+  if (!id) {
+    message.warning('无关联视频');
+    return;
+  }
+  router.push({ name: 'video-detail', params: { id } });
+};
 </script>
 
 <style scoped>

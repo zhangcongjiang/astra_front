@@ -60,8 +60,8 @@
                 </template>
                 <template #origin="{ record }">
                     <div style="text-align: center;">
-                        <a-tag color="blue">
-                            INDEX-TTS
+                        <a-tag :color="record.origin === 'EDGE_TTS' ? 'green' : 'blue'">
+                            {{ record.origin === 'EDGE_TTS' ? 'EDGE-TTS' : 'INDEX-TTS' }}
                         </a-tag>
                     </div>
                 </template>
@@ -128,6 +128,47 @@
             <a-form-item label="朗读者姓名" required>
                 <a-input v-model:value="addSpeakerForm.name" placeholder="请输入朗读者姓名" />
             </a-form-item>
+            
+            <!-- 新增：来源选择 -->
+            <a-form-item label="来源" required>
+                <a-radio-group v-model:value="addSpeakerForm.origin">
+                    <a-radio value="INDEX_TTS">INDEX-TTS</a-radio>
+                    <a-radio value="EDGE_TTS">EDGE-TTS</a-radio>
+                </a-radio-group>
+            </a-form-item>
+
+            <!-- 新增：当来源为 EDGE-TTS 时显示参数输入 -->
+            <a-form-item v-if="addSpeakerForm.origin === 'EDGE_TTS'" label="音量">
+                <a-input-number 
+                    v-model:value="addSpeakerForm.volume" 
+                    :step="1" 
+                    :formatter="v => `${Number(v ?? 0) >= 0 ? '+' : ''}${v}%`" 
+                    :parser="v => Number(String(v).replace(/%/g, '').replace(/\+/g, ''))" 
+                    style="width: 100%" 
+                />
+                <div style="margin-top: 4px; color: #999; font-size: 12px;">默认 0%</div>
+            </a-form-item>
+            <a-form-item v-if="addSpeakerForm.origin === 'EDGE_TTS'" label="语速">
+                <a-input-number 
+                    v-model:value="addSpeakerForm.rate" 
+                    :step="1" 
+                    :formatter="v => `${Number(v ?? 0) >= 0 ? '+' : ''}${v}%`" 
+                    :parser="v => Number(String(v).replace(/%/g, '').replace(/\+/g, ''))" 
+                    style="width: 100%" 
+                />
+                <div style="margin-top: 4px; color: #999; font-size: 12px;">默认 0%</div>
+            </a-form-item>
+            <a-form-item v-if="addSpeakerForm.origin === 'EDGE_TTS'" label="音调">
+                <a-input-number 
+                    v-model:value="addSpeakerForm.pitch" 
+                    :step="1" 
+                    :formatter="v => `${Number(v ?? 0) >= 0 ? '+' : ''}${v}Hz`" 
+                    :parser="v => Number(String(v).replace(/Hz/gi, '').replace(/\+/g, ''))" 
+                    style="width: 100%" 
+                />
+                <div style="margin-top: 4px; color: #999; font-size: 12px;">默认 0Hz</div>
+            </a-form-item>
+
             <a-form-item label="音频文件" required>
                 <a-upload
                     v-model:file-list="addSpeakerForm.fileList"
@@ -339,6 +380,9 @@ const addSpeakerLoading = ref(false);
 const addSpeakerForm = reactive({
     name: '',
     origin: 'INDEX_TTS',
+    volume: 0,
+    rate: 0,
+    pitch: 0,
     fileList: []
 });
 
@@ -521,6 +565,9 @@ const closeAddSpeakerModal = () => {
     addSpeakerModalVisible.value = false;
     addSpeakerForm.name = '';
     addSpeakerForm.origin = 'INDEX_TTS';
+    addSpeakerForm.volume = 0;
+    addSpeakerForm.rate = 0;
+    addSpeakerForm.pitch = 0;
     addSpeakerForm.fileList = [];
 };
 
@@ -538,6 +585,13 @@ const beforeUpload = (file) => {
         return false;
     }
     return false; // 阻止自动上传
+};
+
+// 工具：将数值格式化为带符号与单位的字符串（例如 +10%、-5%、+12Hz）
+const formatSignedUnit = (val, unit) => {
+  const num = Number(val ?? 0);
+  const sign = num >= 0 ? '+' : '';
+  return `${sign}${num}${unit}`;
 };
 
 const handleRemove = () => {
@@ -558,8 +612,15 @@ const handleAddSpeaker = async () => {
     try {
         const formData = new FormData();
         formData.append('name', addSpeakerForm.name.trim());
-        formData.append('origin', 'INDEX_TTS');
+        formData.append('origin', addSpeakerForm.origin);
         formData.append('audio_file', addSpeakerForm.fileList[0].originFileObj);
+
+        // 仅在 EDGE-TTS 时传递三个参数，带符号与单位的字符串（例如 +10%、-5%、+12Hz）
+        if (addSpeakerForm.origin === 'EDGE_TTS') {
+            formData.append('volume', formatSignedUnit(addSpeakerForm.volume, '%'));
+            formData.append('rate', formatSignedUnit(addSpeakerForm.rate, '%'));
+            formData.append('pitch', formatSignedUnit(addSpeakerForm.pitch, 'Hz'));
+        }
 
         const response = await addSpeaker(formData);
         if (response.code === 0) {

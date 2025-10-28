@@ -139,6 +139,18 @@
     <!-- 新增：发布弹窗 -->
     <a-modal v-model:open="publishModalVisible" title="发布图文" width="800px" :footer="null" @cancel="closePublishModal">
       <div class="publish-modal-content">
+        <!-- 标签输入 -->
+        <div class="tag-input" style="margin-bottom: 12px; display:flex; align-items:center; gap:12px;">
+          <span style="min-width: 60px;">标签：</span>
+          <a-select
+            v-model:value="publishTagList"
+            mode="tags"
+            :tokenSeparators="[' ']"
+            placeholder="请输入标签，多个标签之间用空格分隔（最多5个）"
+            style="flex:1"
+            @change="handleTagChange"
+          />
+        </div>
         <!-- 平台选择部分 -->
         <div class="platform-section">
           <div class="platform-header" style="margin-bottom:8px; display:flex; align-items:center; gap:12px;">
@@ -166,7 +178,7 @@
         <!-- 操作按钮 -->
         <div class="modal-actions">
           <a-button @click="closePublishModal">取消</a-button>
-          <a-button type="primary" :disabled="selectedPlatforms.length === 0" @click="confirmPublish">
+          <a-button type="primary" :disabled="selectedPlatforms.length === 0 || !hasTags" @click="confirmPublish">
             发布到选中平台 ({{ selectedPlatforms.length }})
           </a-button>
         </div>
@@ -408,7 +420,20 @@ const selectedText = ref(null);
 const selectedPlatforms = ref([]);
 const dynamicPlatforms = ref([]);
 const isAutoPublish = ref(false);
-// 文章平台列表（根据用户提供配置）
+// 新增：标签相关状态与校验
+const publishTagList = ref([]);
+const MAX_TAGS = 5;
+const hasTags = computed(() => (publishTagList.value || []).filter(t => t && String(t).trim()).length > 0);
+const handleTagChange = (value) => {
+  const list = (value || []).map(t => String(t).trim()).filter(Boolean);
+  if (list.length > MAX_TAGS) {
+    publishTagList.value = list.slice(0, MAX_TAGS);
+    message.warning(`最多只能添加${MAX_TAGS}个标签`);
+  } else {
+    publishTagList.value = list;
+  }
+};
+// 恢复：文章平台列表（根据用户提供配置）
 const localPlatforms = [
   {
     type: 'ARTICLE',
@@ -461,13 +486,11 @@ const localPlatforms = [
     accountKey: 'weibo',
   },
 ];
-
+// 恢复：初始化平台到 UI
 onMounted(() => {
-  // 初始化平台到 UI
   dynamicPlatforms.value = localPlatforms;
 });
-
-// 新增：平台选择与扩展授权辅助函数
+// 恢复：平台选择函数
 const togglePlatform = (platformKey) => {
   const index = selectedPlatforms.value.indexOf(platformKey);
   if (index > -1) {
@@ -476,6 +499,7 @@ const togglePlatform = (platformKey) => {
     selectedPlatforms.value.push(platformKey);
   }
 };
+
 
 const openOptions = async (timeout = 5000) => {
   try {
@@ -816,6 +840,11 @@ const handlePublish = async (record) => {
   try {
     selectedText.value = record;
     selectedPlatforms.value = [];
+    // 初始化标签：支持从 record.tags 或 record.tagList 推断
+    const initTags = Array.isArray(record.tagList) ? record.tagList
+      : Array.isArray(record.tags) ? record.tags
+      : [];
+    publishTagList.value = (initTags || []).map(t => String(t).trim()).filter(Boolean).slice(0, MAX_TAGS);
     // 若列表项不含 content（Markdown），则拉取详情
     if (!record.content || record.content.trim() === '') {
       const resp = await getTextDetail(record.id);
@@ -843,6 +872,10 @@ const confirmPublish = async () => {
   }
   if (!selectedPlatforms.value.length) {
     message.warning('请选择至少一个平台');
+    return;
+  }
+  if (!hasTags.value) {
+    message.warning('请至少输入一个标签');
     return;
   }
   try {
@@ -910,7 +943,8 @@ const confirmPublish = async () => {
         cover,
         htmlContent: html,
         markdownContent: markdown,
-        images
+        images,
+        tags: (publishTagList.value || []).map(t => String(t).trim()).filter(Boolean).slice(0, MAX_TAGS)
       }
     };
 
@@ -924,6 +958,7 @@ const confirmPublish = async () => {
   } finally {
     selectedText.value = null;
     selectedPlatforms.value = [];
+    publishTagList.value = [];
   }
 };
 
@@ -1295,166 +1330,6 @@ onMounted(() => {
   padding-top: 16px;
 }
 
-/* 追加封面缩略图与预览样式 */
-.cover-thumb {
-  width: 48px;
-  height: 48px;
-  object-fit: cover;
-  border-radius: 4px;
-  margin-right: 12px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
-.preview-image {
-  width: 100%;
-  max-height: calc(90vh - 120px);
-  object-fit: contain;
-}
-
-/* 保留并复用现有样式 */
-.title-content {
-  display: flex;
-  align-items: center;
-}
-.title-text {
-  font-weight: 500;
-  color: rgba(0, 0, 0, 0.85);
-}
-
-.text-content {
-  max-height: 120px;
-  overflow: hidden;
-  position: relative;
-}
-
-.content-preview {
-  max-height: 100px;
-  overflow: hidden;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.button-group {
-  display: flex;
-  gap: 8px;
-}
-
-.search-area {
-  margin-bottom: 20px;
-  padding: 16px;
-  background: #fff;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  display: flex;
-  align-items: center;
-}
-
-.search-area .ant-form {
-  flex: 1;
-  margin-right: 16px;
-}
-
-.pagination {
-  margin-top: 16px;
-  text-align: right;
-}
-
-:deep(.ant-table-row) {
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-:deep(.ant-table-row:hover) {
-  background-color: #fafafa;
-  transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-:deep(.ant-table-cell) {
-  padding: 16px !important;
-}
-
-.upload-area {
-  width: 100%;
-}
-
-.upload-dragger {
-  border: 2px dashed #d9d9d9;
-  border-radius: 6px;
-  background: #fafafa;
-  text-align: center;
-  padding: 40px 20px;
-  transition: border-color 0.3s;
-  cursor: pointer;
-}
-
-.upload-dragger:hover {
-  border-color: #1890ff;
-}
-
-.upload-dragger.dragover {
-  border-color: #1890ff;
-  background: #e6f7ff;
-}
-
-.upload-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.upload-hint {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.upload-hint p {
-  margin: 4px 0;
-  color: #666;
-}
-
-.file-selected {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: #f0f9ff;
-  border-radius: 4px;
-  border: 1px solid #91d5ff;
-}
-
-.file-selected span {
-  color: #1890ff;
-  font-weight: 500;
-}
-
-.url-preview {
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  padding: 12px;
-  background-color: #fafafa;
-}
-
-.preview-title {
-  font-weight: 500;
-  margin-bottom: 8px;
-  color: #262626;
-}
-
-.preview-content {
-  color: #595959;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
-
-.ant-tabs-content {
-  padding-top: 16px;
-}
-
 /* 保障平台卡片为横向网格排列 */
 .platform-grid {
   display: grid;
@@ -1625,5 +1500,18 @@ onMounted(() => {
   margin-top: 8px;
   display: flex;
   gap: 8px;
+}
+.cover-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-right: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.preview-image {
+  width: 100%;
+  max-height: calc(90vh - 120px);
+  object-fit: contain;
 }
 </style>
