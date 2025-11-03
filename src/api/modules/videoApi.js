@@ -331,3 +331,28 @@ export const updateVideoAssetTags = async (data) => {
         throw error;
     }
 };
+
+// 新增：上传/替换主视频文件
+export const uploadVideoFile = async (videoId, file) => {
+  try {
+    const formData = new FormData();
+    formData.append('video_id', videoId);
+    formData.append('video_file', file);
+    const response = await request.upload('/video/upload/', formData);
+    return response;
+  } catch (error) {
+    console.error('上传/替换主视频文件失败:', error);
+    throw error;
+  }
+};
+
+// 新增：创建视频（title 必填，content、video_file、cover 可选）
+export const createVideo = async (formData) => {
+  try {
+    const response = await request.upload('/video/create/', formData);
+    return response;
+  } catch (error) {
+    console.error('创建视频失败:', error);
+    throw error;
+  }
+};

@@ -37,6 +37,11 @@
       </a-form>
     </div>
 
+    <!-- 顶部工具栏：添加视频按钮（右上角） -->
+    <div class="toolbar-area">
+      <a-button type="primary" @click="openCreateModal">添加视频</a-button>
+    </div>
+
     <!-- 视频卡片列表 -->
     <div class="video-grid">
       <a-spin :spinning="loading" tip="加载中...">
@@ -140,6 +145,9 @@
                   发布
                 </a-button>
                 <a-button type="default" size="small" @click="showDetail(video)">详情</a-button>
+                <a-button size="small" @click="triggerUpload(video)">
+                  {{ video.video_path ? '替换' : '上传' }}
+                </a-button>
 
                 <a-button type="danger" size="small" @click="handleDelete(video)">删除</a-button>
               </template>
@@ -247,6 +255,32 @@
         <img v-if="coverDetail && getCoverUrl()" :src="getCoverUrl()" alt="封面预览" class="preview-image" />
       </div>
     </a-modal>
+
+    <!-- 新增：创建视频弹窗 -->
+    <a-modal v-model:open="createModalVisible" title="新增视频" :footer="null" width="600px" centered>
+      <a-form layout="vertical">
+        <a-form-item label="标题" required>
+          <a-input v-model:value="createForm.title" placeholder="请输入视频标题" />
+        </a-form-item>
+        <a-form-item label="内容">
+          <a-textarea v-model:value="createForm.content" placeholder="可选：请输入视频文案内容" :rows="3" />
+        </a-form-item>
+        <a-form-item label="视频文件">
+          <input ref="createVideoInput" type="file" accept="video/*" style="display:none" @change="handleCreateVideoFileChange" />
+          <a-button size="small" @click="triggerCreateVideoSelect">{{ createForm.videoFile ? '更改视频文件' : '选择视频文件' }}</a-button>
+          <span v-if="createForm.videoFile" style="margin-left:8px;color:#666;">{{ createForm.videoFile.name }}</span>
+        </a-form-item>
+        <a-form-item label="封面图片">
+          <input ref="createCoverInput" type="file" accept="image/*" style="display:none" @change="handleCreateCoverChange" />
+          <a-button size="small" @click="triggerCreateCoverSelect">{{ createForm.coverFile ? '更改封面' : '选择封面' }}</a-button>
+          <span v-if="createForm.coverFile" style="margin-left:8px;color:#666;">{{ createForm.coverFile.name }}</span>
+        </a-form-item>
+      </a-form>
+      <div style="display:flex; justify-content:flex-end; gap:12px;">
+        <a-button @click="closeCreateModal">取消</a-button>
+        <a-button type="primary" @click="submitCreateVideo">提交</a-button>
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -263,7 +297,7 @@ import {
   CheckCircleFilled
 } from '@ant-design/icons-vue';
 import Pagination from '@/components/Pagination.vue';
-import { getVideoList, deleteVideo } from '@/api/modules/videoApi.js';
+import { getVideoList, deleteVideo, uploadVideoFile, createVideo } from '@/api/modules/videoApi.js';
 import { getImageDetail } from '@/api/modules/imageApi.js';
 import { ElMessage } from 'element-plus';
 import dayjs from 'dayjs';
@@ -412,261 +446,151 @@ const handleDateChange = (dates) => {
 };
 
 
-// 获取状态显示信息
-const getStatusInfo = (result) => {
-  switch (result) {
-    case 'Process':
-      return { text: '生成中', type: 'warning' };
-    case 'Success':
-      return { text: '成功', type: 'success' };
-    case 'Fail':
-      return { text: '失败', type: 'error' };
-    default:
-      return { text: '未知', type: 'default' };
-  }
+// 新增：创建视频弹窗与逻辑
+const createModalVisible = ref(false);
+const createForm = reactive({
+  title: '',
+  content: '',
+  videoFile: null,
+  coverFile: null,
+});
+const createVideoInput = ref(null);
+const createCoverInput = ref(null);
+
+const openCreateModal = () => {
+  createModalVisible.value = true;
 };
-
-// 获取视频类型文本
-const getVideoTypeText = (videoType) => {
-  switch (videoType) {
-    case 'JianYing':
-      return '剪映视频';
-    case 'Regular':
-      return '普通视频';
-    default:
-      return '未知类型';
-  }
+const closeCreateModal = () => {
+  createModalVisible.value = false;
+  createForm.title = '';
+  createForm.content = '';
+  createForm.videoFile = null;
+  createForm.coverFile = null;
 };
-
-// 获取状态颜色
-const getStatusColor = (result) => {
-  switch (result) {
-    case 'Success':
-      return 'success';
-    case 'Fail':
-      return 'error';
-    case 'Process':
-      return 'processing';
-    default:
-      return 'default';
-  }
+const triggerCreateVideoSelect = () => {
+  if (createVideoInput.value) createVideoInput.value.click();
 };
-
-// 格式化时间
-const formatTime = (time) => {
-  return dayjs(time).format('YYYY-MM-DD HH:mm:ss');
+const triggerCreateCoverSelect = () => {
+  if (createCoverInput.value) createCoverInput.value.click();
 };
-
-// 将字节转换为友好显示（KB/MB/GB），保留两位小数
-const formatBytes = (bytes) => {
-  if (bytes == null || isNaN(bytes)) return '未知';
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ['KB', 'MB', 'GB', 'TB'];
-  let value = bytes / 1024; // KB
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex++;
-  }
-  return `${value.toFixed(2)} ${units[unitIndex]}`;
-};
-
-// 将秒转换为 时:分:秒 或 x小时y分z秒 的友好显示
-const formatCost = (seconds) => {
-  if (seconds == null || isNaN(seconds)) return '未知';
-  const s = Math.floor(seconds);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  const parts = [];
-  if (h) parts.push(`${h}小时`);
-  if (m) parts.push(`${m}分`);
-  if (sec || parts.length === 0) parts.push(`${sec}秒`);
-  return parts.join('');
-};
-
-// 获取视频URL
-const getVideoUrl = (video) => {
-  if (!video?.video_path) {
-    console.log('视频路径为空');
-    return '';
-  }
-
-  return video.video_path;
-};
-
-// 处理视频加载错误
-const handleVideoError = (event) => {
-  console.error('视频加载失败:', event);
-  message.error('视频加载失败');
-};
-
-// 调试用的视频事件处理函数
-const handleVideoLoadStart = (event) => {
-  console.log('视频开始加载:', event.target.src);
-};
-
-const handleVideoCanPlay = (event) => {
-  console.log('视频可以播放:', event.target.src);
-};
-
-const handleVideoLoadedMetadata = (event) => {
-  console.log('视频元数据加载完成:', event.target.src);
-  // 只在首次加载时重置播放位置
-  if (event.target.currentTime > 0) {
-    console.log('检测到缓存的播放位置，重置为0');
-    event.target.currentTime = 0;
-  }
-};
-
-const handleVideoClick = (event) => {
-  console.log('视频被点击:', event.target);
-  console.log('视频元素状态:', {
-    src: event.target.src,
-    readyState: event.target.readyState,
-    networkState: event.target.networkState,
-    paused: event.target.paused,
-    controls: event.target.controls,
-    currentTime: event.target.currentTime,
-    duration: event.target.duration
-  });
-};
-
-const handleVideoPlay = (event) => {
-  console.log('视频开始播放:', event.target.currentTime);
-};
-
-const handleVideoPause = (event) => {
-  console.log('视频暂停:', event.target.currentTime);
-};
-
-// 显示发布弹窗
-const showPublishModal = async (video) => {
-  selectedVideo.value = video;
-  selectedPlatforms.value = [];
-  coverDetail.value = null;
-
-  // 初始化可编辑的视频信息
-  editableVideo.value = {
-    title: video.title || '',
-    content: video.content || '',
-    coverPath: video.cover_path || '',
-    tagList: toTagList(video.tags)
-  };
-
-  // 如果视频有封面ID，加载封面详情
-  if (video.cover) {
-    await loadCoverDetail(video.cover);
-  }
-
-  publishModalVisible.value = true;
-};
-
-
-const handlePublish = async () => {
-  if (!selectedVideo.value) {
-    ElMessage.warning('未选择视频');
+const handleCreateVideoFileChange = (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('video/')) {
+    ElMessage.error('请选择视频文件');
     return;
   }
-  if (!selectedPlatforms.value.length) {
-    ElMessage.warning('请选择至少一个平台');
+  createForm.videoFile = file;
+};
+const handleCreateCoverChange = (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    ElMessage.error('请选择图片文件');
     return;
   }
-  if (!hasTags.value) {
-    ElMessage.warning('请至少输入一个标签');
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.error('封面大小不能超过5MB');
+    return;
+  }
+  createForm.coverFile = file;
+};
+const submitCreateVideo = async () => {
+  if (!createForm.title || !createForm.title.trim()) {
+    ElMessage.warning('请填写视频标题');
     return;
   }
   try {
-    // 点击发布后立即关闭弹窗并提示发布中
-    publishModalVisible.value = false;
-    ElMessage.info('作品发布中');
+    const fd = new FormData();
+    fd.append('title', createForm.title.trim());
+    if (createForm.content && createForm.content.trim()) fd.append('content', createForm.content.trim());
+    if (createForm.videoFile) fd.append('video_file', createForm.videoFile);
+    if (createForm.coverFile) fd.append('cover', createForm.coverFile);
 
-    const serviceResp = await checkServiceStatus();
-    if (!serviceResp) {
-      ElMessage.error('扩展服务未运行，请先启动扩展');
-      return;
-    }
-
-    let trustResp = await requestDomainTrust(5000);
-    if (!trustResp || trustResp.status !== 'ok' || !trustResp.trusted) {
-      console.log('当前域名未授权，打开扩展设置页以授权');
-      await openOptions();
-      ElMessage.info('请在扩展设置页授权当前域名后，系统将自动继续');
-    }
-
-    const selectedSet = new Set(selectedPlatforms.value);
-    const targetPlatforms = (dynamicPlatforms.value || []).filter(p => selectedSet.has(p.name));
-    console.log('选中的平台:', selectedPlatforms.value, '\n匹配到的平台:', targetPlatforms.map(p => ({ name: p.name })));
-    if (!targetPlatforms.length) {
-      ElMessage.error('未匹配到选中的平台，请先在列表中选择平台后重试');
-      return;
-    }
-
-    await new Promise(r => setTimeout(r, 1000));
-
-    const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, platformName: p.platformName, injectUrl: p.injectUrl, faviconUrl: p.faviconUrl, accountKey: p.accountKey, extraConfig: {} }));
-
-    // 生成 HTTP 可访问的 URL，供页面和扩展 fetch
-    const convertToHttpUrl = (p) => {
-      if (!p) return '';
-      if (p.startsWith('http')) return p;
-      // /media/... 相对路径 -> 本地服务 http://127.0.0.1:8089/media/...
-      if (p.startsWith('/media/')) return `http://127.0.0.1:8089${p}`;
-      // 绝对 Windows 路径 -> 取文件名，拼到 /media/videos/
-      const fileName = p.split(/[\\/]/).pop();
-      if (fileName) return `http://127.0.0.1:8089/media/videos/${fileName}`;
-      return p;
-    };
-    const httpVideoUrl = convertToHttpUrl(selectedVideo.value?.video_path || selectedVideo.value?.videoUrl || '');
-    const absVideoUrl = (() => {
-      const p = selectedVideo.value?.video_path || selectedVideo.value?.videoUrl || '';
-      if (!p) return '';
-      if (p.startsWith('http') || /^[A-Za-z]:/.test(p) || p.startsWith('/F:')) return p;
-      if (p.startsWith('/media/')) return `F:\\pycharm_workspace\\astra${p.replace(/\//g, '\\')}`;
-      const fileName = p.split(/[\\/]/).pop();
-      if (fileName && !p.includes('\\') && !p.includes('/')) return `F:\\pycharm_workspace\\astra\\media\\videos\\${fileName}`;
-      return p;
-    })();
-    console.log('发布使用的 HTTP 视频URL:', httpVideoUrl);
-    const fileName = (() => {
-      const p = selectedVideo.value?.video_path || selectedVideo.value?.videoUrl || '';
-      const n = p.split(/[\\/]/).pop();
-      if (n) return n;
-      const t = editableVideo.value?.title || selectedVideo.value?.title;
-      if (t) return t.endsWith('.mp4') ? t : `${t}.mp4`;
-      return 'video.mp4';
-    })();
-    const syncData = {
-      platforms: syncPlatforms,
-      isAutoPublish: isAutoPublish.value,
-      data: {
-        title: editableVideo.value?.title || selectedVideo.value?.title || '未命名视频',
-        content: editableVideo.value?.content || '',
-        video: {
-          name: fileName,
-          url: httpVideoUrl,
-          type: 'video/mp4',
-          size: editableVideo.value?.size || selectedVideo.value?.size || 0,
-        },
-        cover: getCoverPublishInfo(),
-        tags: (editableVideo.value?.tagList || []).map(t => t.trim()).filter(Boolean).slice(0, MAX_TAGS)
-      }
-    };
-
-    console.log('发送扩展发布请求 syncData:', JSON.stringify(syncData, null, 2));
-    await extFuncPublish(syncData);
-    ElMessage.success(`发布请求已发送到扩展（${syncPlatforms.length}个平台），请在新标签页查看扩展自动填充`);
-    // 弹窗已在点击发布时关闭，无需再次关闭
-  } catch (e) {
-    console.error('发布异常:', e);
-    ElMessage.error(e?.message || '发布异常');
+    ElMessage.info('正在创建视频...');
+    await createVideo(fd);
+    ElMessage.success('视频创建成功');
+    closeCreateModal();
+    loadVideoList();
+  } catch (err) {
+    console.error('创建视频失败:', err);
+    ElMessage.error(err?.message || '创建视频失败');
   }
 };
 const closePublishModal = () => {
   publishModalVisible.value = false;
   selectedVideo.value = null;
   selectedPlatforms.value = [];
+  editableVideo.value.tagList = [];
   coverDetail.value = null;
+};
+
+// 新增：推断图片 MIME 类型
+const inferMimeFromName = (name) => {
+  const ext = (name || '').split('.').pop()?.toLowerCase();
+  if (!ext) return 'image/png';
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'gif') return 'image/gif';
+  if (ext === 'webp') return 'image/webp';
+  return `image/${ext}`;
+};
+
+// 新增：路径转换工具（与平台脚本一致）
+const convertToAbsolutePath = (relativePath) => {
+  if (!relativePath) return '';
+  if (relativePath.startsWith('http') || relativePath.startsWith('F:') || relativePath.startsWith('/F:')) {
+    return relativePath;
+  }
+  if (relativePath.startsWith('/media/')) {
+    return `F:\\pycharm_workspace\\astra${relativePath.replace(/\//g, '\\')}`;
+  }
+  if (!relativePath.includes('/') && !relativePath.includes('\\')) {
+    return `F:\\pycharm_workspace\\astra\\media\\videos\\${relativePath}`;
+  }
+  return relativePath;
+};
+
+const convertToHttpUrl = (p) => {
+  if (!p) return '';
+  if (p.startsWith('http')) return p;
+  if (p.startsWith('/media/')) return `http://127.0.0.1:8089${p}`;
+  const fileName = p.split(/[\\\/]/).pop();
+  if (fileName) return `http://127.0.0.1:8089/media/videos/${fileName}`;
+  return p;
+};
+
+// 新增：打开发布弹窗
+const showPublishModal = async (video) => {
+  selectedVideo.value = video || null;
+  // 初始化可编辑字段
+  editableVideo.value.title = video?.title || '';
+  editableVideo.value.content = video?.content || '';
+  editableVideo.value.tagList = Array.isArray(video?.tags) ? video.tags : [];
+  editableVideo.value.coverPath = '';
+
+  // 重置选择状态
+  selectedPlatforms.value = [];
+  imagePreviewVisible.value = false;
+
+  // 加载封面详情
+  try {
+    const coverId = video?.cover || video?.coverId || null;
+    if (coverId) {
+      await loadCoverDetail(coverId);
+    } else if (video?.cover_path) {
+      const name = (video.cover_path || '').split(/[\\\/]/).pop() || '';
+      const imgName = name.replace('videos', 'images');
+      coverDetail.value = imgName ? { img_name: imgName } : null;
+    } else {
+      coverDetail.value = null;
+    }
+  } catch (e) {
+    console.warn('初始化封面失败:', e);
+    coverDetail.value = null;
+  }
+
+  publishModalVisible.value = true;
 };
 
 // 显示图片预览
@@ -818,6 +742,35 @@ const handleDelete = async (row) => {
   }
 };
 
+// 新增：触发上传/替换主视频文件
+const triggerUpload = (video) => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'video/*';
+  input.style.display = 'none';
+  input.onchange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      ElMessage.info(video.video_path ? '正在替换视频...' : '正在上传视频...');
+      await uploadVideoFile(video.id, file);
+      ElMessage.success(video.video_path ? '视频替换成功' : '视频上传成功');
+      loadVideoList();
+    } catch (err) {
+      console.error('上传/替换视频失败:', err);
+      ElMessage.error(err?.message || '上传/替换视频失败');
+    } finally {
+      input.remove();
+    }
+  };
+  document.body.appendChild(input);
+  input.click();
+};
+
+
+
+
+
 
 
 
@@ -853,6 +806,86 @@ const openOptions = async (timeout = 5000) => {
   } catch (error) {
     console.error('Failed to open extension options:', error);
     return null;
+  }
+};
+
+// 新增：发布到选中平台
+const handlePublish = async () => {
+  try {
+    if (!selectedVideo.value) {
+      message.warning('未选择视频');
+      return;
+    }
+    if (selectedPlatforms.value.length === 0) {
+      message.warning('请至少选择一个平台');
+      return;
+    }
+    if (!hasTags.value) {
+      message.warning('请至少添加一个标签');
+      return;
+    }
+
+    const platformMap = new Map((dynamicPlatforms.value || []).map(p => [p.name, p]));
+    const targetPlatforms = selectedPlatforms.value.map(name => platformMap.get(name)).filter(Boolean);
+    if (targetPlatforms.length === 0) {
+      message.error('未匹配到选中的平台');
+      return;
+    }
+
+    // 生成封面发布信息
+    let cover = null;
+    if (editableVideo.value.coverPath && editableVideo.value.coverPath.startsWith('data:')) {
+      cover = {
+        name: editableVideo.value.coverFileName || 'cover.png',
+        url: editableVideo.value.coverPath,
+        type: editableVideo.value.coverFileType || 'image/png',
+        size: editableVideo.value.coverFileSize || 0,
+      };
+    } else {
+      cover = getCoverPublishInfo();
+    }
+
+    const video = selectedVideo.value;
+    const videoFileName = (video.video_path || '').split(/[\\\/]/).pop() || 'video.mp4';
+    const httpVideoUrl = convertToHttpUrl(video.video_path || video.videoUrl || '');
+    const absVideoUrl = convertToAbsolutePath(video.video_path || video.videoUrl || '');
+
+    const syncData = {
+      platforms: targetPlatforms.map(p => ({
+        name: p.name,
+        platformName: p.platformName,
+        injectUrl: p.injectUrl,
+        faviconUrl: p.faviconUrl,
+        accountKey: p.accountKey,
+        extraConfig: {}
+      })),
+      isAutoPublish: isAutoPublish.value,
+      data: {
+        title: (editableVideo.value.title || video.title || '未命名视频').trim(),
+        content: (editableVideo.value.content || video.content || '').trim(),
+        cover,
+        videoUrl: httpVideoUrl,
+        video: {
+          name: videoFileName,
+          url: httpVideoUrl,
+          type: 'video/mp4',
+          size: video.file_size || video.size || 0,
+          originUrl: absVideoUrl
+        },
+        tags: (editableVideo.value.tagList || []).map(t => String(t).trim()).filter(Boolean).slice(0, MAX_TAGS)
+      }
+    };
+
+    console.log('发送扩展发布请求 syncData:', JSON.stringify(syncData, null, 2));
+    await extFuncPublish(syncData);
+    message.success(`发布请求已发送到扩展（${targetPlatforms.length}个平台），请在新标签页查看扩展自动填充`);
+    publishModalVisible.value = false;
+  } catch (e) {
+    console.error('发布异常:', e);
+    message.error(e?.message || '发布异常');
+  } finally {
+    selectedVideo.value = null;
+    selectedPlatforms.value = [];
   }
 };
 
@@ -1043,6 +1076,109 @@ const guessPlatformColor = (p) => {
 };
 
 
+// 工具函数与状态文本渲染
+const getStatusInfo = (result) => {
+  switch (result) {
+    case 'Process':
+      return { text: '生成中', type: 'warning' };
+    case 'Success':
+      return { text: '成功', type: 'success' };
+    case 'Fail':
+      return { text: '失败', type: 'error' };
+    default:
+      return { text: '未知', type: 'default' };
+  }
+};
+
+const getStatusColor = (result) => {
+  switch (result) {
+    case 'Success':
+      return 'success';
+    case 'Fail':
+      return 'error';
+    case 'Process':
+      return 'processing';
+    default:
+      return 'default';
+  }
+};
+
+const getVideoTypeText = (videoType) => {
+  switch (videoType) {
+    case 'JianYing':
+      return '剪映视频';
+    case 'Regular':
+      return '普通视频';
+    default:
+      return '未知类型';
+  }
+};
+
+const formatTime = (time) => {
+  return dayjs(time).format('YYYY-MM-DD HH:mm:ss');
+};
+
+const formatBytes = (bytes) => {
+  if (bytes == null || isNaN(bytes)) return '未知';
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let value = bytes / 1024; // KB
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  return `${value.toFixed(2)} ${units[unitIndex]}`;
+};
+
+const formatCost = (seconds) => {
+  if (seconds == null || isNaN(seconds)) return '未知';
+  const s = Math.floor(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const parts = [];
+  if (h) parts.push(`${h}小时`);
+  if (m) parts.push(`${m}分`);
+  if (sec || parts.length === 0) parts.push(`${sec}秒`);
+  return parts.join('');
+};
+
+const getVideoUrl = (video) => {
+  if (!video?.video_path) {
+    console.log('视频路径为空');
+    return '';
+  }
+  return video.video_path;
+};
+
+// 视频事件处理函数
+const handleVideoError = (event) => {
+  console.error('视频加载失败:', event);
+  message.error('视频加载失败');
+};
+const handleVideoLoadStart = (event) => {
+  console.log('视频开始加载:', event?.target?.src);
+};
+const handleVideoCanPlay = (event) => {
+  console.log('视频可以播放:', event?.target?.src);
+};
+const handleVideoLoadedMetadata = (event) => {
+  console.log('视频元数据加载完成:', event?.target?.src);
+  if (event?.target?.currentTime > 0) {
+    event.target.currentTime = 0;
+  }
+};
+const handleVideoClick = (event) => {
+  console.log('视频被点击:', event?.target);
+};
+const handleVideoPlay = (event) => {
+  console.log('视频开始播放:', event?.target?.currentTime);
+};
+const handleVideoPause = (event) => {
+  console.log('视频暂停:', event?.target?.currentTime);
+};
+
 </script>
 
 <style scoped>
@@ -1125,6 +1261,15 @@ const guessPlatformColor = (p) => {
 /* 视频卡片网格样式 */
 .video-grid {
   margin-bottom: 20px;
+  padding: 16px;
+}
+
+/* 顶部右侧工具栏样式 */
+.toolbar-area {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin: 12px 0 8px;
 }
 
 .video-card {
