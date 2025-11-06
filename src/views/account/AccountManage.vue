@@ -2,6 +2,7 @@
   <div class="account-manage-container">
     <a-card title="账号管理" class="manage-card">
       <template #extra>
+        <a-button style="margin-right: 8px;" @click="handleRefreshAccounts">刷新账号</a-button>
         <a-button type="primary" @click="handleAddAccount">新增账号</a-button>
       </template>
 
@@ -18,24 +19,23 @@
               <a-card v-for="account in platform.accounts" :key="account.id" class="account-card">
                 <div class="account-info">
                   <div class="account-name">
-                    {{ account.name }}
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <img v-if="account.avatarUrl" :src="account.avatarUrl" alt="avatar" style="width:24px; height:24px; border-radius:50%; object-fit:cover;" />
+                      <span>{{ account.username || account.name }}</span>
+                    </div>
                     <div class="status-icon">
-                      <CloseCircleOutlined
-                        v-if="account.isExpired"
-                        :style="{ color: '#ff4d4f', fontSize: '16px' }"
-                      />
-                      <CheckCircleOutlined
-                        v-else
-                        :style="{ color: '#52c41a', fontSize: '16px' }"
-                      />
+                      <CheckCircleOutlined :style="{ color: '#52c41a', fontSize: '16px' }" />
                     </div>
                   </div>
-                  <div class="account-expire">
-                    过期时间：{{ formatTime(account.expireTime) }}
+                  <div class="account-expire" v-if="account.description">
+                    {{ account.description }}
+                  </div>
+                  <div class="account-expire" v-if="account.profileUrl">
+                    <a :href="account.profileUrl" target="_blank">主页：{{ account.profileUrl }}</a>
                   </div>
                 </div>
                 <div class="account-actions">
-                  <a-button type="link" @click="handleEnterHome(account)">进入主页</a-button>
+                  <a-button type="link" v-if="account.profileUrl" @click="handleEnterHome(account)">进入主页</a-button>
                   <a-button type="link" @click="handleReLogin(account)">重新登录</a-button>
                   <a-button type="link" danger @click="handleLogout(account)">退出</a-button>
                 </div>
@@ -55,101 +55,13 @@ import { ref, reactive } from 'vue';
 import { message } from 'ant-design-vue';
 import { CloseCircleOutlined, CheckCircleOutlined } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
+import { onMounted } from 'vue';
+import { getAccountInfos as extGetAccountInfos, requestRefreshAccountInfo as extRequestRefreshAccountInfo } from '@/utils/extensionMessaging.js';
 
 const activePlatforms = ref([]);
 const addModalVisible = ref(false);
 
-const platforms = ref([
-  {
-    id: 1,
-    name: '今日头条',
-    logo: new URL('@/assets/logo/toutiao.png', import.meta.url).href,
-    accounts: [
-      {
-        id: 1,
-        name: '头条账号1',
-        isExpired: false,
-        expireTime: dayjs().add(1, 'day').valueOf()
-      },
-      {
-        id: 2,
-        name: '头条账号2',
-        isExpired: true,
-        expireTime: dayjs().subtract(1, 'day').valueOf()
-      },
-      {
-        id: 3,
-        name: '头条账号3',
-        isExpired: false,
-        expireTime: dayjs().add(3, 'day').valueOf()
-      },
-      {
-        id: 4,
-        name: '头条账号4',
-        isExpired: false,
-        expireTime: dayjs().add(2, 'day').valueOf()
-      },
-      {
-        id: 5,
-        name: '头条账号5',
-        isExpired: true,
-        expireTime: dayjs().subtract(2, 'day').valueOf()
-      }
-    ]
-  },
-  {
-    id: 2,
-    name: '抖音',
-    logo: new URL('@/assets/logo/douyin.png', import.meta.url).href,
-    accounts: [
-      {
-        id: 2,
-        name: '抖音账号1',
-        isExpired: true,
-        expireTime: dayjs().subtract(1, 'day').valueOf()
-      }
-    ]
-  },
-  {
-    id: 3,
-    name: '微信公众号',
-    logo: new URL('@/assets/logo/wechat.png', import.meta.url).href,
-    accounts: [
-      {
-        id: 3,
-        name: '公众号账号1',
-        isExpired: false,
-        expireTime: dayjs().add(3, 'day').valueOf()
-      }
-    ]
-  },
-  {
-    id: 4,
-    name: '微信视频号',
-    logo: new URL('@/assets/logo/wechat-video.png', import.meta.url).href,
-    accounts: [
-      {
-        id: 4,
-        name: '视频号账号1',
-        isExpired: false,
-        expireTime: dayjs().add(2, 'day').valueOf()
-      }
-    ]
-  },
-  {
-    id: 5,
-    name: '百家号',
-    logo: new URL('@/assets/logo/baijiahao.png', import.meta.url).href,
-    accounts: [
-      {
-        id: 5,
-        name: '百家号账号1',
-        isExpired: true,
-        expireTime: dayjs().subtract(2, 'day').valueOf()
-      }
-    ]
-  }
-]);
+const platforms = ref([]);
 
 const newAccountForm = reactive({
   platform: null,
@@ -184,6 +96,65 @@ const handleLogout = (account) => {
 const handleEnterHome = (account) => {
   // 处理进入主页逻辑
   message.success(`进入账号主页：${account.name}`);
+};
+
+const providerLogos = {
+  VIDEO_DOUYIN: new URL('@/assets/logo/douyin.png', import.meta.url).href,
+  VIDEO_REDNOTE: new URL('@/assets/logo/xiaohongshu.png', import.meta.url).href,
+  ARTICLE_WECHAT_MP: new URL('@/assets/logo/wechat.png', import.meta.url).href,
+  VIDEO_WECHAT_CHANNEL: new URL('@/assets/logo/wechat-video.png', import.meta.url).href,
+  ARTICLE_TOUTIAO: new URL('@/assets/logo/toutiao.png', import.meta.url).href,
+  ARTICLE_BAIJIAHAO: new URL('@/assets/logo/baijiahao.png', import.meta.url).href,
+};
+
+const loadAccounts = async () => {
+  try {
+    const infos = await extGetAccountInfos();
+    // infos: Record<string, AccountInfo>
+    const byProvider = {};
+    Object.values(infos || {}).forEach((acc) => {
+      const prov = acc.provider || 'UNKNOWN';
+      if (!byProvider[prov]) byProvider[prov] = [];
+      byProvider[prov].push(acc);
+    });
+    const list = Object.entries(byProvider).map(([provider, accounts], idx) => ({
+      id: idx + 1,
+      name: provider,
+      logo: providerLogos[provider] || new URL('@/assets/logo/wechat.png', import.meta.url).href,
+      accounts: accounts.map((acc) => ({
+        id: acc.accountId,
+        name: acc.username || acc.accountId,
+        username: acc.username,
+        description: acc.description,
+        profileUrl: acc.profileUrl,
+        avatarUrl: acc.avatarUrl,
+        isExpired: false,
+        expireTime: null,
+        raw: acc,
+      })),
+    }));
+    platforms.value = list;
+  } catch (e) {
+    console.error('获取账号信息失败', e);
+  }
+};
+
+onMounted(() => {
+  loadAccounts();
+});
+
+const handleRefreshAccounts = async () => {
+  try {
+    await extRequestRefreshAccountInfo(true);
+    message.loading({ content: '正在刷新账号信息...', key: 'refresh-accounts', duration: 0 });
+    // 等待扩展刷新完成后重新拉取（简单延迟）
+    setTimeout(async () => {
+      await loadAccounts();
+      message.success({ content: '账号信息已刷新', key: 'refresh-accounts' });
+    }, 1000);
+  } catch (e) {
+    message.error(e?.message || '刷新账号信息失败');
+  }
 };
 </script>
 

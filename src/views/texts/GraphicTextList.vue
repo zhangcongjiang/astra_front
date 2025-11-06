@@ -139,18 +139,6 @@
     <!-- 新增：发布弹窗 -->
     <a-modal v-model:open="publishModalVisible" title="发布图文" width="800px" :footer="null" @cancel="closePublishModal">
       <div class="publish-modal-content">
-        <!-- 标签输入 -->
-        <div class="tag-input" style="margin-bottom: 12px; display:flex; align-items:center; gap:12px;">
-          <span style="min-width: 60px;">标签：</span>
-          <a-select
-            v-model:value="publishTagList"
-            mode="tags"
-            :tokenSeparators="[' ']"
-            placeholder="请输入标签，多个标签之间用空格分隔（最多5个）"
-            style="flex:1"
-            @change="handleTagChange"
-          />
-        </div>
         <!-- 平台选择部分 -->
         <div class="platform-section">
           <div class="platform-header" style="margin-bottom:8px; display:flex; align-items:center; gap:12px;">
@@ -178,7 +166,7 @@
         <!-- 操作按钮 -->
         <div class="modal-actions">
           <a-button @click="closePublishModal">取消</a-button>
-          <a-button type="primary" :disabled="selectedPlatforms.length === 0 || !hasTags" @click="confirmPublish">
+          <a-button type="primary" :disabled="selectedPlatforms.length === 0" @click="confirmPublish">
             发布到选中平台 ({{ selectedPlatforms.length }})
           </a-button>
         </div>
@@ -420,8 +408,7 @@ const selectedText = ref(null);
 const selectedPlatforms = ref([]);
 const dynamicPlatforms = ref([]);
 const isAutoPublish = ref(false);
-// 新增：标签相关状态与校验
-const publishTagList = ref([]);
+// 已移除：图文发布标签逻辑（publishTagList/MAX_TAGS/hasTags/handleTagChange）不再需要
 const MAX_TAGS = 5;
 const hasTags = computed(() => (publishTagList.value || []).filter(t => t && String(t).trim()).length > 0);
 const handleTagChange = (value) => {
@@ -840,11 +827,7 @@ const handlePublish = async (record) => {
   try {
     selectedText.value = record;
     selectedPlatforms.value = [];
-    // 初始化标签：支持从 record.tags 或 record.tagList 推断
-    const initTags = Array.isArray(record.tagList) ? record.tagList
-      : Array.isArray(record.tags) ? record.tags
-      : [];
-    publishTagList.value = (initTags || []).map(t => String(t).trim()).filter(Boolean).slice(0, MAX_TAGS);
+    // 已移除：初始化标签逻辑，不再需要 tags
     // 若列表项不含 content（Markdown），则拉取详情
     if (!record.content || record.content.trim() === '') {
       const resp = await getTextDetail(record.id);
@@ -874,10 +857,7 @@ const confirmPublish = async () => {
     message.warning('请选择至少一个平台');
     return;
   }
-  if (!hasTags.value) {
-    message.warning('请至少输入一个标签');
-    return;
-  }
+  // 已移除：标签必填校验
   try {
     publishModalVisible.value = false;
     message.info('作品发布中');
@@ -920,12 +900,10 @@ const confirmPublish = async () => {
       }
     }
     const rawHtml = md.render(markdown);
-    // 将 HTML 中的本地媒体路径转换为可访问的 HTTP URL
     const html = DOMPurify.sanitize(
       rawHtml.replace(/src=\"(\/media\/[^\"]+)\"/g, (m, p1) => `src=\"${convertToHttpUrl(p1)}\"`)
     );
     const digest = makeDigest(markdown);
-    // 从 Markdown 中提取本地图片，生成可上传的 FileData 列表，并合并已有 images
     const baseImages = Array.isArray(selectedText.value.images) ? selectedText.value.images : [];
     const extractedImages = extractLocalImages(markdown);
     const imageMap = new Map();
@@ -943,8 +921,8 @@ const confirmPublish = async () => {
         cover,
         htmlContent: html,
         markdownContent: markdown,
-        images,
-        tags: (publishTagList.value || []).map(t => String(t).trim()).filter(Boolean).slice(0, MAX_TAGS)
+        images
+        // 已移除：tags 字段
       }
     };
 
@@ -958,7 +936,7 @@ const confirmPublish = async () => {
   } finally {
     selectedText.value = null;
     selectedPlatforms.value = [];
-    publishTagList.value = [];
+    // 已移除：publishTagList 重置
   }
 };
 
