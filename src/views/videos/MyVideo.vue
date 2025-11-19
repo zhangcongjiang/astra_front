@@ -51,8 +51,8 @@
               <div class="card-content">
                 <!-- 视频封面或播放器 -->
                 <div class="video-cover">
-                  <!-- 普通视频且生成成功时显示视频播放器 -->
-                  <div v-if="video.video_type === 'Regular' && video.result === 'Success' && video.video_path"
+                  <!-- 成功且已上传时显示视频播放器（支持 Regular 与 JianYing） -->
+                  <div v-if="video.result === 'Success' && video.video_path && (video.video_type === 'Regular' || video.video_type === 'JianYing')"
                     class="video-player">
                     <video :key="video.id" :src="getVideoUrl(video)" controls preload="metadata"
                       @error="handleVideoError" @fullscreenchange="handleFullscreenChange"
@@ -66,22 +66,22 @@
                   <div v-else class="cover-placeholder">
                     <video-camera-outlined style="font-size: 48px; color: #ccc;" />
                   </div>
-
+                
                   <!-- 状态提示信息 -->
                   <div class="status-tip"
-                    :class="{ 'pointer-events-none': video.video_type === 'Regular' && video.result === 'Success' }">
+                    :class="{ 'pointer-events-none': video.result === 'Success' && !!video.video_path }">
                     <!-- 生成中状态 -->
                     <div v-if="video.result === 'Processing'" class="tip-text processing">
                       视频正在急速生成中...
                     </div>
-
+                
                     <!-- 生成失败状态 -->
                     <div v-else-if="video.result === 'Fail'" class="tip-text failed">
                       视频生成失败，请重试
                     </div>
-
-                    <!-- 剪映视频成功状态 -->
-                    <div v-else-if="video.video_type === 'JianYing' && video.result === 'Success'"
+                
+                    <!-- 剪映视频成功但未上传：提示去剪映播放 -->
+                    <div v-else-if="video.video_type === 'JianYing' && video.result === 'Success' && !video.video_path"
                       class="tip-text jianying">
                       剪映视频请打开剪映播放
                     </div>
@@ -563,7 +563,6 @@ const convertToHttpUrl = (p) => {
 // 新增：打开发布弹窗
 const showPublishModal = async (video) => {
   selectedVideo.value = video || null;
-  // 初始化可编辑字段
   editableVideo.value.title = video?.title || '';
   editableVideo.value.content = video?.content || '';
   editableVideo.value.tagList = Array.isArray(video?.tags) ? video.tags : [];
@@ -811,6 +810,7 @@ const openOptions = async (timeout = 5000) => {
 
 // 新增：发布到选中平台
 const handlePublish = async () => {
+  publishModalVisible.value = false;
   try {
     if (!selectedVideo.value) {
       message.warning('未选择视频');
@@ -820,11 +820,7 @@ const handlePublish = async () => {
       message.warning('请至少选择一个平台');
       return;
     }
-    if (!hasTags.value) {
-      message.warning('请至少添加一个标签');
-      return;
-    }
-
+    // 移除标签校验
     const platformMap = new Map((dynamicPlatforms.value || []).map(p => [p.name, p]));
     const targetPlatforms = selectedPlatforms.value.map(name => platformMap.get(name)).filter(Boolean);
     if (targetPlatforms.length === 0) {
@@ -879,7 +875,6 @@ const handlePublish = async () => {
     console.log('发送扩展发布请求 syncData:', JSON.stringify(syncData, null, 2));
     await extFuncPublish(syncData);
     message.success(`发布请求已发送到扩展（${targetPlatforms.length}个平台），请在新标签页查看扩展自动填充`);
-    publishModalVisible.value = false;
   } catch (e) {
     console.error('发布异常:', e);
     message.error(e?.message || '发布异常');

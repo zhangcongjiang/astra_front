@@ -849,6 +849,9 @@ const handlePublish = async (record) => {
 
 // 新增：执行发布
 const confirmPublish = async () => {
+  // 点击发布后立即关闭弹窗
+  publishModalVisible.value = false;
+
   if (!selectedText.value) {
     message.warning('未选择图文');
     return;
@@ -859,7 +862,6 @@ const confirmPublish = async () => {
   }
   // 已移除：标签必填校验
   try {
-    publishModalVisible.value = false;
     message.info('作品发布中');
 
     const serviceResp = await extCheckServiceStatus();
