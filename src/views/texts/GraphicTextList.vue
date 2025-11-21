@@ -585,11 +585,7 @@ const fetchData = async () => {
 
 
 // 当前页数据
-const currentPageData = computed(() => {
-  const start = (pagination.current - 1) * pagination.pageSize;
-  const end = start + pagination.pageSize;
-  return textList.value.slice(start, end);
-});
+const currentPageData = computed(() => textList.value);
 
 // 监听当前页数据，预取封面详情
 watch(currentPageData, (rows) => {
