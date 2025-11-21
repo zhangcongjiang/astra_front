@@ -366,6 +366,33 @@ const extractLocalImages = (markdown) => {
 
 const router = useRouter();
 
+// 本地导入弹窗与表单状态
+const importModalVisible = ref(false);
+const importType = ref('file');
+const importForm = reactive({
+  title: '',
+  file: null,
+  url: ''
+});
+const urlPreview = reactive({
+  loading: false,
+  title: '',
+  content: ''
+});
+
+// 点击“本地导入”打开导入弹窗
+const handleImport = () => {
+  importModalVisible.value = true;
+  // 重置表单状态
+  importType.value = 'file';
+  importForm.title = '';
+  importForm.file = null;
+  importForm.url = '';
+  urlPreview.loading = false;
+  urlPreview.title = '';
+  urlPreview.content = '';
+};
+
 // 分页配置
 const pagination = reactive({
   current: 1,
