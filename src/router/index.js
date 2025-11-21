@@ -123,6 +123,19 @@ const router = createRouter({
                 },
                 // 在children数组中添加
                 {
+                    path: 'dynamics',
+                    name: 'dynamics',
+                    component: () => import('@/views/dynamics/DynamicList.vue'),
+                    meta: { title: '我的动态' }
+                },
+                {
+                    path: 'dynamics/:id',
+                    name: 'dynamic-detail',
+                    component: () => import('@/views/dynamics/DynamicDetail.vue'),
+                    meta: { title: '动态详情' },
+                    props: true
+                },
+                {
                     path: 'texts',
                     name: 'texts',
                     component: GraphicTextList,

@@ -80,6 +80,7 @@ const menuData = [
         name: '工作台',
         children: [
             { id: 11, name: '工作台', content: '这里是用户工作台...', path: '/dashboard' },
+            { id: 17, name: '我的动态', content: '这里是用户创建的动态内容...', path: '/dynamics' },
             { id: 12, name: '我的图文', content: '这里是用户创建的图文内容...', path: '/texts' },
             { id: 13, name: '我的视频', content: '这里是平台生成的视频内容...', path: '/my-videos' },
             { id: 14, name: '我的音频', content: '这里是平台生成的音频内容...', path: '/my-sounds' },
