@@ -26,9 +26,6 @@
         <a-button type="primary" @click="openCreateModal">
           <PlusOutlined /> 新建动态
         </a-button>
-        <a-button @click="openImportModal">
-          导入动态
-        </a-button>
         <a-button danger :disabled="selectedIds.length === 0" @click="handleBatchDelete">
           批量删除
         </a-button>
@@ -49,7 +46,7 @@
                   <span class="title-text" :title="item.title">{{ item.title || '未命名动态' }}</span>
                 </div>
               </template>
-              <div class="card-content">
+              <div class="card-content" @click="goDetail(item)">
                 <!-- 图片轮播（上半部分） -->
                 <div class="cover-carousel">
                   <a-carousel v-if="Array.isArray(item.images) && item.images.length > 0" dots autoplay>
@@ -72,9 +69,9 @@
                 </div>
 
                 <!-- 操作按钮（底部） -->
-                <div class="card-actions">
+                <div class="card-actions" @click.stop>
                   <a-space>
-                    <a-button type="primary" @click="handlePublish(item)">发布</a-button>
+                    <a-button type="primary" @click="openPublish(item)">发布</a-button>
                     <a-button @click="goDetail(item)">详情</a-button>
                     <a-button danger @click="handleDelete(item)">删除</a-button>
                   </a-space>
@@ -108,48 +105,76 @@
         <a-form-item label="正文">
           <a-textarea v-model:value="createForm.content" :rows="6" placeholder="请输入正文内容（支持 Markdown）" />
         </a-form-item>
-        <a-form-item label="图片">
-          <div class="create-upload-area" :class="{ 'drag-over': isCreateDragOver }"
-               @dragover.prevent="handleCreateDragOver" @dragenter.prevent="handleCreateDragEnter" @dragleave.prevent="handleCreateDragLeave" @drop.prevent="handleCreateDrop"
-               @paste="handleCreatePaste">
-            <div class="upload-placeholder" v-if="createImages.length === 0">
-              <p>点击、拖拽或粘贴图片到此处</p>
-              <p class="sub">支持 jpg、png、gif，单张不超过 50MB</p>
-            </div>
-            <div class="upload-preview" v-else>
-              <a-carousel dots autoplay>
-                <div v-for="(img, idx) in createImages" :key="idx" class="carousel-item">
-                  <img :src="img.previewUrl || img.url" class="cover-image" />
-                </div>
-              </a-carousel>
-            </div>
+        <a-form-item label="图片（仅支持本地选择）">
+          <a-upload :beforeUpload="() => false" :showUploadList="false" multiple accept="image/png,image/jpeg,image/jpg,image/gif" @change="handleCreateFileChange">
+            <a-button type="dashed">选择本地图片</a-button>
+          </a-upload>
+          <div class="upload-preview" v-if="createImages.length > 0" style="margin-top: 12px;">
+            <a-carousel dots autoplay>
+              <div v-for="(img, idx) in createImages" :key="idx" class="carousel-item">
+                <img :src="img.previewUrl || img.url" class="cover-image" />
+              </div>
+            </a-carousel>
           </div>
         </a-form-item>
       </a-form>
     </a-modal>
 
-    <!-- 导入动态弹窗 -->
-    <a-modal v-model:open="importModalVisible" title="导入动态" :confirm-loading="importLoading" @ok="submitImport" @cancel="closeImportModal">
-      <div>
-        <input type="file" @change="handleFileSelect" accept=".md,.markdown,.json" />
-        <div v-if="selectedFile" class="file-info">已选择：{{ selectedFile.name }}</div>
-        <a-input v-model:value="importTitle" placeholder="可选：为导入文件设置标题（默认使用文件名）" style="margin-top: 12px" />
+
+    <!-- 发布弹窗 -->
+    <a-modal v-model:open="publishModalVisible" title="发布动态" :footer="null" width="820px">
+      <div class="publish-editor-grid">
+        <div class="editor-left" style="width: 100%;">
+          <a-form layout="vertical">
+            <a-form-item label="标题">
+              <a-input v-model:value="publishTitle" placeholder="编辑标题" />
+            </a-form-item>
+            <a-form-item label="内容">
+              <a-textarea v-model:value="publishContent" :rows="6" placeholder="编辑内容（支持 Markdown / 纯文本）" />
+            </a-form-item>
+          </a-form>
+          <div class="images-toolbar">
+            <a-checkbox v-model:checked="publishSelectAll" @change="toggleSelectAll">全选</a-checkbox>
+            <a-button size="small" type="link" @click="resetPublishEdit">重置为原文</a-button>
+          </div>
+          <div class="publish-images-grid compact">
+            <!-- 仅保留图片列表，缩略图尺寸更小 -->
+            <div class="img-card" v-for="(img, idx) in publishImages" :key="idx" :class="{selected: img.selected}" @click="togglePublishImage(idx)">
+              <img :src="img.url" @error="onImageError($event)" />
+              <div class="img-name" :title="img.name">{{ img.name || '图片' }}</div>
+              <a-checkbox class="img-check" :checked="img.selected" />
+            </div>
+          </div>
+        </div>
+        <!-- 移除右侧预览区域 -->
+        
+      </div>
+      <div class="publish-platforms">
+        <div class="platform" v-for="p in dynamicPlatforms" :key="p.name" :class="{active: selectedPlatforms.includes(p.name)}" @click="togglePlatform(p.name)">
+          <img v-if="p.faviconUrl" :src="p.faviconUrl" alt=""/>
+          <span>{{ p.platformName }}</span>
+        </div>
+      </div>
+      <div class="publish-actions">
+        <a-switch v-model:checked="isAutoPublish" checked-children="自动" un-checked-children="手动" />
+        <a-button type="primary" style="margin-left: 12px" @click="confirmPublish">开始发布</a-button>
+        <a-button style="margin-left: 8px" @click="cancelPublish">取消</a-button>
       </div>
     </a-modal>
-  </div>
-</template>
+    
+   </div>
+ </template>
 
-<script setup>
+ <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
 import { PlusOutlined } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
 import UserSelect from '@/components/UserSelect.vue';
-import { getDynamicList, deleteDynamic, batchDeleteDynamics, createDynamic, uploadDynamic } from '@/api/modules/dynamicApi.js';
-import { uploadImages } from '@/api/modules/imageApi.js';
-import { funcPublish as extFuncPublish } from '@/utils/extensionMessaging.js';
-
+import { getDynamicList, deleteDynamic, batchDeleteDynamics, createDynamic } from '@/api/modules/dynamicApi.js';
+import { funcPublish as extFuncPublish, getPlatformInfos, checkServiceStatus, funcGetPermission, openOptions } from '@/utils/extensionMessaging.js';
+// import { uploadImages } from '@/api/modules/imageApi.js';
 const router = useRouter();
 
 // 搜索表单
@@ -202,7 +227,7 @@ const fetchData = async () => {
       content: it.content || it.text || '',
       creator: it.username || it.creator || '',
       origin: it.origin || '未知来源',
-      images: Array.isArray(it.images) ? it.images : [], // 预期为数组
+      images: Array.isArray(it.images) ? it.images : [],
     }));
   } catch (e) {
     console.error('获取动态列表失败:', e);
@@ -237,7 +262,6 @@ const onImageError = (ev) => { ev.target.src = 'data:image/svg+xml,<svg xmlns="h
 // 文本预览（最多5行）
 const renderDigest = (text) => {
   const t = (text || '').toString();
-  // 简易处理 Markdown 文本为纯文本预览
   const plain = t.replace(/[#>`*_\-\[\]]/g, '').replace(/\n+/g, ' ');
   return plain;
 };
@@ -304,15 +328,33 @@ const createModalVisible = ref(false);
 const createLoading = ref(false);
 const createForm = reactive({ title: '', content: '' });
 const createImages = ref([]);
-const isCreateDragOver = ref(false);
 
-// 修复：新增/关闭弹窗的方法，确保点击“新建动态”有响应
-const openCreateModal = () => {
-  createModalVisible.value = true;
+// 弹窗开关
+const openCreateModal = () => { createModalVisible.value = true; };
+const closeCreateModal = () => { createModalVisible.value = false; createImages.value = []; selectedImageKeys.value = new Set(); };
+
+// 处理上传组件文件选择变更（仅本地选择，不立即上传）
+const getFileKey = (file) => `${file.name}_${file.size}_${file.lastModified || 0}`;
+const selectedImageKeys = ref(new Set());
+const handleCreateFileChange = async (info) => {
+  const incoming = (info?.fileList || [])
+    .map(f => f.originFileObj)
+    .filter(Boolean)
+    .filter(f => beforeCreateUpload(f));
+
+  // 仅添加新增文件，避免因多次触发 change 导致重复追加
+  const newFiles = [];
+  for (const f of incoming) {
+    const key = getFileKey(f);
+    if (!selectedImageKeys.value.has(key)) {
+      selectedImageKeys.value.add(key);
+      newFiles.push(f);
+    }
+  }
+  if (newFiles.length === 0) return;
+  uploadCreateImages(newFiles);
 };
-const closeCreateModal = () => {
-  createModalVisible.value = false;
-};
+
 const beforeCreateUpload = (file) => {
   const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
   const isValidType = allowed.includes(file.type);
@@ -322,64 +364,44 @@ const beforeCreateUpload = (file) => {
   return true;
 };
 
-const handleCreateDragOver = (e) => { isCreateDragOver.value = true; };
-const handleCreateDragEnter = (e) => { isCreateDragOver.value = true; };
-const handleCreateDragLeave = (e) => { isCreateDragOver.value = false; };
-const handleCreateDrop = async (e) => {
-  isCreateDragOver.value = false;
-  const files = Array.from(e.dataTransfer?.files || []).filter(f => beforeCreateUpload(f));
-  if (files.length === 0) return;
-  await uploadCreateImages(files);
-};
-
-const handleCreatePaste = async (e) => {
-  const items = Array.from(e.clipboardData?.items || []);
-  const imageFiles = items
-    .filter(i => i.type && i.type.startsWith('image/'))
-    .map(i => i.getAsFile())
-    .filter(Boolean)
-    .filter(f => beforeCreateUpload(f));
-  if (imageFiles.length === 0) return;
-  await uploadCreateImages(imageFiles);
-};
-
 const uploadCreateImages = async (files) => {
   try {
-    createLoading.value = true;
-    const response = await uploadImages(files, 'normal', (progress) => { /* 可选进度处理 */ });
-    // 将返回的文件信息映射到 createImages
-    // 兼容后端返回单文件或数组结构
-    const data = response?.data;
-    const uploaded = Array.isArray(data) ? data : (Array.isArray(data?.results) ? data.results : [data]);
-    const images = uploaded.filter(Boolean).map((item, idx) => {
-      const name = item?.name || files[idx]?.name;
-      const fileName = item?.img_name || item?.filename || name;
-      const url = item?.url || (fileName ? `${staticBaseUrl}/media/images/${encodeURIComponent(fileName)}` : undefined);
-      return {
-        name: fileName || name,
-        url,
-        previewUrl: URL.createObjectURL(files[idx]),
-      };
-    });
+    const images = files.map((file) => ({
+      file,
+      name: file.name,
+      previewUrl: URL.createObjectURL(file),
+    }));
     createImages.value.push(...images);
-    message.success(`已添加 ${images.length} 张图片`);
+    message.success(`已选择 ${images.length} 张图片`);
   } catch (error) {
-    console.error('图片上传失败:', error);
-    message.error(`图片上传失败: ${error.message || '未知错误'}`);
-  } finally {
-    createLoading.value = false;
+    console.error('处理本地图片失败:', error);
+    message.error(`处理本地图片失败: ${error.message || '未知错误'}`);
   }
 };
-
 const submitCreate = async () => {
   if (!createForm.title?.trim()) { message.warning('请填写标题'); return; }
+  const contentText = (createForm.content || '').trim();
+  if (!contentText) { message.warning('内容不能为空'); return; }
+  if (createImages.value.length === 0) { message.warning('请至少选择一张图片'); return; }
+
   createLoading.value = true;
   try {
-    const payload = { title: createForm.title, content: createForm.content };
-    // 如果后端支持 images 字段，一并提交
-    if (createImages.value.length > 0) {
-      payload.images = createImages.value.map(img => ({ url: img.url, name: img.name }));
+    const imageFiles = createImages.value
+      .map(img => img?.file)
+      .filter(Boolean);
+
+    if (imageFiles.length === 0) {
+      message.error('请选择至少一张有效图片文件');
+      return;
     }
+
+    const payload = {
+      title: createForm.title.trim(),
+      content: contentText,
+      images: imageFiles,
+      publish: false,
+    };
+
     const resp = await createDynamic(payload);
     if (resp?.code === 0 || resp?.success) {
       message.success('创建成功');
@@ -396,52 +418,133 @@ const submitCreate = async () => {
   }
 };
 
-// 导入动态
-const importModalVisible = ref(false);
-const importLoading = ref(false);
-const selectedFile = ref(null);
-const importTitle = ref('');
-const openImportModal = () => { importModalVisible.value = true; selectedFile.value = null; importTitle.value = ''; };
-const closeImportModal = () => { importModalVisible.value = false; selectedFile.value = null; importTitle.value = ''; };
-const handleFileSelect = (e) => { selectedFile.value = e.target.files?.[0] || null; if (selectedFile.value && !importTitle.value) { importTitle.value = selectedFile.value.name.replace(/\.(md|markdown|json)$/i, ''); } };
-const submitImport = async () => {
-  if (!selectedFile.value) { message.warning('请先选择文件'); return; }
-  importLoading.value = true;
-  try {
-    await uploadDynamic(selectedFile.value, importTitle.value, null);
-    message.success('导入成功');
-    closeImportModal();
-    fetchData();
-  } catch (e) {
-    console.error('导入失败:', e);
-    message.error('导入失败');
-  } finally {
-    importLoading.value = false;
+
+
+// 发布相关（列表页）
+const publishModalVisible = ref(false);
+const dynamicPlatforms = ref([]);
+const selectedPlatforms = ref([]);
+const isAutoPublish = ref(false);
+const selectedPublishItem = ref(null);
+// 发布编辑与预览
+const publishTitle = ref('');
+const publishContent = ref('');
+const publishImages = ref([]); // { name, url, type, selected }
+const publishSelectAll = ref(true);
+
+const initPublishFormFromItem = (item) => {
+  publishTitle.value = item?.title || '';
+  publishContent.value = (item?.content || '').toString();
+  publishImages.value = (item?.images || []).map(img => ({
+    name: img.name || img.img_name || '',
+    url: getImageUrl(img),
+    type: `image/${img.type}`,
+    selected: true,
+  }));
+  publishSelectAll.value = true;
+};
+
+const togglePublishImage = (idx) => {
+  const img = publishImages.value[idx];
+  if (img) {
+    img.selected = !img.selected;
+    publishSelectAll.value = publishImages.value.length > 0 && publishImages.value.every(i => i.selected);
   }
 };
 
-// 发布
-const handlePublish = async (item) => {
+const toggleSelectAll = (e) => {
+  const checked = e?.target?.checked ?? publishSelectAll.value;
+  publishSelectAll.value = checked;
+  publishImages.value.forEach(i => { i.selected = checked; });
+};
+
+const resetPublishEdit = () => { if (selectedPublishItem.value) initPublishFormFromItem(selectedPublishItem.value); };
+
+const togglePlatform = (key) => {
+  const i = selectedPlatforms.value.indexOf(key);
+  if (i > -1) selectedPlatforms.value.splice(i, 1); else selectedPlatforms.value.push(key);
+};
+
+const openPublish = async (item) => {
+  selectedPublishItem.value = item;
+  publishModalVisible.value = true;
+  initPublishFormFromItem(item);
   try {
+    dynamicPlatforms.value = await getPlatformInfos('DYNAMIC');
+    // 仅保留指定平台：哔哩哔哩、抖音、小红书、今日头条、百家号、微信视频号
+    const allowedKeywords = [
+      'bilibili', '哔哩', 'b站',
+      'douyin', '抖音',
+      'xiaohongshu', '小红书', 'rednote',
+      'toutiao', '今日头条', '头条',
+      'baijiahao', '百家号',
+      'weixinchannel', '微信视频号', '视频号'
+    ];
+    dynamicPlatforms.value = (dynamicPlatforms.value || []).filter((p) => {
+      const en = `${(p.name || '').toLowerCase()} ${(p.platformName || '').toLowerCase()}`;
+      const zh = `${p.platformName || ''}`;
+      return allowedKeywords.some((k) => en.includes(k) || zh.includes(k));
+    });
+  } catch (e) {
+    console.error('获取平台信息失败:', e);
+    message.error('获取平台信息失败');
+  }
+};
+
+const confirmPublish = async () => {
+  try {
+    if (!selectedPublishItem.value) { message.warning('未选择动态'); return; }
+    if (!selectedPlatforms.value.length) { message.warning('请选择至少一个平台'); return; }
+
+    const serviceResp = await checkServiceStatus();
+    if (!serviceResp) { message.error('扩展服务未运行，请先启动扩展'); return; }
+
+    const trustResp = await funcGetPermission(5000);
+    if (!trustResp || trustResp.status !== 'ok' || !trustResp.trusted) {
+      await openOptions();
+      message.info('请在扩展设置页授权当前域名后，系统将自动继续');
+    }
+
+    const selectedSet = new Set(selectedPlatforms.value);
+    const targetPlatforms = (dynamicPlatforms.value || []).filter(p => selectedSet.has(p.name));
+    if (!targetPlatforms.length) { message.error('未匹配到选中的平台'); return; }
+
+    const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, platformName: p.platformName, injectUrl: p.injectUrl, faviconUrl: p.faviconUrl, accountKey: p.accountKey, extraConfig: {} }));
+
+    const item = selectedPublishItem.value;
+    const images = publishImages.value
+      .filter(i => i.selected)
+      .map(({ name, url, type }) => ({ name, url, type }));
+
     const syncData = {
-      platforms: [], // 可在详情页选择平台，这里直接触发扩展以便快速演示
-      isAutoPublish: false,
+      platforms: syncPlatforms,
+      isAutoPublish: isAutoPublish.value,
       data: {
-        title: item.title,
-        textContent: (item.content || '').toString(),
-        images: (item.images || []).map(img => ({ name: img.name || img.img_name || '', url: getImageUrl(img) })),
+        title: (publishTitle.value || item.title),
+        content: (publishContent.value || '').toString() || (item.content || '').toString(),
+        images,
+        videos: []
       }
     };
+
     await extFuncPublish(syncData);
-    message.success('发布请求已发送到扩展');
+    message.success(`发布请求已发送到扩展（${syncPlatforms.length}个平台）`);
+    publishModalVisible.value = false;
+    selectedPublishItem.value = null;
+    selectedPlatforms.value = [];
+    publishImages.value = [];
+    publishTitle.value = '';
+    publishContent.value = '';
   } catch (e) {
     console.error('发布失败:', e);
     message.error(e?.message || '发布失败');
   }
 };
-</script>
+const cancelPublish = () => { publishModalVisible.value = false; selectedPublishItem.value = null; selectedPlatforms.value = []; };
 
-<style scoped>
+ </script>
+ 
+ <style scoped>
 .graphic-list-container {
   padding: 20px;
   min-height: 100vh;
@@ -493,6 +596,7 @@ const handlePublish = async (item) => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  cursor: pointer;
 }
 
 .cover-carousel {
@@ -576,5 +680,58 @@ const handlePublish = async (item) => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.publish-platforms { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
+.publish-platforms .platform { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; cursor:pointer; background:#fff; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: all .2s; }
+.publish-platforms .platform:hover { border-color:#1890ff; box-shadow: 0 2px 8px rgba(24,144,255,.15); }
+.publish-platforms .platform.active { border-color:#1890ff; background:#f0f7ff; }
+.publish-platforms .platform img { width:24px; height:24px; border-radius:4px; object-fit: contain; }
+.publish-platforms .platform span { flex:1; font-size:14px; color:#333; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
+.publish-actions { margin-top: 16px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+</style>
+
+<style scoped>
+/* 紧凑图片列表样式 */
+.publish-editor-grid {
+  display: flex;
+  gap: 12px;
+}
+.editor-left {
+  flex: 1;
+}
+.publish-images-grid.compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+}
+.publish-images-grid.compact .img-card {
+  position: relative;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 6px;
+  cursor: pointer;
+}
+.publish-images-grid.compact .img-card.selected {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.15);
+}
+.publish-images-grid.compact .img-card img {
+  width: 100%;
+  height: 70px; /* 缩小高度 */
+  object-fit: cover;
+  border-radius: 4px;
+}
+.publish-images-grid.compact .img-card .img-name {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.publish-images-grid.compact .img-card .img-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
 }
 </style>

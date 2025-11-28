@@ -28,10 +28,25 @@ export const getDynamicDetail = async (id) => {
   }
 };
 
-/** 创建动态 */
+/** 创建动态（multipart/form-data，images为文件数组） */
 export const createDynamic = async (data) => {
   try {
-    const response = await request.post("/text/dynamic/create/", data);
+    const formData = new FormData();
+    // 基本字段
+    formData.append('title', (data?.title || '').toString());
+    formData.append('content', (data?.content || '').toString());
+    // 多文件，同名字段传递多个
+    if (Array.isArray(data?.images)) {
+      data.images.forEach((file) => {
+        if (file) formData.append('images', file);
+      });
+    }
+    // 仅当为 true 时传递，否则后端将使用默认 False
+    if (data?.publish === true) {
+      formData.append('publish', 'true');
+    }
+
+    const response = await request.upload("/text/dynamic/create/", formData);
     return response;
   } catch (error) {
     console.error("创建动态失败:", error);
@@ -61,12 +76,3 @@ export const batchDeleteDynamics = async (dynamic_ids = []) => {
   }
 };
 
-/** 上传动态文件（如 Markdown/JSON） */
-export const uploadDynamic = async (file, title, onProgress) => {
-  if (!file) throw new Error("请选择要上传的文件");
-  const formData = new FormData();
-  formData.append("file", file);
-  if (title) formData.append("title", title);
-  const headers = {};
-  return request.upload("/text/dynamic/upload/", formData, headers, { onProgress });
-};
