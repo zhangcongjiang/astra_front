@@ -61,10 +61,33 @@
     </a-card>
 
     <!-- 发布弹窗 -->
-    <a-modal v-model:open="publishModalVisible" title="发布动态" :footer="null" width="680px">
+    <a-modal v-model:open="publishModalVisible" title="发布动态" :footer="null" width="820px">
+      <div class="publish-editor-grid">
+        <div class="editor-left" style="width: 100%;">
+          <a-form layout="vertical">
+            <a-form-item label="标题">
+              <a-input v-model:value="publishTitle" placeholder="编辑标题" />
+            </a-form-item>
+            <a-form-item label="内容">
+              <a-textarea v-model:value="publishContent" :rows="6" placeholder="编辑内容（支持 Markdown / 纯文本）" />
+            </a-form-item>
+          </a-form>
+          <div class="images-toolbar">
+            <a-checkbox v-model:checked="publishSelectAll" @change="toggleSelectAll">全选</a-checkbox>
+            <a-button size="small" type="link" @click="resetPublishEdit">重置为原文</a-button>
+          </div>
+          <div class="publish-images-grid compact">
+            <div class="img-card" v-for="(img, idx) in publishImages" :key="idx" :class="{selected: img.selected}" @click="togglePublishImage(idx)">
+              <img :src="img.url" @error="onImageError($event)" />
+              <div class="img-name" :title="img.name">{{ img.name || '图片' }}</div>
+              <a-checkbox class="img-check" :checked="img.selected" />
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="publish-platforms">
         <div class="platform" v-for="p in dynamicPlatforms" :key="p.name" :class="{active: selectedPlatforms.includes(p.name)}" @click="togglePlatform(p.name)">
-          <img v-if="p.faviconUrl" :src="p.faviconUrl" alt="" />
+          <img v-if="p.faviconUrl" :src="p.faviconUrl" alt=""/>
           <span>{{ p.platformName }}</span>
         </div>
       </div>
@@ -96,6 +119,7 @@ const getImageUrl = (img) => {
   const path = url.startsWith('/') ? url : `/${url}`;
   return url.startsWith('http') ? url : `${base}${path}`;
 };
+const onImageError = (ev) => { ev.target.src = fallbackSvg; };
 
 const router = useRouter();
 const route = useRoute();
@@ -107,6 +131,39 @@ const publishModalVisible = ref(false);
 const dynamicPlatforms = ref([]);
 const selectedPlatforms = ref([]);
 const isAutoPublish = ref(false);
+// 发布编辑与图片选择（与列表页保持一致）
+const publishTitle = ref('');
+const publishContent = ref('');
+const publishImages = ref([]); // { name, url, type, selected }
+const publishSelectAll = ref(true);
+
+const initPublishFormFromDetail = () => {
+  publishTitle.value = detail.value?.title || '';
+  publishContent.value = (detail.value?.content || '').toString();
+  const imgs = Array.isArray(detail.value?.images) ? detail.value.images : [];
+  publishImages.value = imgs.map(img => ({
+    name: img.name || img.img_name || '',
+    url: getImageUrl(img),
+    type: `image/${img.type.toLowerCase()}`,
+    selected: true,
+    size: img.size || 0,
+  }));
+  publishSelectAll.value = true;
+};
+
+const togglePublishImage = (idx) => {
+  const img = publishImages.value[idx];
+  if (img) {
+    img.selected = !img.selected;
+    publishSelectAll.value = publishImages.value.length > 0 && publishImages.value.every(i => i.selected);
+  }
+};
+const toggleSelectAll = (e) => {
+  const checked = e?.target?.checked ?? publishSelectAll.value;
+  publishSelectAll.value = checked;
+  publishImages.value.forEach(i => { i.selected = checked; });
+};
+const resetPublishEdit = () => { initPublishFormFromDetail(); };
 
 const togglePlatform = (key) => {
   const i = selectedPlatforms.value.indexOf(key);
@@ -115,7 +172,22 @@ const togglePlatform = (key) => {
 
 const openPublish = async () => {
   publishModalVisible.value = true;
+  initPublishFormFromDetail();
   dynamicPlatforms.value = await getPlatformInfos('DYNAMIC');
+  // 仅保留指定平台：哔哩哔哩、抖音、小红书、今日头条、百家号、微信视频号
+  const allowedKeywords = [
+    'bilibili', '哔哩', 'b站',
+    'douyin', '抖音',
+    'xiaohongshu', '小红书', 'rednote',
+    'toutiao', '今日头条', '头条',
+    'baijiahao', '百家号',
+    'weixinchannel', '微信视频号', '视频号'
+  ];
+  dynamicPlatforms.value = (dynamicPlatforms.value || []).filter((p) => {
+    const en = `${(p.name || '').toLowerCase()} ${(p.platformName || '').toLowerCase()}`;
+    const zh = `${p.platformName || ''}`;
+    return allowedKeywords.some((k) => en.includes(k) || zh.includes(k));
+  });
 };
 const confirmPublish = async () => {
   try {
@@ -145,21 +217,17 @@ const confirmPublish = async () => {
 
     const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, platformName: p.platformName, injectUrl: p.injectUrl, faviconUrl: p.faviconUrl, accountKey: p.accountKey, extraConfig: {} }));
 
-    // 仅使用后端返回的图片参与发布，确保为可访问的 HTTP 链接
-    const images = Array.isArray(detail.value.images)
-      ? detail.value.images.map(img => ({
-          name: img.name || img.img_name || '',
-          url: getImageUrl(img),
-          type: (img.type && String(img.type)) || 'image/*'
-        }))
-      : [];
+    // 仅使用编辑后选择的图片参与发布
+    const images = publishImages.value
+      .filter(i => i.selected)
+      .map(({ name, url, type, size }) => ({ name, url, type, size }));
 
     const syncData = {
       platforms: syncPlatforms,
       isAutoPublish: isAutoPublish.value,
       data: {
-        title: detail.value.title || '未命名动态',
-        content: (detail.value.content || '').toString(),
+        title: publishTitle.value || detail.value.title || '未命名动态',
+        content: (publishContent.value || '').toString() || (detail.value.content || '').toString(),
         images,
         videos: []
       }
@@ -169,6 +237,10 @@ const confirmPublish = async () => {
     await funcPublish(syncData);
     message.success(`发布请求已发送到扩展（${syncPlatforms.length}个平台），请在新标签页查看扩展自动填充`);
     publishModalVisible.value = false;
+    selectedPlatforms.value = [];
+    publishImages.value = [];
+    publishTitle.value = '';
+    publishContent.value = '';
   } catch (e) {
     console.error(e);
     message.error(e?.message || '发布失败');
@@ -245,9 +317,26 @@ onMounted(async () => {
 .image-gallery { margin-top: 8px; }
 .gallery-image { width: 100%; border-radius: 8px; overflow: hidden; }
 .image-placeholder { width: 100%; height: 160px; display: flex; align-items: center; justify-content: center; background: #fafafa; color: #999; border-radius: 6px; }
-.publish-platforms { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.publish-platforms .platform { display:flex; align-items:center; gap:8px; padding:6px 10px; border:1px solid #eee; border-radius:6px; cursor:pointer; }
-.publish-platforms .platform.active { border-color:#1890ff; background:#e6f7ff; }
+
+/* 与列表页统一的发布样式 */
+.publish-editor-grid { display: flex; gap: 12px; }
+.editor-left { flex: 1; }
+.images-toolbar { margin: 8px 0; display: flex; align-items: center; justify-content: space-between; }
+.publish-images-grid.compact { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+.publish-images-grid.compact .img-card { position: relative; border: 1px solid #f0f0f0; border-radius: 6px; padding: 6px; cursor: pointer; }
+.publish-images-grid.compact .img-card.selected { border-color: #1677ff; box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.15); }
+.publish-images-grid.compact .img-card img { width: 100%; height: 70px; object-fit: cover; border-radius: 4px; }
+.publish-images-grid.compact .img-card .img-name { margin-top: 4px; font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.publish-images-grid.compact .img-card .img-check { position: absolute; top: 6px; right: 6px; }
+
+.publish-platforms { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
+.publish-platforms .platform { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; cursor:pointer; background:#fff; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: all .2s; }
+.publish-platforms .platform:hover { border-color:#1890ff; box-shadow: 0 2px 8px rgba(24,144,255,.15); }
+.publish-platforms .platform.active { border-color:#1890ff; background:#f0f7ff; }
+.publish-platforms .platform img { width:24px; height:24px; border-radius:4px; object-fit: contain; }
+.publish-platforms .platform span { flex:1; font-size:14px; color:#333; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
+.publish-actions { margin-top: 16px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+
 .media-section { display: flex; align-items: flex-start; gap: 12px; }
 .media-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .media-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border: 1px solid #eee; border-radius: 6px; }

@@ -435,18 +435,7 @@ const selectedText = ref(null);
 const selectedPlatforms = ref([]);
 const dynamicPlatforms = ref([]);
 const isAutoPublish = ref(false);
-// 已移除：图文发布标签逻辑（publishTagList/MAX_TAGS/hasTags/handleTagChange）不再需要
-const MAX_TAGS = 5;
-const hasTags = computed(() => (publishTagList.value || []).filter(t => t && String(t).trim()).length > 0);
-const handleTagChange = (value) => {
-  const list = (value || []).map(t => String(t).trim()).filter(Boolean);
-  if (list.length > MAX_TAGS) {
-    publishTagList.value = list.slice(0, MAX_TAGS);
-    message.warning(`最多只能添加${MAX_TAGS}个标签`);
-  } else {
-    publishTagList.value = list;
-  }
-};
+
 // 恢复：文章平台列表（根据用户提供配置）
 const localPlatforms = [
   {

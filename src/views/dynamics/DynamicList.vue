@@ -438,8 +438,9 @@ const initPublishFormFromItem = (item) => {
   publishImages.value = (item?.images || []).map(img => ({
     name: img.name || img.img_name || '',
     url: getImageUrl(img),
-    type: `image/${img.type}`,
+    type: `image/${img.type.toLowerCase()}`,
     selected: true,
+    size: img.size || 0,
   }));
   publishSelectAll.value = true;
 };
@@ -514,7 +515,7 @@ const confirmPublish = async () => {
     const item = selectedPublishItem.value;
     const images = publishImages.value
       .filter(i => i.selected)
-      .map(({ name, url, type }) => ({ name, url, type }));
+      .map(({ name, url, type, size }) => ({ name, url, type, size }));
 
     const syncData = {
       platforms: syncPlatforms,
