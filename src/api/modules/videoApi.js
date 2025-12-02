@@ -191,6 +191,21 @@ export const uploadVideoCover = async (videoId, file) => {
   }
 };
 
+// 新增：上传/替换竖版视频封面
+export const uploadVideoVerticalCover = async (videoId, file) => {
+  try {
+    const formData = new FormData();
+    formData.append('video_id', videoId);
+    formData.append('vertical_cover', file);
+    // 后端已统一成一个上传接口，横/竖版均走 /video/cover/upload/
+    const response = await request.upload('/video/cover/upload/', formData);
+    return response;
+  } catch (error) {
+    console.error('上传竖版视频封面失败:', error);
+    throw error;
+  }
+};
+
 
 /**
  * 上传视频素材

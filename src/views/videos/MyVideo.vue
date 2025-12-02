@@ -170,21 +170,13 @@
           <div class="video-info-content">
             <div class="cover-section">
               <div class="cover-preview">
-                <img v-if="editableVideo.coverPath && editableVideo.coverPath.startsWith('data:')"
-                  :src="editableVideo.coverPath" class="cover-image" alt="封面" />
-                <img v-else-if="coverDetail && getCoverUrl()" :src="getCoverUrl()" class="cover-image" alt="封面"
+                <img v-if="verticalCoverDetail && getVerticalCoverUrl()"
+                  :src="getVerticalCoverUrl()" class="cover-image" alt="竖版封面"
                   @click="showImagePreview" style="cursor: pointer;" />
                 <div v-else class="cover-placeholder">
                   <video-camera-outlined style="font-size: 32px; color: #ccc;" />
-                  <span>暂无封面</span>
+                  <span>暂无竖版封面</span>
                 </div>
-              </div>
-              <div class="cover-actions">
-                <input ref="coverInput" type="file" accept="image/*" style="display: none"
-                  @change="handleCoverChange" />
-                <a-button size="small" @click="$refs.coverInput.click()">
-                  {{ editableVideo.coverPath ? '替换封面' : '上传封面' }}
-                </a-button>
               </div>
             </div>
             <div class="video-details">
@@ -270,10 +262,16 @@
           <a-button size="small" @click="triggerCreateVideoSelect">{{ createForm.videoFile ? '更改视频文件' : '选择视频文件' }}</a-button>
           <span v-if="createForm.videoFile" style="margin-left:8px;color:#666;">{{ createForm.videoFile.name }}</span>
         </a-form-item>
-        <a-form-item label="封面图片">
+        <a-form-item label="横版封面图片">
           <input ref="createCoverInput" type="file" accept="image/*" style="display:none" @change="handleCreateCoverChange" />
           <a-button size="small" @click="triggerCreateCoverSelect">{{ createForm.coverFile ? '更改封面' : '选择封面' }}</a-button>
           <span v-if="createForm.coverFile" style="margin-left:8px;color:#666;">{{ createForm.coverFile.name }}</span>
+        </a-form-item>
+        <!-- 新增：竖版封面上传 -->
+        <a-form-item label="竖版封面上传">
+          <input ref="createVerticalCoverInput" type="file" accept="image/*" style="display:none" @change="handleCreateVerticalCoverChange" />
+          <a-button size="small" @click="triggerCreateVerticalCoverSelect">{{ createForm.verticalCoverFile ? '更改竖版封面' : '选择竖版封面' }}</a-button>
+          <span v-if="createForm.verticalCoverFile" style="margin-left:8px;color:#666;">{{ createForm.verticalCoverFile.name }}</span>
         </a-form-item>
       </a-form>
       <div style="display:flex; justify-content:flex-end; gap:12px;">
@@ -341,6 +339,9 @@ const publishModalVisible = ref(false);
 const selectedVideo = ref(null);
 const selectedPlatforms = ref([]);
 const coverDetail = ref(null);
+// 声明：竖版封面详情与定时发布时间
+const verticalCoverDetail = ref(null);
+const scheduledPublishAt = ref(null);
 const imagePreviewVisible = ref(false);
 const editableVideo = ref({
   title: '',
@@ -453,9 +454,11 @@ const createForm = reactive({
   content: '',
   videoFile: null,
   coverFile: null,
+  verticalCoverFile: null,
 });
 const createVideoInput = ref(null);
 const createCoverInput = ref(null);
+const createVerticalCoverInput = ref(null);
 
 const openCreateModal = () => {
   createModalVisible.value = true;
@@ -466,12 +469,16 @@ const closeCreateModal = () => {
   createForm.content = '';
   createForm.videoFile = null;
   createForm.coverFile = null;
+  createForm.verticalCoverFile = null;
 };
 const triggerCreateVideoSelect = () => {
   if (createVideoInput.value) createVideoInput.value.click();
 };
 const triggerCreateCoverSelect = () => {
   if (createCoverInput.value) createCoverInput.value.click();
+};
+const triggerCreateVerticalCoverSelect = () => {
+  if (createVerticalCoverInput.value) createVerticalCoverInput.value.click();
 };
 const handleCreateVideoFileChange = (e) => {
   const file = e.target.files?.[0];
@@ -495,6 +502,19 @@ const handleCreateCoverChange = (e) => {
   }
   createForm.coverFile = file;
 };
+const handleCreateVerticalCoverChange = (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    ElMessage.error('请选择图片文件');
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.error('封面大小不能超过5MB');
+    return;
+  }
+  createForm.verticalCoverFile = file;
+};
 const submitCreateVideo = async () => {
   if (!createForm.title || !createForm.title.trim()) {
     ElMessage.warning('请填写视频标题');
@@ -506,6 +526,7 @@ const submitCreateVideo = async () => {
     if (createForm.content && createForm.content.trim()) fd.append('content', createForm.content.trim());
     if (createForm.videoFile) fd.append('video_file', createForm.videoFile);
     if (createForm.coverFile) fd.append('cover', createForm.coverFile);
+    if (createForm.verticalCoverFile) fd.append('vertical_cover', createForm.verticalCoverFile);
 
     ElMessage.info('正在创建视频...');
     await createVideo(fd);
@@ -584,9 +605,16 @@ const showPublishModal = async (video) => {
     } else {
       coverDetail.value = null;
     }
+    const vCoverId = video?.vertical_cover || video?.verticalCover || null;
+    if (vCoverId) {
+      await loadVerticalCoverDetail(vCoverId);
+    } else {
+      verticalCoverDetail.value = null;
+    }
   } catch (e) {
     console.warn('初始化封面失败:', e);
     coverDetail.value = null;
+    verticalCoverDetail.value = null;
   }
 
   publishModalVisible.value = true;
@@ -656,37 +684,36 @@ const getCoverPublishInfo = () => {
   return { 'name':name, "url":url, "type":type, "size":size };
 };
 
-// 处理封面文件变化
-const handleCoverChange = (event) => {
-  const file = event.target.files[0];
-  if (file) {
-    // 验证文件类型
-    if (!file.type.startsWith('image/')) {
-      message.error('请选择图片文件');
-      return;
+// 新增：获取竖版封面详情
+const loadVerticalCoverDetail = async (coverId) => {
+  if (!coverId) return;
+  try {
+    const response = await getImageDetail(coverId);
+    if (response && response.data) {
+      verticalCoverDetail.value = response.data;
+    } else if (response) {
+      verticalCoverDetail.value = response;
     }
-
-    // 验证文件大小（限制为5MB）
-    if (file.size > 5 * 1024 * 1024) {
-      message.error('图片大小不能超过5MB');
-      return;
+  } catch (error) {
+    console.error('获取竖版封面详情失败:', error);
+    if (coverId) {
+      verticalCoverDetail.value = {
+        img_name: `${coverId}.png`,
+        id: coverId
+      };
+    } else {
+      verticalCoverDetail.value = null;
     }
-
-    // 创建预览URL
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      editableVideo.value.coverPath = e.target.result;
-      // 保存文件元信息用于发布
-      editableVideo.value.coverFileName = file.name;
-      editableVideo.value.coverFileType = file.type;
-      editableVideo.value.coverFileSize = file.size;
-    };
-    reader.readAsDataURL(file);
-
-    // 这里可以添加上传到服务器的逻辑
-    // uploadCoverToServer(file);
   }
 };
+
+// 新增：获取竖版封面URL
+const getVerticalCoverUrl = () => {
+  if (!verticalCoverDetail.value?.img_name) return '';
+  return `http://127.0.0.1:8089/media/images/${verticalCoverDetail.value.img_name}`;
+};
+
+
 
 const handleFullscreenChange = (event) => {
   console.log('全屏状态变化:', event);
@@ -840,11 +867,15 @@ const handlePublish = async () => {
     } else {
       cover = getCoverPublishInfo();
     }
+    // 新增：竖版封版信息（仅后端已有的竖版封版）
+    const verticalCover = getVerticalCoverPublishInfo();
 
     const video = selectedVideo.value;
     const videoFileName = (video.video_path || '').split(/[\\\/]/).pop() || 'video.mp4';
     const httpVideoUrl = convertToHttpUrl(video.video_path || video.videoUrl || '');
     const absVideoUrl = convertToAbsolutePath(video.video_path || video.videoUrl || '');
+
+    const scheduledTs = scheduledPublishAt.value ? scheduledPublishAt.value.valueOf() : undefined;
 
     const syncData = {
       platforms: targetPlatforms.map(p => ({
@@ -860,6 +891,8 @@ const handlePublish = async () => {
         title: (editableVideo.value.title || video.title || '未命名视频').trim(),
         content: (editableVideo.value.content || video.content || '').trim(),
         cover,
+        verticalCover,
+        scheduledPublishTime: scheduledTs,
         videoUrl: httpVideoUrl,
         video: {
           name: videoFileName,
@@ -1172,6 +1205,20 @@ const handleVideoPlay = (event) => {
 };
 const handleVideoPause = (event) => {
   console.log('视频暂停:', event?.target?.currentTime);
+};
+
+const getVerticalCoverPublishInfo = () => {
+  if (!verticalCoverDetail.value || !getVerticalCoverUrl()) return null;
+  const name = verticalCoverDetail.value.img_name || 'vertical_cover.png';
+  const url = getVerticalCoverUrl();
+  const fmt = (verticalCoverDetail.value.spec?.format || '').toLowerCase();
+  const size = verticalCoverDetail.value.spec?.size || 0;
+  return {
+    name,
+    url,
+    type: fmt ? `image/${fmt}` : 'image/png',
+    size
+  };
 };
 
 </script>

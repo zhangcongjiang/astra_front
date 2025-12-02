@@ -496,27 +496,23 @@ const confirmPublish = async () => {
   try {
     if (!selectedPublishItem.value) { message.warning('未选择动态'); return; }
     if (!selectedPlatforms.value.length) { message.warning('请选择至少一个平台'); return; }
-
+    if (!selectedPublishItem.value) { message.warning('未选择动态'); return; }
+    if (!selectedPlatforms.value.length) { message.warning('请选择至少一个平台'); return; }
     const serviceResp = await checkServiceStatus();
     if (!serviceResp) { message.error('扩展服务未运行，请先启动扩展'); return; }
-
     const trustResp = await funcGetPermission(5000);
     if (!trustResp || trustResp.status !== 'ok' || !trustResp.trusted) {
       await openOptions();
       message.info('请在扩展设置页授权当前域名后，系统将自动继续');
     }
-
     const selectedSet = new Set(selectedPlatforms.value);
     const targetPlatforms = (dynamicPlatforms.value || []).filter(p => selectedSet.has(p.name));
     if (!targetPlatforms.length) { message.error('未匹配到选中的平台'); return; }
-
     const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, platformName: p.platformName, injectUrl: p.injectUrl, faviconUrl: p.faviconUrl, accountKey: p.accountKey, extraConfig: {} }));
-
     const item = selectedPublishItem.value;
     const images = publishImages.value
       .filter(i => i.selected)
-      .map(({ name, url, type, size }) => ({ name, url, type, size }));
-
+      .map(({ name, url, type }) => ({ name, url, type }));
     const syncData = {
       platforms: syncPlatforms,
       isAutoPublish: isAutoPublish.value,
@@ -527,10 +523,15 @@ const confirmPublish = async () => {
         videos: []
       }
     };
-
-    await extFuncPublish(syncData);
-    message.success(`发布请求已发送到扩展（${syncPlatforms.length}个平台）`);
+    // 点击开始发布后立即关闭弹窗（通过校验后）
     publishModalVisible.value = false;
+    await extFuncPublish(syncData);
+    selectedPublishItem.value = null;
+    selectedPlatforms.value = [];
+    publishImages.value = [];
+    publishTitle.value = '';
+    publishContent.value = '';
+    message.success(`发布请求已发送到扩展（${syncPlatforms.length}个平台）`);
     selectedPublishItem.value = null;
     selectedPlatforms.value = [];
     publishImages.value = [];

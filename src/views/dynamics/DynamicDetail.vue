@@ -191,37 +191,21 @@ const openPublish = async () => {
 };
 const confirmPublish = async () => {
   try {
-    if (!selectedPlatforms.value.length) {
-      message.warning('请选择至少一个平台');
-      return;
-    }
-
+    if (!selectedPlatforms.value.length) { message.warning('请选择至少一个平台'); return; }
     const serviceResp = await checkServiceStatus();
-    if (!serviceResp) {
-      message.error('扩展服务未运行，请先启动扩展');
-      return;
-    }
-
+    if (!serviceResp) { message.error('扩展服务未运行，请先启动扩展'); return; }
     const trustResp = await funcGetPermission(5000);
     if (!trustResp || trustResp.status !== 'ok' || !trustResp.trusted) {
       await openOptions();
       message.info('请在扩展设置页授权当前域名后，系统将自动继续');
     }
-
     const selectedSet = new Set(selectedPlatforms.value);
     const targetPlatforms = (dynamicPlatforms.value || []).filter(p => selectedSet.has(p.name));
-    if (!targetPlatforms.length) {
-      message.error('未匹配到选中的平台');
-      return;
-    }
-
+    if (!targetPlatforms.length) { message.error('未匹配到选中的平台'); return; }
     const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, platformName: p.platformName, injectUrl: p.injectUrl, faviconUrl: p.faviconUrl, accountKey: p.accountKey, extraConfig: {} }));
-
-    // 仅使用编辑后选择的图片参与发布
     const images = publishImages.value
       .filter(i => i.selected)
       .map(({ name, url, type, size }) => ({ name, url, type, size }));
-
     const syncData = {
       platforms: syncPlatforms,
       isAutoPublish: isAutoPublish.value,
@@ -232,15 +216,15 @@ const confirmPublish = async () => {
         videos: []
       }
     };
-
-    console.log('发送扩展发布请求 syncData:', JSON.stringify(syncData, null, 2));
-    await funcPublish(syncData);
-    message.success(`发布请求已发送到扩展（${syncPlatforms.length}个平台），请在新标签页查看扩展自动填充`);
+    // 点击开始发布后立即关闭弹窗（通过校验后）
     publishModalVisible.value = false;
+    await funcPublish(syncData);
+    // reset
     selectedPlatforms.value = [];
     publishImages.value = [];
     publishTitle.value = '';
     publishContent.value = '';
+    message.success(`发布请求已发送到扩展（${syncPlatforms.length}个平台），请在新标签页查看扩展自动填充`);
   } catch (e) {
     console.error(e);
     message.error(e?.message || '发布失败');

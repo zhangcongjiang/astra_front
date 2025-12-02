@@ -63,42 +63,76 @@
         <!-- Tab切换 -->
         <n-tabs v-model:value="activeTab" type="line" class="detail-tabs">
           <n-tab-pane name="cover" tab="视频封面">
-            <div v-if="coverDetail" class="cover-section">
-              <div class="cover-preview">
-                <img 
-                  :src="getCoverUrl()" 
-                  alt="视频封面" 
-                  class="cover-image" 
-                  @click="showImagePreview"
-                  style="cursor: pointer;"
-                />
+            <div class="cover-row">
+              <!-- 左侧：竖版封面（预览/占位 + 按钮居中） -->
+              <div class="cover-col">
+                <div v-if="verticalCoverDetail" class="cover-section">
+                  <div class="cover-preview">
+                    <n-image
+                      :src="getVerticalCoverUrl()"
+                      :preview-src="getVerticalCoverUrl()"
+                      object-fit="contain"
+                      :style="{ width: '100%', height: '100%' }"
+                      :img-props="{ class: 'cover-image', style: 'width: 100%; height: 100%; object-fit: contain; cursor: zoom-in' }"
+                    />
+                  </div>
+                </div>
+                <div v-else class="cover-section">
+                  <div class="cover-preview">
+                    <div class="no-cover">
+                      <n-text depth="3">暂无竖版封面</n-text>
+                    </div>
+                  </div>
+                </div>
+                <div class="cover-actions-center">
+                  <input ref="verticalCoverFileInput" type="file" accept="image/*" @change="onVerticalCoverFileChange" style="display:none" />
+                  <n-button size="small" type="primary" @click="triggerVerticalCoverUpload" :loading="verticalCoverUploading" class="action-btn">
+                    <template #icon>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M5 20h14v-2H5v2zm7-9l5 5h-3v4h-4v-4H7l5-5zm0-9l-5 5h3v4h4V7h3l-5-5z"/>
+                      </svg>
+                    </template>
+                    {{ verticalCoverDetail ? '替换竖版封面' : '上传竖版封面' }}
+                  </n-button>
+                </div>
               </div>
-              <div class="cover-actions">
-                <input ref="coverFileInput" type="file" accept="image/*" @change="onCoverFileChange" style="display:none" />
-                <n-button size="small" type="primary" @click="triggerCoverUpload" :loading="coverUploading" class="action-btn">
-                  <template #icon>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M5 20h14v-2H5v2zm7-9l5 5h-3v4h-4v-4H7l5-5zm0-9l-5 5h3v4h4V7h3l-5-5z"/>
-                    </svg>
-                  </template>
-                  替换封面
-                </n-button>
+              
+              <!-- 右侧：横版封面（预览/占位 + 按钮居中） -->
+              <div class="cover-col">
+                <div v-if="coverDetail" class="cover-section">
+                  <div class="cover-preview">
+                    <n-image
+                      :src="getCoverUrl()"
+                      :preview-src="getCoverUrl()"
+                      object-fit="contain"
+                      :style="{ width: '100%', height: '100%' }"
+                      :img-props="{ class: 'cover-image', style: 'width: 100%; height: 100%; object-fit: contain; cursor: zoom-in' }"
+                    />
+                  </div>
+                </div>
+                <div v-else class="cover-section">
+                  <div class="cover-preview">
+                    <div class="no-cover">
+                      <n-text depth="3">暂无横版封面</n-text>
+                    </div>
+                  </div>
+                </div>
+                <div class="cover-actions-center">
+                  <input ref="coverFileInput" type="file" accept="image/*" @change="onCoverFileChange" style="display:none" />
+                  <n-button size="small" type="primary" @click="triggerCoverUpload" :loading="coverUploading" class="action-btn">
+                    <template #icon>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M5 20h14v-2H5v2zm7-9l5 5h-3v4h-4v-4H7l5-5zm0-9l-5 5h3v4h4V7h3l-5-5z"/>
+                      </svg>
+                    </template>
+                    {{ coverDetail ? '替换横版封面' : '上传横版封面' }}
+                  </n-button>
+                </div>
               </div>
             </div>
-            <div v-else class="no-cover">
-              <n-text depth="3">暂无封面</n-text>
-              <div class="cover-actions">
-                <input ref="coverFileInput" type="file" accept="image/*" @change="onCoverFileChange" style="display:none" />
-                <n-button size="small" type="primary" @click="triggerCoverUpload" :loading="coverUploading" class="action-btn">
-                  <template #icon>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M5 20h14v-2H5v2zm7-9l5 5h-3v4h-4v-4H7l5-5zm0-9l-5 5h3v4h4V7h3l-5-5z"/>
-                    </svg>
-                  </template>
-                  上传封面
-                </n-button>
-              </div>
-            </div>
+            
+            <!-- 移除底部统一操作栏 cover-actions-bottom -->
+            
           </n-tab-pane>
           
           <n-tab-pane name="content" tab="视频文案">
@@ -175,9 +209,15 @@
       </template>
       <div class="image-preview-container">
         <img 
-          v-if="coverDetail" 
+          v-if="previewKind === 'horizontal' && coverDetail" 
           :src="getCoverUrl()" 
-          alt="封面预览" 
+          alt="横版封面预览" 
+          class="preview-image"
+        />
+        <img 
+          v-else-if="previewKind === 'vertical' && verticalCoverDetail" 
+          :src="getVerticalCoverUrl()" 
+          alt="竖版封面预览" 
           class="preview-image"
         />
       </div>
@@ -223,9 +263,10 @@ import {
   NForm,
   NFormItem,
   NInput,
-  useMessage 
+  useMessage, 
+  NImage
 } from 'naive-ui';
-import { getVideoDetail, regenerateVideo, updateVideo, uploadVideoCover } from '@/api/modules/videoApi.js';
+import { getVideoDetail, regenerateVideo, updateVideo, uploadVideoCover, uploadVideoVerticalCover } from '@/api/modules/videoApi.js';
 import { getImageDetail } from '@/api/modules/imageApi.js';
 import dayjs from 'dayjs';
 
@@ -267,6 +308,7 @@ const loading = ref(false);
 const regenerating = ref(false);
 const videoDetail = ref(null);
 const coverDetail = ref(null);
+const verticalCoverDetail = ref(null);
 const activeTab = ref('cover');
 const imagePreviewVisible = ref(false);
 const editVisible = ref(false);
@@ -369,40 +411,57 @@ const formatCost = (seconds) => {
   return `${ss}秒`;
 };
 
-// 获取封面详情
+// 获取封面详情（横版）
 const loadCoverDetail = async (coverId) => {
   if (!coverId) return;
   try {
     const response = await getImageDetail(coverId);
-    console.log('封面详情响应:', response);
     if (response && response.data) {
       coverDetail.value = response.data;
     } else if (response) {
-      // 如果response存在但没有data字段，直接使用response
       coverDetail.value = response;
     }
   } catch (error) {
-    console.error('获取封面详情失败:', error);
-    // API调用失败时，使用coverId作为img_name创建基本的封面信息
+    console.error('获取横版封面详情失败:', error);
     if (coverId) {
-      coverDetail.value = {
-        img_name: `${coverId}.png`,
-        id: coverId
-      };
+      coverDetail.value = { img_name: `${coverId}.png`, id: coverId };
     } else {
       coverDetail.value = null;
     }
   }
 };
-
-// 获取封面URL
+// 获取封面详情（竖版）
+const loadVerticalCoverDetail = async (coverId) => {
+  if (!coverId) return;
+  try {
+    const response = await getImageDetail(coverId);
+    if (response && response.data) {
+      verticalCoverDetail.value = response.data;
+    } else if (response) {
+      verticalCoverDetail.value = response;
+    }
+  } catch (error) {
+    console.error('获取竖版封面详情失败:', error);
+    if (coverId) {
+      verticalCoverDetail.value = { img_name: `${coverId}.png`, id: coverId };
+    } else {
+      verticalCoverDetail.value = null;
+    }
+  }
+};
+// 获取封面URL（横版）
 const getCoverUrl = () => {
-  if (!coverDetail.value?.img_name) return '';
+  if (!coverDetail?.value?.img_name) return '';
   return `http://127.0.0.1:8089/media/images/${coverDetail.value.img_name}`;
 };
-
-// 显示图片预览
-const showImagePreview = () => {
+// 获取封面URL（竖版）
+const getVerticalCoverUrl = () => {
+  if (!verticalCoverDetail?.value?.img_name) return '';
+  return `http://127.0.0.1:8089/media/images/${verticalCoverDetail.value.img_name}`;
+};
+// 显示图片预览（区分横/竖）
+const showImagePreview = (kind = 'horizontal') => {
+  previewKind.value = kind;
   imagePreviewVisible.value = true;
 };
 
@@ -438,12 +497,11 @@ const loadVideoDetail = async () => {
     const response = await getVideoDetail(route.params.id);
     if (response && response.code === 0) {
       videoDetail.value = response.data;
-      // 如果有封面ID，尝试获取封面详情（不阻塞主流程）
       if (videoDetail.value.cover) {
-        loadCoverDetail(videoDetail.value.cover).catch(() => {
-          // 封面加载失败不影响主流程
-          console.warn('封面加载失败，但不影响页面显示');
-        });
+        loadCoverDetail(videoDetail.value.cover).catch(() => {});
+      }
+      if (videoDetail.value.vertical_cover) {
+        loadVerticalCoverDetail(videoDetail.value.vertical_cover).catch(() => {});
       }
     } else {
       message.error(response?.message || '获取视频详情失败');
@@ -461,6 +519,9 @@ onMounted(() => {
 });
 const coverUploading = ref(false);
 const coverFileInput = ref(null);
+const verticalCoverUploading = ref(false);
+const verticalCoverFileInput = ref(null);
+
 const triggerCoverUpload = () => {
   if (!videoDetail.value?.id) {
     message.error('视频ID缺失');
@@ -468,10 +529,17 @@ const triggerCoverUpload = () => {
   }
   coverFileInput.value?.click();
 };
+const triggerVerticalCoverUpload = () => {
+  if (!videoDetail.value?.id) {
+    message.error('视频ID缺失');
+    return;
+  }
+  verticalCoverFileInput.value?.click();
+};
+
 const onCoverFileChange = async (e) => {
   const file = e.target?.files?.[0];
   if (!file) return;
-  // 前端快速校验（后端也会校验）
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
   if (!allowedTypes.includes(file.type)) {
     message.warning('不支持的文件类型，请上传 JPG/PNG 图片');
@@ -488,22 +556,56 @@ const onCoverFileChange = async (e) => {
   try {
     const resp = await uploadVideoCover(videoDetail.value.id, file);
     if (resp?.code === 0) {
-      message.success('封面上传成功');
+      message.success('横版封面上传成功');
       e.target.value = '';
-      // 重新拉取视频详情，确保拿到最新的 cover id
       await loadVideoDetail();
-      // 如果有封面ID，刷新封面详情
       if (videoDetail.value?.cover) {
         await loadCoverDetail(videoDetail.value.cover);
       }
     } else {
-      message.error(resp?.message || '封面上传失败');
+      message.error(resp?.message || '横版封面上传失败');
     }
   } catch (err) {
-    console.error('封面上传失败:', err);
-    message.error('封面上传失败');
+    console.error('横版封面上传失败:', err);
+    message.error('横版封面上传失败');
   } finally {
     coverUploading.value = false;
+  }
+};
+
+const onVerticalCoverFileChange = async (e) => {
+  const file = e.target?.files?.[0];
+  if (!file) return;
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+  if (!allowedTypes.includes(file.type)) {
+    message.warning('不支持的文件类型，请上传 JPG/PNG 图片');
+    e.target.value = '';
+    return;
+  }
+  const maxSize = 5 * 1024 * 1024;
+  if (file.size > maxSize) {
+    message.warning('文件大小不能超过5MB');
+    e.target.value = '';
+    return;
+  }
+  verticalCoverUploading.value = true;
+  try {
+    const resp = await uploadVideoVerticalCover(videoDetail.value.id, file);
+    if (resp?.code === 0) {
+      message.success('竖版封面上传成功');
+      e.target.value = '';
+      await loadVideoDetail();
+      if (videoDetail.value?.vertical_cover) {
+        await loadVerticalCoverDetail(videoDetail.value.vertical_cover);
+      }
+    } else {
+      message.error(resp?.message || '竖版封面上传失败');
+    }
+  } catch (err) {
+    console.error('竖版封面上传失败:', err);
+    message.error('竖版封面上传失败');
+  } finally {
+    verticalCoverUploading.value = false;
   }
 };
 </script>
@@ -711,4 +813,56 @@ const onCoverFileChange = async (e) => {
   word-break: break-all;
 }
 
+.cover-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.cover-col { display: flex; flex-direction: column; align-items: center; }
+.cover-actions-bottom { margin-top: 16px; display: flex; align-items: center; gap: 8px; }
+/* 覆盖封面展示样式，统一高度并居中 */
+.cover-preview {
+  height: 360px; /* 统一预览高度 */
+  width: 300px;  /* 限制预览宽度，确保按钮可居中对齐 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden; /* 防止图片超出预览框 */
+  /* 移除边框与背景以避免“背景框”视觉效果 */
+  border: none;
+  background: transparent;
+}
+
+.cover-image {
+  max-height: 100%;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: none; /* 移除阴影，保持干净视觉 */
+}
+
+/* 每列按钮居中并与预览区域宽度对齐 */
+.cover-actions-center {
+  margin-top: 12px;
+  width: 300px; /* 与预览区域保持一致宽度，保证按钮居中位置与封面一致 */
+  display: flex;
+  justify-content: center;
+}
+
+/* 预览模态框：完整展示原图（可滚动查看） */
+.image-preview-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  overflow: auto; /* 原图过大时可滚动查看完整内容 */
+  max-height: 80vh; /* 限制最大高度，避免模态框溢出屏幕 */
+}
+
+.preview-image {
+  max-width: none; /* 使用原图宽度 */
+  max-height: none; /* 使用原图高度 */
+  width: auto;
+  height: auto;
+  object-fit: contain; /* 保证不裁剪 */
+  border-radius: 0;
+}
 </style>
