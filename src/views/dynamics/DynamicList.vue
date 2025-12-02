@@ -172,7 +172,7 @@ import { message, Modal } from 'ant-design-vue';
 import { PlusOutlined } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
 import UserSelect from '@/components/UserSelect.vue';
-import { getDynamicList, deleteDynamic, batchDeleteDynamics, createDynamic } from '@/api/modules/dynamicApi.js';
+import { getDynamicList, getDynamicDetail, deleteDynamic, batchDeleteDynamics, createDynamic } from '@/api/modules/dynamicApi.js';
 import { funcPublish as extFuncPublish, getPlatformInfos, checkServiceStatus, funcGetPermission, openOptions } from '@/utils/extensionMessaging.js';
 // import { uploadImages } from '@/api/modules/imageApi.js';
 const router = useRouter();
@@ -254,6 +254,11 @@ const handlePageSizeChange = (current, size) => { pagination.pageSize = size; pa
 const staticBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8089';
 const getImageUrl = (img) => {
   if (!img) return '';
+  // 支持字符串或对象两种图片数据结构
+  if (typeof img === 'string') {
+    const url = img;
+    return url.startsWith('http') ? url : (url ? `${staticBaseUrl}${url}` : '');
+  }
   const url = img.url || img.path || (img.img_name ? `${staticBaseUrl}/media/images/${img.img_name}` : '');
   return url.startsWith('http') ? url : (url ? `${staticBaseUrl}${url}` : '');
 };
@@ -435,13 +440,17 @@ const publishSelectAll = ref(true);
 const initPublishFormFromItem = (item) => {
   publishTitle.value = item?.title || '';
   publishContent.value = (item?.content || '').toString();
-  publishImages.value = (item?.images || []).map(img => ({
-    name: img.name || img.img_name || '',
-    url: getImageUrl(img),
-    type: `image/${img.type.toLowerCase()}`,
-    selected: true,
-    size: img.size || 0,
-  }));
+  publishImages.value = (item?.images || []).map(img => {
+    const t = img?.type ? String(img.type) : '';
+    const mime = t.startsWith('image/') ? t : (t ? `image/${t.toLowerCase()}` : 'image/jpeg');
+    return {
+      name: (img && typeof img === 'object') ? (img.name || img.img_name || '') : '',
+      url: getImageUrl(img),
+      type: mime,
+      selected: true,
+      size: (img && typeof img === 'object') ? (img.size || 0) : 0,
+    };
+  });
   publishSelectAll.value = true;
 };
 
@@ -467,12 +476,38 @@ const togglePlatform = (key) => {
 };
 
 const openPublish = async (item) => {
-  selectedPublishItem.value = item;
   publishModalVisible.value = true;
-  initPublishFormFromItem(item);
   try {
-    dynamicPlatforms.value = await getPlatformInfos('DYNAMIC');
-    // 仅保留指定平台：哔哩哔哩、抖音、小红书、今日头条、百家号、微信视频号
+    const resp = await getDynamicDetail(item?.id);
+    const detail = resp?.data?.data || resp?.data || {};
+    const normalized = {
+      id: detail.id || item.id,
+      title: detail.title || item.title || '',
+      content: detail.content || item.content || '',
+      images: Array.isArray(detail.images) ? detail.images : (Array.isArray(item.images) ? item.images : []),
+      creator: detail.username || detail.creator || item.creator || '',
+      origin: detail.origin || item.origin || '',
+    };
+    selectedPublishItem.value = normalized;
+    initPublishFormFromItem(normalized);
+  } catch (e) {
+    console.warn('获取动态详情失败，使用列表数据填充', e);
+    selectedPublishItem.value = item;
+    initPublishFormFromItem(item);
+  }
+  try {
+    const normalizePlatforms = (raw) => {
+      let arr = Array.isArray(raw) ? raw : Object.values(raw || {});
+      arr = (arr || []).map((p) => ({
+        ...p,
+        name: p?.name || p?.platformName || p?.key || p?.id,
+      }));
+      return arr;
+    };
+    dynamicPlatforms.value = normalizePlatforms(await getPlatformInfos('DYNAMIC'));
+    if (!dynamicPlatforms.value.length) {
+      dynamicPlatforms.value = normalizePlatforms(await getPlatformInfos());
+    }
     const allowedKeywords = [
       'bilibili', '哔哩', 'b站',
       'douyin', '抖音',
@@ -481,11 +516,16 @@ const openPublish = async (item) => {
       'baijiahao', '百家号',
       'weixinchannel', '微信视频号', '视频号'
     ];
-    dynamicPlatforms.value = (dynamicPlatforms.value || []).filter((p) => {
+    const filtered = (dynamicPlatforms.value || []).filter((p) => {
       const en = `${(p.name || '').toLowerCase()} ${(p.platformName || '').toLowerCase()}`;
       const zh = `${p.platformName || ''}`;
       return allowedKeywords.some((k) => en.includes(k) || zh.includes(k));
     });
+    if (filtered.length > 0) {
+      dynamicPlatforms.value = filtered;
+    } else {
+      message.info('未匹配到指定平台关键字，已显示全部平台');
+    }
   } catch (e) {
     console.error('获取平台信息失败:', e);
     message.error('获取平台信息失败');
@@ -510,9 +550,24 @@ const confirmPublish = async () => {
     if (!targetPlatforms.length) { message.error('未匹配到选中的平台'); return; }
     const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, platformName: p.platformName, injectUrl: p.injectUrl, faviconUrl: p.faviconUrl, accountKey: p.accountKey, extraConfig: {} }));
     const item = selectedPublishItem.value;
-    const images = publishImages.value
-      .filter(i => i.selected)
-      .map(({ name, url, type }) => ({ name, url, type }));
+    // 构建 images，补充 size 字段；如果缺失尝试通过 HEAD 获取 content-length，失败则回退为 0
+    const images = await Promise.all(
+      publishImages.value
+        .filter(i => i.selected)
+        .map(async (it) => {
+          const base = { name: it.name, url: it.url, type: it.type, size: it.size ?? 0 };
+          if (!base.size && it?.url) {
+            try {
+              const headResp = await fetch(it.url, { method: 'HEAD' });
+              const len = headResp.headers.get('content-length');
+              if (len) base.size = Number(len);
+            } catch (_) {
+              // 忽略跨域或网络错误，保留默认值
+            }
+          }
+          return base;
+        })
+    );
     const syncData = {
       platforms: syncPlatforms,
       isAutoPublish: isAutoPublish.value,
