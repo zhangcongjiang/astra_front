@@ -26,6 +26,9 @@
         <a-button type="primary" @click="openCreateModal">
           <PlusOutlined /> 新建动态
         </a-button>
+        <a-button :disabled="dynamicList.length === 0" @click="selectAllOnPage">
+          {{ allSelectedOnPage ? '取消全选' : '全部选中' }}
+        </a-button>
         <a-button danger :disabled="selectedIds.length === 0" @click="handleBatchDelete">
           批量删除
         </a-button>
@@ -166,7 +169,7 @@
  </template>
 
  <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
 import { PlusOutlined } from '@ant-design/icons-vue';
@@ -201,6 +204,20 @@ const toggleSelection = (id, checked) => {
   const idx = selectedIds.value.indexOf(id);
   if (checked && idx === -1) selectedIds.value.push(id);
   if (!checked && idx > -1) selectedIds.value.splice(idx, 1);
+};
+// 全选/取消本页所有动态
+const currentPageIds = computed(() => dynamicList.value.map(it => it.id));
+const allSelectedOnPage = computed(() => currentPageIds.value.length > 0 && currentPageIds.value.every(id => selectedIds.value.includes(id)));
+const selectAllOnPage = () => {
+  if (allSelectedOnPage.value) {
+    // 取消选择本页所有
+    selectedIds.value = selectedIds.value.filter(id => !currentPageIds.value.includes(id));
+  } else {
+    // 选择本页所有
+    const set = new Set(selectedIds.value);
+    currentPageIds.value.forEach(id => set.add(id));
+    selectedIds.value = Array.from(set);
+  }
 };
 
 // 获取列表
