@@ -35,98 +35,76 @@
 
     <!-- 操作按钮 -->
     <div class="action-area">
-      <!-- 批量选择模式切换 - 放在最左边 -->
-      <a-button 
-        :type="batchMode ? 'primary' : 'default'" 
-        @click="toggleBatchMode"
-      >
-        {{ batchMode ? '退出批量' : '批量选择' }}
+      <!-- 上传按钮置左，与视频页一致 -->
+      <a-upload v-model:file-list="fileList" :multiple="true" :show-upload-list="false" :before-upload="beforeUpload"
+        :customRequest="handleUpload">
+        <a-button type="primary">
+          <upload-outlined /> 上传图片
+        </a-button>
+      </a-upload>
+      <!-- 本页全选/取消全选按钮，与视频页一致 -->
+      <a-button @click="toggleSelectAll" :disabled="currentPageImages.length === 0">
+        {{ isAllSelected ? '取消全选' : '全选' }}
       </a-button>
-      
-      <!-- 批量操作按钮组 - 在批量模式下显示 -->
-      <div class="batch-actions" v-if="batchMode">
-        <a-button type="default" @click="toggleSelectAll">
-          {{ isAllSelected ? '取消全选' : '全选' }}
-        </a-button>
-        <a-button 
-          type="danger" 
-          @click="showBatchDeleteConfirm" 
-          :disabled="selectedImages.length === 0"
-        >
-          <delete-outlined /> 批量删除{{ selectedImages.length > 0 ? ` (${selectedImages.length})` : '' }}
-        </a-button>
-        <a-button @click="clearSelection" v-if="selectedImages.length > 0">
-          取消选择
-        </a-button>
-      </div>
-      
-      <!-- 上传按钮 - 放在右边 -->
-      <div class="upload-section">
-        <a-upload v-model:file-list="fileList" :multiple="true" :show-upload-list="false" :before-upload="beforeUpload"
-          :customRequest="handleUpload">
-          <a-button type="primary">
-            <upload-outlined /> 上传图片
-          </a-button>
-        </a-upload>
-      </div>
+      <!-- 批量删除危险按钮，使用 danger 属性，与视频页一致 -->
+      <a-button danger @click="showBatchDeleteConfirm" :disabled="selectedImages.length === 0">
+        批量删除
+      </a-button>
     </div>
 
     <!-- 图片列表 - 响应式5列布局 -->
     <div class="image-grid">
-      <a-row :gutter="[16, 16]">
-        <a-col v-for="(image, index) in currentPageImages" :key="image.id" :xs="24" :sm="12" :md="8" :lg="6" :xl="4.8"
-          class="image-col">
-          <a-card hoverable class="image-card" :class="{ 'selected': selectedImages.includes(image.id) }" @click="handleCardClick(image, index)">
-            <!-- 批量选择模式下的选择框 -->
-            <div v-if="batchMode" class="selection-overlay" @click.stop="toggleImageSelection(image.id)">
-              <a-checkbox :checked="selectedImages.includes(image.id)" />
-            </div>
-            
-            <template #cover>
-              <div class="cover-container" :style="{ height: imageHeight + 'px' }">
-                <!-- 加载中状态 -->
-                <div v-if="image.loading" class="loading-placeholder">
-                  <a-spin size="large" />
-                  <p>加载中...</p>
-                </div>
-                <!-- 加载失败状态 -->
-                <div v-else-if="image.loadError" class="error-placeholder">
-                  <ExclamationCircleOutlined style="font-size: 24px; color: #ff4d4f;" />
-                  <p>加载失败</p>
-                </div>
-                <!-- 正常显示图片 -->
-                <img v-else-if="image.url" :src="image.url" :alt="image.name" class="cover-image"
-                  :style="{ height: imageHeight + 'px' }" />
+      <a-spin :spinning="loading" tip="加载中...">
+        <a-row :gutter="[16, 16]">
+          <a-col v-for="(image, index) in currentPageImages" :key="image.id" :xs="24" :sm="12" :md="8" :lg="6" :xl="4.8"
+            class="image-col">
+            <a-card hoverable class="image-card" :class="{ 'selected': selectedImages.includes(image.id) }" @click="handleCardClick(image, index)">
+              <!-- 批量选择模式下的选择框改为始终显示，与视频页一致 -->
+              <div class="select-checkbox" @click.stop="toggleImageSelection(image.id)">
+                <a-checkbox :checked="selectedImages.includes(image.id)" @update:checked="(val) => toggleSelectOne(image.id, val)" />
               </div>
-              <!-- 图片标签 -->
-              <div class="image-tags">
-                <a-tag v-for="tag in getTagNames(image.tags)" :key="tag.id" color="blue"
-                  @click.stop="handleTagClick(tag.id)">
-                  {{ tag.name }}
-                </a-tag>
-              </div>
-            </template>
-            
-            <template #actions>
-              <!-- 删除按钮 -->
-              <span class="action-item" @click.stop="showDeleteConfirm(image.id)">
-                <delete-outlined />
-                <span class="action-text">删除</span>
-              </span>
-              <!-- 编辑标签按钮 -->
-              <span class="action-item" @click.stop="showTagModal(image)">
-                <tags-outlined />
-                <span class="action-text">标签</span>
-              </span>
-              <!-- 加入素材集按钮 -->
-              <span class="action-item" @click.stop="showAddToAssetModal(image)">
-                <folder-add-outlined />
-                <span class="action-text">加入素材集</span>
-              </span>
-            </template>
-          </a-card>
-        </a-col>
-      </a-row>
+              
+              <template #cover>
+                <div class="cover-container" :style="{ height: imageHeight + 'px' }">
+                  <!-- 加载中状态 -->
+                  <div v-if="image.loading" class="loading-placeholder">
+                    <a-spin size="large" />
+                    <p>加载中...</p>
+                  </div>
+                  <!-- 加载失败状态 -->
+                  <div v-else-if="image.loadError" class="error-placeholder">
+                    <ExclamationCircleOutlined style="font-size: 24px; color: #ff4d4f;" />
+                    <p>加载失败</p>
+                  </div>
+                  <!-- 正常显示图片 -->
+                  <img v-else-if="image.url" :src="image.url" :alt="image.name" class="cover-image"
+                    :style="{ height: imageHeight + 'px' }" />
+                </div>
+                <!-- 图片标签 -->
+                <div class="image-tags">
+                  <a-tag v-for="tag in getTagNames(image.tags)" :key="tag.id" color="blue"
+                    @click.stop="handleTagClick(tag.id)">
+                    {{ tag.name }}
+                  </a-tag>
+                </div>
+              </template>
+              
+              <template #actions>
+                <!-- 删除按钮 -->
+                <span class="action-item" @click.stop="showDeleteConfirm(image.id)">
+                  <delete-outlined />
+                  <span class="action-text">删除</span>
+                </span>
+                <!-- 编辑标签按钮 -->
+                <span class="action-item" @click.stop="showTagModal(image)">
+                  <tags-outlined />
+                  <span class="action-text">标签</span>
+                </span>
+              </template>
+            </a-card>
+          </a-col>
+        </a-row>
+      </a-spin>
     </div>
 
     <!-- 分页控制 -->
@@ -847,14 +825,13 @@ const showBatchDeleteConfirm = () => {
 
 const handleBatchDelete = async () => {
   try {
+    // 开始全局加载，与视频页一致
+    loading.value = true;
     await deleteImages(selectedImages.value);
-    
     message.success(`成功删除 ${selectedImages.value.length} 张图片`);
     clearSelection();
-    
-    // 重新获取图片列表，刷新页面数据
+    // 重新获取图片列表，刷新页面数据，并在其中关闭 loading
     await fetchImageList();
-    
   } catch (error) {
     console.error('批量删除图片失败:', error);
     message.error('批量删除图片失败');
@@ -1183,7 +1160,7 @@ const fetchTagCategories = async () => {
   margin-bottom: 20px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -1256,5 +1233,17 @@ const fetchTagCategories = async () => {
   object-fit: contain;
   object-position: center;
   display: block;
+}
+
+/* 与视频页一致的选择复选框样式 */
+.select-checkbox {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  padding: 4px 6px;
 }
 </style>

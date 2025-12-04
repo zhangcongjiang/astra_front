@@ -37,9 +37,15 @@
       </a-form>
     </div>
 
-    <!-- 顶部工具栏：添加视频按钮（右上角） -->
+    <!-- 顶部工具栏：添加视频 + 本页全选 + 批量删除 -->
     <div class="toolbar-area">
       <a-button type="primary" @click="openCreateModal">添加视频</a-button>
+      <a-button style="margin-left:8px" @click="toggleSelectAllCurrentPage" :disabled="videoList.length === 0">
+        {{ isAllCurrentPageSelected ? '取消全选' : '全选' }}
+      </a-button>
+      <a-button danger style="margin-left:8px" :disabled="selectedIds.length === 0" @click="handleBatchDelete">
+        批量删除
+      </a-button>
     </div>
 
     <!-- 视频卡片列表 -->
@@ -51,6 +57,9 @@
               <div class="card-content">
                 <!-- 视频封面或播放器 -->
                 <div class="video-cover">
+                  <div class="select-checkbox">
+                    <a-checkbox :checked="selectedIds.includes(video.id)" @update:checked="(val) => toggleSelectOne(video.id, val)" />
+                  </div>
                   <!-- 成功且已上传时显示视频播放器（支持 Regular 与 JianYing） -->
                   <div v-if="video.result === 'Success' && video.video_path && (video.video_type === 'Regular' || video.video_type === 'JianYing')"
                     class="video-player">
@@ -149,7 +158,7 @@
                   {{ video.video_path ? '替换' : '上传' }}
                 </a-button>
 
-                <a-button type="danger" size="small" @click="handleDelete(video)">删除</a-button>
+                <a-button danger size="small" @click="handleDelete(video)">删除</a-button>
               </template>
             </a-card>
           </a-col>
@@ -295,7 +304,7 @@ import {
   CheckCircleFilled
 } from '@ant-design/icons-vue';
 import Pagination from '@/components/Pagination.vue';
-import { getVideoList, deleteVideo, uploadVideoFile, createVideo } from '@/api/modules/videoApi.js';
+import { getVideoList, deleteVideo, uploadVideoFile, createVideo, batchDeleteVideos } from '@/api/modules/videoApi.js';
 import { getImageDetail } from '@/api/modules/imageApi.js';
 import { ElMessage } from 'element-plus';
 import dayjs from 'dayjs';
@@ -413,6 +422,7 @@ const loadVideoList = async () => {
 // 处理查询
 const handleSearch = () => {
   pagination.current = 1;
+  selectedIds.value = [];
   loadVideoList();
 };
 
@@ -420,6 +430,7 @@ const handleSearch = () => {
 const handlePageChange = ({ current, pageSize: newPageSize }) => {
   pagination.current = current;
   pagination.pageSize = newPageSize;
+  selectedIds.value = [];
   loadVideoList();
 };
 
@@ -738,6 +749,68 @@ const showDetail = (row) => {
 // 在 script setup 中添加
 const dialog = useDialog();
 const message = useMessage();
+
+// 批量选择/删除逻辑
+const selectedIds = ref([]);
+const currentPageIds = computed(() => (videoList.value || []).map(v => v.id));
+const isAllCurrentPageSelected = computed(() => currentPageIds.value.length > 0 && currentPageIds.value.every(id => selectedIds.value.includes(id)));
+const toggleSelectAllCurrentPage = () => {
+  if (isAllCurrentPageSelected.value) {
+    selectedIds.value = selectedIds.value.filter(id => !currentPageIds.value.includes(id));
+  } else {
+    const set = new Set(selectedIds.value);
+    currentPageIds.value.forEach(id => set.add(id));
+    selectedIds.value = Array.from(set);
+  }
+};
+const toggleSelectOne = (id, checked) => {
+  const idx = selectedIds.value.indexOf(id);
+  if (checked) {
+    if (idx === -1) selectedIds.value.push(id);
+  } else {
+    if (idx > -1) selectedIds.value.splice(idx, 1);
+  }
+};
+
+const handleBatchDelete = async () => {
+  const ids = [...selectedIds.value];
+  if (ids.length === 0) {
+    message.warning('请先选择视频');
+    return;
+  }
+  const confirmed = await new Promise((resolve) => {
+    dialog.warning({
+      title: '批量删除确认',
+      content: `确定要删除选中的 ${ids.length} 个视频吗？`,
+      positiveText: '确定',
+      negativeText: '取消',
+      onPositiveClick: () => resolve(true),
+      onNegativeClick: () => resolve(false),
+    });
+  });
+  if (!confirmed) return;
+  // 确认后立即显示全局加载
+  loading.value = true;
+  try {
+    const resp = await batchDeleteVideos(ids);
+    if (resp && resp.code === 0) {
+      const data = resp.data || {};
+      const deletedCount = (data.deleted || []).length;
+      const notFoundCount = (data.not_found || []).length;
+      const failedCount = (data.failed || []).length;
+      message.success(`删除完成：成功 ${deletedCount}，未找到 ${notFoundCount}，失败 ${failedCount}`);
+    } else {
+      message.error(resp?.message || '批量删除失败');
+    }
+  } catch (e) {
+    console.error('批量删除异常:', e);
+    message.error(e?.message || '批量删除异常');
+  } finally {
+    selectedIds.value = [];
+    // 刷新列表并在其中关闭 loading
+    await loadVideoList();
+  }
+};
 
 // 修改删除函数
 const handleDelete = async (row) => {
@@ -1711,5 +1784,14 @@ const getVerticalCoverPublishInfo = () => {
   .platform-item {
     padding: 12px 8px;
   }
+}
+.select-checkbox {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  padding: 2px 6px;
 }
 </style>

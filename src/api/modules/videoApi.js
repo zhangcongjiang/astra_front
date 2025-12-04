@@ -163,6 +163,18 @@ export const deleteVideo = async (video_id) => {
   }
 };
 
+export const batchDeleteVideos = async (video_ids) => {
+  try {
+    const response = await request.post('/video/batch-delete/', {
+      video_ids
+    });
+    return response;
+  } catch (error) {
+    console.error('批量删除视频失败:', error);
+    throw error;
+  }
+};
+
 export const updateVideo = async (video_id,title,content) => {
   try {
     const response = await request.post('/video/update/', {
