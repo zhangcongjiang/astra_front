@@ -45,6 +45,21 @@
       </a-button>
       <a-button type="primary" @click="handleImport">本地导入</a-button>
       <a-button type="primary" @click="handleUrlImport">URL导入</a-button>
+      <!-- 新增：本页全选与批量删除 -->
+      <a-button 
+        @click="toggleSelectAllCurrentPage" 
+        :disabled="currentPageData.length === 0"
+      >
+        {{ isAllCurrentPageSelected ? '取消全选' : '全选' }}
+      </a-button>
+      <a-button 
+        type="primary" 
+        danger 
+        @click="handleBatchDelete" 
+        :disabled="selectedIds.length === 0"
+      >
+        批量删除 ({{ selectedIds.length }})
+      </a-button>
     </div>
 
     <div class="table-container">
@@ -54,6 +69,7 @@
         :pagination="false" 
         :loading="loading"
         rowKey="id"
+        :rowSelection="rowSelection"
         :customRow="handleRowClick">
         <template #bodyCell="{ column, record }">
           <!-- 新增：封面列渲染 -->
@@ -295,7 +311,8 @@ import {
   downloadText, 
   uploadMarkdown,
   importFromUrl,
-  replaceTextCover
+  replaceTextCover,
+  batchDeleteTexts
 } from '@/api/modules/textApi';
 import { getImageDetail } from '@/api/modules/imageApi.js';
 import { getAssetCollectionDetail } from '@/api/modules/assetApi.js';
@@ -812,6 +829,9 @@ const handleDelete = (record) => {
     async onOk() {
       try {
         await deleteText(record.id);
+        // 移除选中状态中的该ID（若存在）
+        const idx = selectedIds.value.indexOf(record.id);
+        if (idx > -1) selectedIds.value.splice(idx, 1);
         message.success('删除成功');
         fetchData();
       } catch (error) {
@@ -1158,6 +1178,58 @@ const handlePaginationChange = ({ current, pageSize }) => {
 onMounted(() => {
   fetchData();
 });
+// 新增：批量选择与批量删除状态与方法
+const selectedIds = ref([]);
+const currentPageIds = computed(() => (currentPageData.value || []).map(r => r.id));
+const isAllCurrentPageSelected = computed(() => (
+  currentPageIds.value.length > 0 && currentPageIds.value.every(id => selectedIds.value.includes(id))
+));
+const toggleSelectAllCurrentPage = () => {
+  if (isAllCurrentPageSelected.value) {
+    // 取消当前页全选：移除当前页的所有ID
+    const set = new Set(selectedIds.value);
+    currentPageIds.value.forEach(id => set.delete(id));
+    selectedIds.value = Array.from(set);
+  } else {
+    // 本页全选：合并当前页所有ID
+    const set = new Set(selectedIds.value);
+    currentPageIds.value.forEach(id => set.add(id));
+    selectedIds.value = Array.from(set);
+  }
+};
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedIds.value,
+  onChange: (keys) => { selectedIds.value = keys; }
+}));
+const handleBatchDelete = () => {
+  if (!selectedIds.value.length) {
+    message.warning('请先选择要删除的图文');
+    return;
+  }
+  Modal.confirm({
+    title: '批量删除确认',
+    content: `确认删除选中的 ${selectedIds.value.length} 条图文吗？`,
+    okText: '确认',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        const resp = await batchDeleteTexts(selectedIds.value);
+        const deleted = resp?.data?.deleted ?? resp?.deleted ?? 0;
+        const requested = resp?.data?.requested ?? resp?.requested ?? selectedIds.value.length;
+        if (resp?.code === 0 || deleted >= 0) {
+          message.success(`批量删除成功，已删除 ${deleted} / 请求 ${requested}`);
+          selectedIds.value = [];
+          fetchData();
+        } else {
+          message.error(resp?.message || resp?.msg || '批量删除失败');
+        }
+      } catch (error) {
+        console.error('批量删除失败:', error);
+        message.error('批量删除失败');
+      }
+    }
+  });
+};
 </script>
 
 <style scoped>

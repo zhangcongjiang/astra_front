@@ -162,3 +162,16 @@ export const replaceTextCover = async (text_id, cover_id) => {
     }
 };
 
+
+export const batchDeleteTexts = async (text_ids) => {
+    try {
+        const response = await request.post('/text/batch-delete/', {
+            text_ids
+        });
+        return response;
+    } catch (error) {
+        console.error('批量删除图文失败:', error);
+        throw error;
+    }
+};
+
