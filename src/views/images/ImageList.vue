@@ -626,19 +626,41 @@ const showDeleteConfirm = (imageId) => {
 // 新增删除处理方法
 const handleDeleteImage = async (imageId) => {
   try {
-    await deleteImages([imageId]);
-    const index = imageData.value.findIndex(img => img.id === imageId);
-    if (index !== -1) {
-      // 释放图片的Blob URL
-      if (imageData.value[index].url && imageData.value[index].url.startsWith('blob:')) {
-        URL.revokeObjectURL(imageData.value[index].url);
+    loading.value = true;
+    const resp = await deleteImages([imageId]);
+    const result = (resp?.data && (resp.data.deleted !== undefined || resp.data?.blocked !== undefined || resp.data?.not_found !== undefined)) ? resp.data : resp;
+    const deleted = Array.isArray(result?.deleted) ? result.deleted : [];
+    const blocked = Array.isArray(result?.blocked) ? result.blocked : [];
+    const notFound = Array.isArray(result?.not_found) ? result.not_found : [];
+
+    if (deleted.includes(imageId)) {
+      const index = imageData.value.findIndex(img => img.id === imageId);
+      if (index !== -1) {
+        if (imageData.value[index].url && imageData.value[index].url.startsWith('blob:')) {
+          URL.revokeObjectURL(imageData.value[index].url);
+        }
+        imageData.value.splice(index, 1);
       }
-      imageData.value.splice(index, 1);
       message.success('图片删除成功');
+    }
+
+    if (blocked.length > 0) {
+      const item = blocked.find(b => b.image_id === imageId);
+      const reasonsText = item?.reasons?.length ? item.reasons.join('、') : '存在引用关系，无法删除';
+      Modal.warning({
+        title: '图片无法删除',
+        content: `原因：${reasonsText}`,
+      });
+    }
+
+    if (notFound.includes(imageId)) {
+      message.warning('图片不存在或已被删除');
     }
   } catch (error) {
     console.error('删除图片失败:', error);
     message.error('图片删除失败');
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -828,13 +850,39 @@ const handleBatchDelete = async () => {
     // 开始全局加载，与视频页一致
     loading.value = true;
     await deleteImages(selectedImages.value);
-    message.success(`成功删除 ${selectedImages.value.length} 张图片`);
-    clearSelection();
-    // 重新获取图片列表，刷新页面数据，并在其中关闭 loading
+    const result = (resp?.data && (resp.data.deleted !== undefined || resp.data?.blocked !== undefined || resp.data?.not_found !== undefined)) ? resp.data : resp;
+    const deleted = Array.isArray(result?.deleted) ? result.deleted : [];
+    const blocked = Array.isArray(result?.blocked) ? result.blocked : [];
+    const notFound = Array.isArray(result?.not_found) ? result.not_found : [];
+
+    const deletedCount = deleted.length;
+    const blockedCount = blocked.length;
+    const notFoundCount = notFound.length;
+
+    if (deletedCount > 0) {
+      message.success(`成功删除 ${deletedCount} 张图片`);
+    }
+    if (blockedCount > 0) {
+      const detail = blocked.map(b => `- ${b.image_id}: ${Array.isArray(b.reasons) ? b.reasons.join('、') : '存在引用，无法删除'}`).join('<br/>');
+      Modal.warning({
+        title: '部分图片无法删除',
+        content: `共有 ${blockedCount} 张图片被阻止删除：<br/>${detail}`,
+      });
+    }
+    if (notFoundCount > 0) {
+      message.warning(`有 ${notFoundCount} 张图片未找到或已删除`);
+    }
+
+    // 仅移除已成功删除的选中项，保留被阻止的选中项，便于用户后续处理
+    selectedImages.value = selectedImages.value.filter(id => !deleted.includes(id));
+
+    // 刷新列表
     await fetchImageList();
   } catch (error) {
     console.error('批量删除图片失败:', error);
     message.error('批量删除图片失败');
+  } finally {
+    loading.value = false;
   }
 };
 
