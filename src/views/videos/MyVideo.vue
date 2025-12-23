@@ -171,7 +171,7 @@
       @change="handlePageChange" />
 
     <!-- 发布弹窗 -->
-    <a-modal v-model:open="publishModalVisible" title="发布视频" width="800px" :footer="null" @cancel="closePublishModal">
+    <a-modal v-model:open="publishModalVisible" title="发布视频" width="960px" :footer="null" @cancel="closePublishModal">
       <div class="publish-modal-content">
         <!-- 视频信息部分 -->
         <div class="video-info-section">
@@ -226,9 +226,7 @@
             <div v-for="p in dynamicPlatforms" :key="p.name" class="platform-item"
               :class="{ active: selectedPlatforms.includes(p.name) }" @click="togglePlatform(p.name)">
               <div class="platform-icon">
-                <img v-if="p.faviconUrl" :src="p.faviconUrl" alt="" style="width:24px;height:24px;" />
-                <component v-else :is="guessPlatformIcon(p)"
-                  :style="{ fontSize: '24px', color: guessPlatformColor(p) }" />
+                <img v-if="p.faviconUrl" :src="p.faviconUrl" alt="" style="width:20px;height:20px;" />
               </div>
               <div class="platform-name">{{ p.platformName || p.name }}</div>
               <div class="platform-check" v-if="selectedPlatforms.includes(p.name)">
@@ -243,7 +241,7 @@
         <div class="modal-actions">
           <a-button @click="closePublishModal">取消</a-button>
           <a-button type="primary" :disabled="selectedPlatforms.length === 0 || !hasTags" @click="handlePublish">
-            发布到选中平台 ({{ selectedPlatforms.length }})
+            开始发布 ({{ selectedPlatforms.length }})
           </a-button>
         </div>
       </div>
@@ -292,15 +290,10 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted, watch } from 'vue';
-import { h } from 'vue';
-import { NDataTable, NCard, NButton, NProgress, NTag, useDialog, useMessage } from 'naive-ui';
+import { ref, computed, reactive, onMounted } from 'vue';
+ 
 import {
   VideoCameraOutlined,
-  GlobalOutlined,
-  PlayCircleOutlined,
-  WechatOutlined,
-  WeiboOutlined,
   CheckCircleFilled
 } from '@ant-design/icons-vue';
 import Pagination from '@/components/Pagination.vue';
@@ -309,6 +302,7 @@ import { getImageDetail } from '@/api/modules/imageApi.js';
 import { ElMessage } from 'element-plus';
 import dayjs from 'dayjs';
 import UserSelect from '@/components/UserSelect.vue'
+import { useDialog, useMessage } from 'naive-ui';
 
 import {
   checkServiceStatus as extCheckServiceStatus,
@@ -316,7 +310,7 @@ import {
   funcPublish as extFuncPublish,
   funcGetPermission as extFuncGetPermission,
   getPlatformInfos as extGetPlatformInfos,
-  getAccountInfos as extGetAccountInfos,
+ 
 
 } from '@/utils/extensionMessaging.js';
 
@@ -627,6 +621,8 @@ const showPublishModal = async (video) => {
     coverDetail.value = null;
     verticalCoverDetail.value = null;
   }
+
+  await loadPlatformsForPublish();
 
   publishModalVisible.value = true;
 };
@@ -963,8 +959,8 @@ const handlePublish = async () => {
       data: {
         title: (editableVideo.value.title || video.title || '未命名视频').trim(),
         content: (editableVideo.value.content || video.content || '').trim(),
-        cover,
-        verticalCover,
+        cover: verticalCover,
+        verticalCover: cover,
         scheduledPublishTime: scheduledTs,
         videoUrl: httpVideoUrl,
         video: {
@@ -993,188 +989,33 @@ const handlePublish = async () => {
 
 
 const dynamicPlatforms = ref([]);
-// 本地自定义平台列表（可按需修改 injectUrl/homeUrl/icon 等）
-const localPlatforms = [
-
-  {
-    type: 'VIDEO',
-    name: 'VIDEO_DOUYIN',
-    homeUrl: 'https://creator.douyin.com/',
-    faviconUrl: 'https://lf1-cdn-tos.bytegoofy.com/goofy/ies/douyin_web/public/favicon.ico',
-    platformName: '抖音',
-    injectUrl: 'https://creator.douyin.com/creator-micro/content/upload',
-    tags: ['CN'],
-    accountKey: 'douyin',
-  },
-  
-  {
-    type: 'VIDEO',
-    name: 'VIDEO_REDNOTE',
-    homeUrl: 'https://creator.xiaohongshu.com',
-    faviconUrl: 'https://creator.xiaohongshu.com/favicon.ico',
-    iconifyIcon: 'simple-icons:xiaohongshu',
-    platformName: '小红书',
-    injectUrl: 'https://creator.xiaohongshu.com/publish/publish?from=tab_switch&target=video',
-    tags: ['CN'],
-    accountKey: 'rednote',
-  },
-   {
-    type: 'VIDEO',
-    name: 'VIDEO_TOUTIAOHAO',
-    homeUrl: 'https://www.toutiao.com/',
-    faviconUrl: 'https://sf1-cdn-tos.toutiaostatic.com/obj/ttfe/pgcfe/sz/mp_logo.png',
-    platformName: '今日头条',
-    injectUrl: 'https://mp.toutiao.com/profile_v4/xigua/upload-video',
-    tags: ['CN'],
-    accountKey: 'toutiaohao',
-  },
-  {
-    type: 'VIDEO',
-    name: 'VIDEO_BILIBILI',
-    homeUrl: 'https://member.bilibili.com/',
-    faviconUrl: 'https://static.hdslb.com/images/favicon.ico',
-    iconifyIcon: 'simple-icons:bilibili',
-    platformName: 'B站',
-    injectUrl: 'https://member.bilibili.com/platform/upload/video/frame',
-    tags: ['CN'],
-    accountKey: 'bilibili',
-  },
-  {
-    type: 'VIDEO',
-    name: 'VIDEO_WEIXINCHANNEL',
-    homeUrl: 'https://channels.weixin.qq.com/platform',
-    faviconUrl: 'https://res.wx.qq.com/t/wx_fed/finder/helper/finder-helper-web/res/favicon-v2.ico',
-    platformName: '微信视频号',
-    injectUrl: 'https://channels.weixin.qq.com/platform/post/create',
-    tags: ['CN'],
-    accountKey: 'weixinchannel',
-  },
-
-  {
-    type: 'VIDEO',
-    name: 'VIDEO_BAIJIAHAO',
-    homeUrl: 'https://baijiahao.baidu.com/',
-    faviconUrl: 'https://pic.rmb.bdstatic.com/10e1e2b43c35577e1315f0f6aad6ba24.vnd.microsoft.icon',
-    platformName: '百家号',
-    injectUrl: 'https://baijiahao.baidu.com/builder/rc/edit?type=videoV2',
-    tags: ['CN'],
-    accountKey: 'baijiahao',
-  },
-  {
-    type: 'VIDEO',
-    name: 'VIDEO_WEIBO',
-    homeUrl: 'https://weibo.com/',
-    faviconUrl: 'https://weibo.com/favicon.ico',
-    platformName: '微博',
-    injectUrl: 'https://weibo.com/upload/channel',
-    tags: ['CN'],
-    accountKey: 'weibo',
-  },
-    {
-    type: 'VIDEO',
-    name: 'VIDEO_KUAISHOU',
-    homeUrl: 'https://cp.kuaishou.com/',
-    faviconUrl: 'https://www.kuaishou.com/favicon.ico',
-    platformName: '快手',
-    injectUrl: 'https://cp.kuaishou.com/article/publish/video',
-    tags: ['CN'],
-    accountKey: 'kuaishou',
-  },
-  {
-    type: 'VIDEO',
-    name: 'VIDEO_OKJIKE',
-    homeUrl: 'https://web.okjike.com',
-    faviconUrl: 'https://web.okjike.com/favicon.ico',
-    platformName: '即刻',
-    injectUrl: 'https://web.okjike.com',
-    tags: ['CN'],
-    accountKey: 'okjike',
-  },
-   {
-    type: 'VIDEO',
-    name: 'VIDEO_BLUESKY',
-    homeUrl: 'https://bsky.app/',
-    faviconUrl: 'https://web-cdn.bsky.app/static/favicon-32x32.png',
-    platformName: 'BLUESKY',
-    injectUrl: 'https://bsky.app/',
-    tags: ['International'],
-    accountKey: 'bluesky',
-  },
-  {
-    type: 'VIDEO',
-    name: 'VIDEO_ZHIHU',
-    homeUrl: 'https://www.zhihu.com/',
-    faviconUrl: 'https://www.zhihu.com/favicon.ico',
-    platformName: '知乎',
-    injectUrl: 'https://www.zhihu.com/zvideo/upload-video',
-    tags: ['CN'],
-    accountKey: 'zhihu',
-  },
-   {
-    type: 'VIDEO',
-    name: 'VIDEO_EASTMONEY',
-    homeUrl: 'https://www.eastmoney.com/',
-    faviconUrl: 'https://mycaifuhao.eastmoney.com/public/publish/favicon.ico',
-    platformName: '东方财富',
-    injectUrl: 'https://mp.eastmoney.com/collect/pc_writer/index.html#/publish/video',
-    tags: ['CN'],
-    accountKey: 'eastmoney',
-  },
-  {
-    type: 'VIDEO',
-    name: 'VIDEO_XIAOHEIHE',
-    homeUrl: 'https://www.xiaoheihe.cn/',
-    faviconUrl: 'https://www.xiaoheihe.cn/favicon.ico',
-    platformName: '小黑盒',
-    injectUrl: 'https://www.xiaoheihe.cn/creator/editor/draft/video',
-    tags: ['CN'],
-    accountKey: 'xiaoheihe',
-  },
-
-  {
-    type: 'VIDEO',
-    name: 'VIDEO_YOUTUBE',
-    homeUrl: 'https://studio.youtube.com/',
-    faviconUrl: 'https://www.youtube.com/favicon.ico',
-    platformName: '油管',
-    injectUrl: 'https://studio.youtube.com/',
-    tags: ['International'],
-    accountKey: 'youtube',
-  },
-    {
-    type: 'VIDEO',
-    name: 'VIDEO_TIKTOK',
-    homeUrl: 'https://www.tiktok.com/tiktokstudio',
-    faviconUrl: 'https://pic1.zhimg.com/80/v2-9ad49e8e52b473e4c366b69bc9653a45_1440w.png',
-    platformName: 'TIK-TOK',
-    injectUrl: 'https://www.tiktok.com/tiktokstudio/upload',
-    tags: ['International'],
-    accountKey: 'tiktok',
-  },
-];
 
 // 初始化平台列表到 UI
-dynamicPlatforms.value = localPlatforms;
+dynamicPlatforms.value = [];
 
-const guessPlatformIcon = (p) => {
-  const key = (p?.name || p?.platformName || '').toLowerCase();
-  if (key.includes('douyin') || key.includes('抖音')) return PlayCircleOutlined;
-  if (key.includes('bilibili') || key.includes('哔哩')) return PlayCircleOutlined;
-  if (key.includes('weibo')) return WeiboOutlined;
-  if (key.includes('wechat') || key.includes('微信')) return WechatOutlined;
-  if (key.includes('toutiao') || key.includes('头条')) return GlobalOutlined;
-  return PlayCircleOutlined;
+const normalizePlatforms = (raw) => {
+  let arr = Array.isArray(raw) ? raw : Object.values(raw || {});
+  return (arr || []).map((p) => ({
+    ...p,
+    name: p?.name || p?.platformName || p?.key || p?.id,
+  }));
 };
 
-const guessPlatformColor = (p) => {
-  const key = (p?.name || p?.platformName || '').toLowerCase();
-  if (key.includes('douyin') || key.includes('抖音')) return '#000000';
-  if (key.includes('bilibili') || key.includes('哔哩')) return '#00a1d6';
-  if (key.includes('weibo')) return '#e6162d';
-  if (key.includes('wechat') || key.includes('微信')) return '#07c160';
-  if (key.includes('toutiao') || key.includes('头条')) return '#ff6600';
-  return '#666';
+const loadPlatformsForPublish = async () => {
+  try {
+    let list = await extGetPlatformInfos('VIDEO');
+    let platforms = normalizePlatforms(list);
+    if (!platforms.length) {
+      const all = await extGetPlatformInfos();
+      platforms = normalizePlatforms(all).filter((p) => (p.type === 'VIDEO' || !p.type));
+    }
+    dynamicPlatforms.value = platforms;
+  } catch (_) {
+    dynamicPlatforms.value = [];
+  }
 };
+
+ 
 
 
 // 工具函数与状态文本渲染
@@ -1709,7 +1550,7 @@ const getVerticalCoverPublishInfo = () => {
 
 .platform-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(7, 1fr);
   gap: 12px;
 }
 
@@ -1718,7 +1559,7 @@ const getVerticalCoverPublishInfo = () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16px 12px;
+  padding: 12px 8px;
   border: 2px solid #e8e8e8;
   border-radius: 8px;
   cursor: pointer;

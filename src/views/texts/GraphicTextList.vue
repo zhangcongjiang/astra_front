@@ -40,7 +40,8 @@
     </div>
 
     <div class="button-group" style="margin-left: auto;">
-      <a-button type="primary" @click="handleCreate" :icon="h(PlusOutlined)">
+      <a-button type="primary" @click="handleCreate">
+        <template #icon><PlusOutlined /></template>
         创建图文
       </a-button>
       <a-button type="primary" @click="handleImport">本地导入</a-button>
@@ -153,23 +154,35 @@
       </a-spin>
     </a-modal>
     <!-- 新增：发布弹窗 -->
-    <a-modal v-model:open="publishModalVisible" title="发布图文" width="800px" :footer="null" @cancel="closePublishModal">
+    <a-modal v-model:open="publishModalVisible" title="发布图文" width="960px" :footer="null" @cancel="closePublishModal">
       <div class="publish-modal-content">
+        <!-- 图文信息：封面与标题 -->
+        <div class="text-info-section">
+          <div class="text-info-box">
+            <div class="modal-cover" :class="{ clickable: selectedText && selectedText.coverId }" @click="handlePreviewSelectedCover">
+              <img
+                v-if="selectedText && selectedText.coverId && getTextCoverUrl(selectedText)"
+                :src="getTextCoverUrl(selectedText)"
+                alt="封面"
+              />
+              <div v-else class="modal-cover-placeholder">暂无封面</div>
+            </div>
+            <div class="modal-title">
+              {{ (selectedText && selectedText.title) || '未命名图文' }}
+            </div>
+          </div>
+        </div>
         <!-- 平台选择部分 -->
         <div class="platform-section">
           <div class="platform-header" style="margin-bottom:8px; display:flex; align-items:center; gap:12px;">
             <h3 style="margin:0;">选择发布平台</h3>
-            <div class="auto-publish" style="display:flex; align-items:center; gap:8px;">
-              <span>直接发布</span>
-              <a-switch v-model:checked="isAutoPublish" size="small" />
-            </div>
           </div>
           <div class="platform-grid">
             <div v-for="p in dynamicPlatforms" :key="p.name" class="platform-item"
                  :class="{ active: selectedPlatforms.includes(p.name) }"
                  @click="togglePlatform(p.name)">
               <div class="platform-icon">
-                <img v-if="p.faviconUrl" :src="p.faviconUrl" alt="" style="width:24px;height:24px;" />
+                <img v-if="p.faviconUrl" :src="p.faviconUrl" alt="" style="width:20px;height:20px;" />
               </div>
               <div class="platform-name">{{ p.platformName || p.name }}</div>
               <div class="platform-check" v-if="selectedPlatforms.includes(p.name)">
@@ -179,12 +192,11 @@
           </div>
         </div>
 
-        <!-- 操作按钮 -->
-        <div class="modal-actions">
-          <a-button @click="closePublishModal">取消</a-button>
-          <a-button type="primary" :disabled="selectedPlatforms.length === 0" @click="confirmPublish">
-            发布到选中平台 ({{ selectedPlatforms.length }})
-          </a-button>
+        <!-- 底部操作区域（参考动态发布样式） -->
+        <div class="publish-actions">
+          <a-switch v-model:checked="isAutoPublish" checked-children="自动" un-checked-children="手动" />
+          <a-button type="primary" style="margin-left: 12px" :disabled="selectedPlatforms.length === 0" @click="confirmPublish">开始发布</a-button>
+          <a-button style="margin-left: 8px" @click="closePublishModal">取消</a-button>
         </div>
       </div>
     </a-modal>
@@ -297,7 +309,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, h, watch } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
 import { PlusOutlined } from '@ant-design/icons-vue';
@@ -324,7 +336,6 @@ import {
   funcPublish as extFuncPublish,
   funcGetPermission as extFuncGetPermission,
   getPlatformInfos as extGetPlatformInfos,
-  getAccountInfos as extGetAccountInfos,
 } from '@/utils/extensionMessaging.js';
 // 新增：Markdown 渲染与 HTML 净化
 import MarkdownIt from 'markdown-it';
@@ -453,62 +464,30 @@ const selectedPlatforms = ref([]);
 const dynamicPlatforms = ref([]);
 const isAutoPublish = ref(false);
 
-// 恢复：文章平台列表（根据用户提供配置）
-const localPlatforms = [
-  {
-    type: 'ARTICLE',
-    name: 'ARTICLE_BAIJIAHAO',
-    homeUrl: 'https://baijiahao.baidu.com/',
-    faviconUrl: 'https://pic.rmb.bdstatic.com/10e1e2b43c35577e1315f0f6aad6ba24.vnd.microsoft.icon',
-    platformName: '百家号',
-    injectUrl: 'https://baijiahao.baidu.com/builder/rc/edit?type=news',
-    tags: ['CN'],
-    accountKey: 'baijiahao',
-  },
-  {
-    type: 'ARTICLE',
-    name: 'ARTICLE_TOUTIAO',
-    homeUrl: 'https://mp.toutiao.com/',
-    faviconUrl: 'https://sf1-cdn-tos.toutiaostatic.com/obj/ttfe/pgcfe/sz/mp_logo.png',
-    platformName: '今日头条',
-    injectUrl: 'https://mp.toutiao.com/profile_v4/graphic/publish',
-    tags: ['CN'],
-    accountKey: 'toutiao',
-  },
-  {
-    type: 'ARTICLE',
-    name: 'ARTICLE_WEIXIN',
-    homeUrl: 'https://mp.weixin.qq.com/',
-    faviconUrl: 'https://mp.weixin.qq.com/favicon.ico',
-    platformName: '微信公众号',
-    injectUrl: 'https://mp.weixin.qq.com/',
-    tags: ['CN'],
-    accountKey: 'weixin',
-  },
-  {
-    type: 'ARTICLE',
-    name: 'ARTICLE_BILIBILI',
-    homeUrl: 'https://www.bilibili.com/',
-    faviconUrl: 'https://www.bilibili.com/favicon.ico',
-    platformName: 'B站专栏',
-    injectUrl: 'https://member.bilibili.com/article-text/home?newEditor=-1',
-    tags: ['CN'],
-    accountKey: 'bilibili',
-  },
-  {
-    type: 'ARTICLE',
-    name: 'ARTICLE_WEIBO',
-    homeUrl: 'https://weibo.com/',
-    faviconUrl: 'https://weibo.com/favicon.ico',
-    platformName: '微博',
-    injectUrl: 'https://card.weibo.com/article/v3/editor',
-    tags: ['CN'],
-    accountKey: 'weibo',
-  },
-];
-// 恢复：初始化平台到 UI
+const normalizePlatforms = (raw) => {
+  let arr = Array.isArray(raw) ? raw : Object.values(raw || {});
+  return (arr || []).map((p) => ({
+    ...p,
+    name: p?.name || p?.platformName || p?.key || p?.id,
+  }));
+};
+
+const loadPlatformsForPublish = async () => {
+  try {
+    let list = await extGetPlatformInfos('ARTICLE');
+    let platforms = normalizePlatforms(list);
+    if (!platforms.length) {
+      const all = await extGetPlatformInfos();
+      platforms = normalizePlatforms(all).filter((p) => (p.type === 'ARTICLE' || !p.type));
+    }
+    dynamicPlatforms.value = platforms;
+  } catch (_) {
+    dynamicPlatforms.value = [];
+  }
+};
+
 onMounted(() => {
-  dynamicPlatforms.value = localPlatforms;
+  loadPlatformsForPublish();
 });
 // 恢复：平台选择函数
 const togglePlatform = (platformKey) => {
@@ -538,6 +517,20 @@ const requestDomainTrust = async (timeout = 5000) => {
   } catch (error) {
     console.error('Domain trust request failed:', error);
     return { status: 'error', trusted: false };
+  }
+};
+
+// 预览当前选择的图文封面
+const handlePreviewSelectedCover = async () => {
+  const rec = selectedText.value;
+  if (!rec) return;
+  if (!getTextCoverUrl(rec) && rec.coverId) {
+    await loadCoverDetailForText(rec);
+  }
+  const url = getTextCoverUrl(rec);
+  if (url) {
+    previewImageUrl.value = url;
+    imagePreviewVisible.value = true;
   }
 };
 
@@ -872,6 +865,7 @@ const handlePublish = async (record) => {
     if (record.coverId && !coverDetails[record.id]) {
       await loadCoverDetailForText(record);
     }
+    await loadPlatformsForPublish();
     publishModalVisible.value = true;
   } catch (error) {
     console.error('打开发布弹窗失败:', error);
@@ -1397,152 +1391,8 @@ const handleBatchDelete = () => {
 /* 保障平台卡片为横向网格排列 */
 .platform-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(7, 1fr);
   gap: 12px;
-}
-/* 其余样式保留 */
-.title-content {
-  display: flex;
-  align-items: center;
-}
-.title-text {
-  font-weight: 500;
-  color: rgba(0, 0, 0, 0.85);
-}
-
-.text-content {
-  max-height: 120px;
-  overflow: hidden;
-  position: relative;
-}
-
-.content-preview {
-  max-height: 100px;
-  overflow: hidden;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.button-group {
-  display: flex;
-  gap: 8px;
-}
-
-.search-area {
-  margin-bottom: 20px;
-  padding: 16px;
-  background: #fff;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  display: flex;
-  align-items: center;
-}
-
-.search-area .ant-form {
-  flex: 1;
-  margin-right: 16px;
-}
-
-.pagination {
-  margin-top: 16px;
-  text-align: right;
-}
-
-:deep(.ant-table-row) {
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-:deep(.ant-table-row:hover) {
-  background-color: #fafafa;
-  transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-:deep(.ant-table-cell) {
-  padding: 16px !important;
-}
-
-.upload-area {
-  width: 100%;
-}
-
-.upload-dragger {
-  border: 2px dashed #d9d9d9;
-  border-radius: 6px;
-  background: #fafafa;
-  text-align: center;
-  padding: 40px 20px;
-  transition: border-color 0.3s;
-  cursor: pointer;
-}
-
-.upload-dragger:hover {
-  border-color: #1890ff;
-}
-
-.upload-dragger.dragover {
-  border-color: #1890ff;
-  background: #e6f7ff;
-}
-
-.upload-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.upload-hint {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.upload-hint p {
-  margin: 4px 0;
-  color: #666;
-}
-
-.file-selected {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: #f0f9ff;
-  border-radius: 4px;
-  border: 1px solid #91d5ff;
-}
-
-.file-selected span {
-  color: #1890ff;
-  font-weight: 500;
-}
-
-.url-preview {
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  padding: 12px;
-  background-color: #fafafa;
-}
-
-.preview-title {
-  font-weight: 500;
-  margin-bottom: 8px;
-  color: #262626;
-}
-
-.preview-content {
-  color: #595959;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
-
-.ant-tabs-content {
-  padding-top: 16px;
 }
 
 /* 新增：封面选择弹窗的网格样式 */
@@ -1578,4 +1428,13 @@ const handleBatchDelete = () => {
   max-height: calc(90vh - 120px);
   object-fit: contain;
 }
+
+/* 发布弹窗：图文信息与按钮布局优化 */
+.text-info-section { margin-bottom: 12px; }
+.text-info-box { display: flex; align-items: center; gap: 12px; }
+.modal-cover { width: 60px; height: 60px; border-radius: 6px; overflow: hidden; background: #fafafa; border: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.modal-cover img { width: 100%; height: 100%; object-fit: cover; }
+.modal-cover-placeholder { font-size: 12px; color: #999; }
+.modal-title { font-size: 16px; font-weight: 600; color: #333; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.publish-actions { margin-top: 16px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 </style>

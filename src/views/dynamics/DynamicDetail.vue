@@ -61,7 +61,7 @@
     </a-card>
 
     <!-- 发布弹窗 -->
-    <a-modal v-model:open="publishModalVisible" title="发布动态" :footer="null" width="820px">
+    <a-modal v-model:open="publishModalVisible" title="发布动态" :footer="null" width="960px">
       <div class="publish-editor-grid">
         <div class="editor-left" style="width: 100%;">
           <a-form layout="vertical">
@@ -88,7 +88,7 @@
       <div class="publish-platforms">
         <div class="platform" v-for="p in dynamicPlatforms" :key="p.name" :class="{active: selectedPlatforms.includes(p.name)}" @click="togglePlatform(p.name)">
           <img v-if="p.faviconUrl" :src="p.faviconUrl" alt=""/>
-          <span>{{ p.platformName }}</span>
+          <span>{{ p.platformName || p.name }}</span>
         </div>
       </div>
       <div class="publish-actions">
@@ -173,21 +173,25 @@ const togglePlatform = (key) => {
 const openPublish = async () => {
   publishModalVisible.value = true;
   initPublishFormFromDetail();
-  dynamicPlatforms.value = await getPlatformInfos('DYNAMIC');
-  // 仅保留指定平台：哔哩哔哩、抖音、小红书、今日头条、百家号、微信视频号
-  const allowedKeywords = [
-    'bilibili', '哔哩', 'b站',
-    'douyin', '抖音',
-    'xiaohongshu', '小红书', 'rednote',
-    'toutiao', '今日头条', '头条',
-    'baijiahao', '百家号',
-    'weixinchannel', '微信视频号', '视频号'
-  ];
-  dynamicPlatforms.value = (dynamicPlatforms.value || []).filter((p) => {
-    const en = `${(p.name || '').toLowerCase()} ${(p.platformName || '').toLowerCase()}`;
-    const zh = `${p.platformName || ''}`;
-    return allowedKeywords.some((k) => en.includes(k) || zh.includes(k));
-  });
+  try {
+    const normalizePlatforms = (raw) => {
+      let arr = Array.isArray(raw) ? raw : Object.values(raw || {});
+      return (arr || []).map((p) => ({
+        ...p,
+        name: p?.name || p?.platformName || p?.key || p?.id,
+      }));
+    };
+    let list = await getPlatformInfos('DYNAMIC');
+    let platforms = normalizePlatforms(list);
+    if (!platforms.length) {
+      const all = await getPlatformInfos();
+      platforms = normalizePlatforms(all).filter((p) => (p.type === 'DYNAMIC' || !p.type));
+    }
+    dynamicPlatforms.value = platforms;
+  } catch (e) {
+    message.error('获取平台信息失败');
+    dynamicPlatforms.value = [];
+  }
 };
 const confirmPublish = async () => {
   try {
@@ -313,12 +317,12 @@ onMounted(async () => {
 .publish-images-grid.compact .img-card .img-name { margin-top: 4px; font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .publish-images-grid.compact .img-card .img-check { position: absolute; top: 6px; right: 6px; }
 
-.publish-platforms { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
-.publish-platforms .platform { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; cursor:pointer; background:#fff; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: all .2s; }
+.publish-platforms { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-top: 12px; }
+.publish-platforms .platform { display:flex; align-items:center; gap:10px; padding:12px 8px; border:1px solid #e5e7eb; border-radius:8px; cursor:pointer; background:#fff; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: all .2s; }
 .publish-platforms .platform:hover { border-color:#1890ff; box-shadow: 0 2px 8px rgba(24,144,255,.15); }
 .publish-platforms .platform.active { border-color:#1890ff; background:#f0f7ff; }
-.publish-platforms .platform img { width:24px; height:24px; border-radius:4px; object-fit: contain; }
-.publish-platforms .platform span { flex:1; font-size:14px; color:#333; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
+.publish-platforms .platform img { width:20px; height:20px; border-radius:4px; object-fit: contain; }
+.publish-platforms .platform span { flex:1; font-size:12px; color:#333; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
 .publish-actions { margin-top: 16px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 
 .media-section { display: flex; align-items: flex-start; gap: 12px; }

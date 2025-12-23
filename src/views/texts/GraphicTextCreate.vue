@@ -48,6 +48,13 @@
             >
               {{ route.params.id ? '保存' : '创建' }}
             </a-button>
+            <a-button 
+              style="margin-left:8px"
+              @click="openPublish"
+              :disabled="!title.trim() || !content.trim()"
+            >
+              发布
+            </a-button>
           </div>
         </div>
       </a-col>
@@ -149,6 +156,39 @@
         <EditOutlined />
       </a-button>
     </div>
+    <a-modal v-model:open="publishModalVisible" title="发布图文" :footer="null" width="960px">
+      <div style="margin-bottom:12px;">
+        <a-form layout="vertical">
+          <a-form-item label="标题">
+            <a-input v-model:value="publishTitle" />
+          </a-form-item>
+          <a-form-item label="内容">
+            <a-textarea v-model:value="publishContent" :rows="6" />
+          </a-form-item>
+        </a-form>
+        <div style="display:flex; align-items:center; justify-content: space-between; margin-bottom:8px;">
+          <a-checkbox v-model:checked="publishSelectAll" @change="toggleSelectAll">全选图片</a-checkbox>
+          <a-switch v-model:checked="isAutoPublish" checked-children="自动" un-checked-children="手动" />
+        </div>
+        <div class="publish-images-grid compact">
+          <div class="img-card" v-for="(img, idx) in publishImages" :key="idx" :class="{selected: img.selected}" @click="togglePublishImage(idx)">
+            <img :src="img.url" />
+            <div class="img-name" :title="img.name">{{ img.name || '图片' }}</div>
+            <a-checkbox class="img-check" :checked="img.selected" />
+          </div>
+        </div>
+      </div>
+      <div class="publish-platforms">
+        <div class="platform" v-for="p in dynamicPlatforms" :key="p.name" :class="{active: selectedPlatforms.includes(p.name)}" @click="togglePlatform(p.name)">
+          <img v-if="p.faviconUrl" :src="p.faviconUrl" alt=""/>
+          <span>{{ p.platformName || p.name }}</span>
+        </div>
+      </div>
+      <div class="publish-actions">
+        <a-button type="primary" @click="confirmPublish">开始发布</a-button>
+        <a-button style="margin-left: 8px" @click="publishModalVisible = false">取消</a-button>
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -160,6 +200,7 @@ import { EditOutlined, EyeOutlined } from '@ant-design/icons-vue';
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
 import { getTextDetail, saveText } from '@/api/modules/textApi';
+import { funcPublish, getPlatformInfos, checkServiceStatus, funcGetPermission, openOptions } from '@/utils/extensionMessaging';
 
 const md = new MarkdownIt();
 const title = ref('');
@@ -383,6 +424,171 @@ onUnmounted(() => {
   document.removeEventListener('mousemove', handleResize);
   document.removeEventListener('mouseup', stopResize);
 });
+
+const publishModalVisible = ref(false);
+const dynamicPlatforms = ref([]);
+const selectedPlatforms = ref([]);
+const isAutoPublish = ref(false);
+const publishTitle = ref('');
+const publishContent = ref('');
+const publishImages = ref([]);
+const publishSelectAll = ref(true);
+const staticBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8089';
+
+const convertToHttpUrl = (p) => {
+  if (!p) return '';
+  if (p.startsWith('http')) return p;
+  if (p.startsWith('/media/')) return `${staticBaseUrl}${p}`;
+  const fileName = p.split(/[\\/]/).pop();
+  if (fileName) return `${staticBaseUrl}/media/images/${fileName}`;
+  return p;
+};
+
+const inferMimeFromName = (name) => {
+  const ext = String(name || '').toLowerCase().split('.').pop();
+  if (ext === 'png') return 'image/png';
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  if (ext === 'gif') return 'image/gif';
+  return 'image/jpeg';
+};
+
+const extractLocalImages = (markdown) => {
+  const files = [];
+  if (!markdown) return files;
+  const added = new Set();
+  const addByPath = (path) => {
+    if (!path) return;
+    const match = path.match(/\/media\/images\/([^?#)\"\s]+)/);
+    if (!match) return;
+    const name = decodeURIComponent(match[1]);
+    if (added.has(name)) return;
+    added.add(name);
+    files.push({
+      name,
+      url: convertToHttpUrl(`/media/images/${name}`),
+      type: inferMimeFromName(name),
+      size: 0,
+      selected: true,
+    });
+  };
+  const mdImgRe = /!\[[^\]]*\]\(([^)]+)\)/g;
+  let m;
+  while ((m = mdImgRe.exec(markdown)) !== null) {
+    addByPath(m[1]);
+  }
+  const htmlImgRe = /src=\"([^\"]+)\"/g;
+  while ((m = htmlImgRe.exec(markdown)) !== null) {
+    addByPath(m[1]);
+  }
+  return files;
+};
+
+const makeDigest = (markdown) => {
+  const safeHtml = DOMPurify.sanitize(md.render(markdown || ''));
+  const text = safeHtml.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  return text.slice(0, 160);
+};
+
+const normalizePlatforms = (raw) => {
+  let arr = Array.isArray(raw) ? raw : Object.values(raw || {});
+  return (arr || []).map((p) => ({
+    ...p,
+    name: p?.name || p?.platformName || p?.key || p?.id,
+  }));
+};
+
+const loadPlatformsForPublish = async () => {
+  try {
+    let list = await getPlatformInfos('ARTICLE');
+    let platforms = normalizePlatforms(list);
+    if (!platforms.length) {
+      const all = await getPlatformInfos();
+      platforms = normalizePlatforms(all).filter((p) => (p.type === 'ARTICLE' || !p.type));
+    }
+    dynamicPlatforms.value = platforms;
+  } catch (_) {
+    dynamicPlatforms.value = [];
+  }
+};
+
+const initPublishForm = () => {
+  publishTitle.value = title.value || '';
+  publishContent.value = content.value || '';
+  publishImages.value = extractLocalImages(content.value || '');
+  publishSelectAll.value = publishImages.value.length > 0;
+};
+
+const togglePublishImage = (idx) => {
+  const img = publishImages.value[idx];
+  if (img) {
+    img.selected = !img.selected;
+    publishSelectAll.value = publishImages.value.length > 0 && publishImages.value.every(i => i.selected);
+  }
+};
+
+const toggleSelectAll = (e) => {
+  const checked = e?.target?.checked ?? publishSelectAll.value;
+  publishSelectAll.value = checked;
+  publishImages.value.forEach(i => { i.selected = checked; });
+};
+
+const togglePlatform = (key) => {
+  const i = selectedPlatforms.value.indexOf(key);
+  if (i > -1) selectedPlatforms.value.splice(i, 1); else selectedPlatforms.value.push(key);
+};
+
+const openPublish = async () => {
+  publishModalVisible.value = true;
+  initPublishForm();
+  await loadPlatformsForPublish();
+};
+
+const confirmPublish = async () => {
+  publishModalVisible.value = false;
+  try {
+    if (!selectedPlatforms.value.length) { message.warning('请选择至少一个平台'); return; }
+    const serviceResp = await checkServiceStatus();
+    if (!serviceResp) { message.error('扩展服务未运行，请先启动扩展'); return; }
+    const trustResp = await funcGetPermission(5000);
+    if (!trustResp || trustResp.status !== 'ok' || !trustResp.trusted) {
+      await openOptions();
+      message.info('请在扩展设置页授权当前域名后，系统将自动继续');
+    }
+    const selectedSet = new Set(selectedPlatforms.value);
+    const targetPlatforms = (dynamicPlatforms.value || []).filter(p => selectedSet.has(p.name));
+    if (!targetPlatforms.length) { message.error('未匹配到选中的平台'); return; }
+    const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, platformName: p.platformName, injectUrl: p.injectUrl, faviconUrl: p.faviconUrl, accountKey: p.accountKey, extraConfig: {} }));
+    const markdown = publishContent.value || content.value || '';
+    const rawHtml = md.render(markdown);
+    const html = DOMPurify.sanitize(
+      rawHtml.replace(/src=\"(\/media\/[^\"]+)\"/g, (m, p1) => `src=\"${convertToHttpUrl(p1)}\"`)
+    );
+    const digest = makeDigest(markdown);
+    const images = publishImages.value
+      .filter(i => i.selected)
+      .map(({ name, url, type, size }) => ({ name, url, type, size }));
+    const syncData = {
+      platforms: syncPlatforms,
+      isAutoPublish: isAutoPublish.value,
+      data: {
+        title: publishTitle.value || title.value || '未命名图文',
+        digest,
+        cover: null,
+        htmlContent: html,
+        markdownContent: markdown,
+        images,
+      }
+    };
+    await funcPublish(syncData);
+    message.success(`发布请求已发送到扩展（${syncPlatforms.length}个平台）`);
+  } catch (e) {
+    console.error('发布失败:', e);
+    message.error(e?.message || '发布失败');
+  } finally {
+    selectedPlatforms.value = [];
+    publishImages.value = [];
+  }
+};
 </script>
 
 <style scoped>
@@ -667,4 +873,20 @@ body.resizing {
 body.resizing * {
   cursor: col-resize !important;
 }
+</style>
+
+<style scoped>
+.publish-platforms { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-top: 12px; }
+.publish-platforms .platform { display:flex; align-items:center; gap:10px; padding:12px 8px; border:1px solid #e5e7eb; border-radius:8px; cursor:pointer; background:#fff; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: all .2s; }
+.publish-platforms .platform:hover { border-color:#1890ff; box-shadow: 0 2px 8px rgba(24,144,255,.15); }
+.publish-platforms .platform.active { border-color:#1890ff; background:#f0f7ff; }
+.publish-platforms .platform img { width:20px; height:20px; border-radius:4px; object-fit: contain; }
+.publish-platforms .platform span { flex:1; font-size:12px; color:#333; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
+.publish-actions { margin-top: 16px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.publish-images-grid.compact { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+.publish-images-grid.compact .img-card { position: relative; border: 1px solid #f0f0f0; border-radius: 6px; padding: 6px; cursor: pointer; }
+.publish-images-grid.compact .img-card.selected { border-color: #1677ff; box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.15); }
+.publish-images-grid.compact .img-card img { width: 100%; height: 70px; object-fit: cover; border-radius: 4px; }
+.publish-images-grid.compact .img-card .img-name { margin-top: 4px; font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.publish-images-grid.compact .img-card .img-check { position: absolute; top: 6px; right: 6px; }
 </style>
