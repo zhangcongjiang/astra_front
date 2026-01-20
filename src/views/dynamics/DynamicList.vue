@@ -33,6 +33,53 @@
           批量删除
         </a-button>
       </a-space>
+      <a-popover v-model:open="autoPopoverVisible" trigger="click" placement="leftTop" :overlayStyle="{ maxWidth: 'calc(100vw - 32px)' }">
+        <template #content>
+          <div style="width: 560px; max-width: calc(100vw - 32px); max-height: 70vh; overflow: auto;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+              <a-switch v-model:checked="autoDynamicEnabled" :loading="autoDynamicLoading" @change="toggleAutoDynamic" />
+              <span>自动发布（{{ autoPublishIntervalLabel }}）</span>
+              <span v-if="autoDynamicNextRunTime" style="color:#999;">下次执行: {{ autoDynamicNextRunTime }}</span>
+            </div>
+            <div style="margin-bottom:8px;">执行周期</div>
+            <a-space>
+              <a-input-number v-model:value="autoPublishIntervalDays" :min="0" placeholder="天" />
+              <a-input-number v-model:value="autoPublishIntervalHours" :min="0" :max="23" placeholder="小时" />
+              <a-input-number v-model:value="autoPublishIntervalMinutes" :min="0" :max="59" placeholder="分钟" />
+            </a-space>
+            <div style="margin-top:12px;">
+              <span style="margin-right:8px;">初次执行时间</span>
+              <a-date-picker v-model:value="autoFirstTime" show-time format="YYYY-MM-DD HH:mm:ss" style="width: 220px" />
+            </div>
+            <div style="margin-top:16px;">同步平台（已配置：{{ selectedAutoPlatformNames }}）</div>
+            <div class="platform-grid" style="margin-top:8px;">
+              <div
+                v-for="p in dynamicPlatforms"
+                :key="p.name"
+                class="platform-item"
+                :class="{ active: selectedAutoPlatforms.includes(p.name) }"
+                @click="() => {
+                  const i = selectedAutoPlatforms.indexOf(p.name);
+                  if (i > -1) selectedAutoPlatforms.splice(i, 1); else selectedAutoPlatforms.push(p.name);
+                }"
+              >
+                <div class="platform-icon">
+                  <img v-if="p.faviconUrl" :src="p.faviconUrl" alt="" style="width:20px;height:20px;" />
+                </div>
+                <div class="platform-name">{{ p.platformName || p.name }}</div>
+                <div class="platform-check" v-if="selectedAutoPlatforms.includes(p.name)">
+                  <CheckCircleFilled style="color: #52c41a; font-size: 16px;" />
+                </div>
+              </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+              <a-button type="primary" :loading="autoConfigLoading" @click="saveAutoPublishConfig">保存设置</a-button>
+              <a-button @click="autoPopoverVisible=false">关闭</a-button>
+            </div>
+          </div>
+        </template>
+        <a-button size="small" @click="openAutoPublishPopover">自动发布</a-button>
+      </a-popover>
     </div>
 
     <!-- 动态卡片列表 -->
@@ -173,10 +220,12 @@ import { ref, reactive, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
 import { PlusOutlined } from '@ant-design/icons-vue';
+import { CheckCircleFilled } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
 import UserSelect from '@/components/UserSelect.vue';
 import { getDynamicList, getDynamicDetail, deleteDynamic, batchDeleteDynamics, createDynamic } from '@/api/modules/dynamicApi.js';
 import { funcPublish as extFuncPublish, getPlatformInfos, checkServiceStatus, funcGetPermission, openOptions } from '@/utils/extensionMessaging.js';
+import { getSystemSettings, updateSystemSettings } from '@/api/modules/accountApi';
 // import { uploadImages } from '@/api/modules/imageApi.js';
 const router = useRouter();
 
@@ -257,6 +306,10 @@ const fetchData = async () => {
 };
 
 onMounted(fetchData);
+onMounted(() => {
+  loadPlatformsForAutoPublish();
+  loadAutoPublishConfig();
+});
 
 // 搜索与重置
 const handleSearch = () => { pagination.current = 1; fetchData(); };
@@ -286,6 +339,291 @@ const renderDigest = (text) => {
   const t = (text || '').toString();
   const plain = t.replace(/[#>`*_\-\[\]]/g, '').replace(/\n+/g, ' ');
   return plain;
+};
+
+const requestDomainTrust = async (timeout = 5000) => {
+  try {
+    const resp = await funcGetPermission(timeout);
+    return resp;
+  } catch (error) {
+    return { status: 'error', trusted: false };
+  }
+};
+
+const pickEarliestUnpublishedDynamic = async () => {
+  const resp = await getDynamicList({ page: 1, pageSize: 1, publish: false, ordering: 'create_time', order: 'asc' });
+  const results = (resp?.data?.results) || (resp?.results) || [];
+  return results.length ? results[0] : null;
+};
+
+const autoPublishOnce = async () => {
+  try {
+    const item = await pickEarliestUnpublishedDynamic();
+    if (!item) {
+      autoDynamicNextRunTime.value = dayjs().add(calculateInterval(), 'second').format('YYYY-MM-DD HH:mm:ss');
+      return;
+    }
+    const set = new Set(selectedAutoPlatforms.value);
+    const targetPlatforms = (dynamicPlatforms.value || []).filter(p => set.has(p.name));
+    if (targetPlatforms.length) {
+      const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, platformName: p.platformName, injectUrl: p.injectUrl, faviconUrl: p.faviconUrl, accountKey: p.accountKey, extraConfig: {} }));
+      const images = (item.images || []).map((img) => {
+        const url = getImageUrl(img);
+        const name = (typeof img === 'object') ? (img.name || img.img_name || '') : '';
+        const t = (typeof img === 'object') ? String(img.type || '') : '';
+        const type = t.startsWith('image/') ? t : (t ? `image/${t.toLowerCase()}` : 'image/jpeg');
+        const size = (typeof img === 'object') ? (img.size || 0) : 0;
+        return { name, url, type, size };
+      });
+      const syncData = {
+        platforms: syncPlatforms,
+        isAutoPublish: true,
+        data: {
+          title: item.title || '未命名动态',
+          content: (item.content || '').toString(),
+          images,
+          videos: []
+        }
+      };
+      const serviceResp = await checkServiceStatus();
+      if (!serviceResp) {
+        message.error('扩展服务未运行');
+      } else {
+        const trustResp = await requestDomainTrust(5000);
+        if (!trustResp || trustResp.status !== 'ok' || !trustResp.trusted) {
+          await openOptions();
+          message.info('请在扩展设置页授权当前域名后，自动发布继续');
+        }
+        await extFuncPublish({
+          ...syncData,
+          autoClose: true,
+          autoCloseDelaySec: 60,
+          syncCloseTabs: true
+        });
+      }
+    }
+    autoDynamicNextRunTime.value = dayjs().add(calculateInterval(), 'second').format('YYYY-MM-DD HH:mm:ss');
+  } catch (err) {
+    autoDynamicNextRunTime.value = dayjs().add(calculateInterval(), 'second').format('YYYY-MM-DD HH:mm:ss');
+  }
+};
+
+const startAutoPublishSchedule = async () => {
+  const intervalSec = Math.max(60, calculateInterval());
+  const first = autoFirstTime.value ? dayjs(autoFirstTime.value) : null;
+  const now = dayjs();
+  const delayMs = first && first.isAfter(now) ? first.diff(now) : 0;
+  if (delayMs > 0) {
+    autoDynamicNextRunTime.value = first.format('YYYY-MM-DD HH:mm:ss');
+    autoInitialTimeoutId.value = setTimeout(async () => {
+      await autoPublishOnce();
+      autoIntervalId.value = setInterval(autoPublishOnce, intervalSec * 1000);
+    }, delayMs);
+  } else {
+    await autoPublishOnce();
+    autoIntervalId.value = setInterval(autoPublishOnce, intervalSec * 1000);
+  }
+  autoDynamicEnabled.value = true;
+};
+
+const stopAutoPublishSchedule = () => {
+  if (autoInitialTimeoutId.value) {
+    clearTimeout(autoInitialTimeoutId.value);
+    autoInitialTimeoutId.value = null;
+  }
+  if (autoIntervalId.value) {
+    clearInterval(autoIntervalId.value);
+    autoIntervalId.value = null;
+  }
+  autoDynamicNextRunTime.value = '';
+  autoDynamicEnabled.value = false;
+};
+
+const toggleAutoDynamic = async (val) => {
+  try {
+    autoDynamicLoading.value = true;
+    if (val) {
+      if (!selectedAutoPlatforms.value.length) {
+        message.warning('请先选择至少一个平台');
+        autoDynamicEnabled.value = false;
+        autoDynamicLoading.value = false;
+        return;
+      }
+    }
+    if (val) {
+      await startAutoPublishSchedule();
+    } else {
+      stopAutoPublishSchedule();
+    }
+    try {
+      await updateSystemSettings({
+        key: 'auto_publish_dynamic',
+        value: { dynamic_auto_enabled: !!val }
+      });
+      localStorage.setItem('autoPublishDynamicEnabled', String(!!val));
+    } catch {}
+    message.success(val ? '已开启自动发布' : '已关闭自动发布');
+  } catch (e) {
+    message.error(e?.message || '自动发布切换失败');
+  } finally {
+    autoDynamicLoading.value = false;
+  }
+};
+
+const loadAutoPublishConfig = async () => {
+  try {
+    autoConfigLoading.value = true;
+    const resp = await getSystemSettings({ key: 'auto_publish_dynamic' });
+    const raw = (resp?.data?.data) ?? (resp?.data) ?? resp;
+    const data = raw?.value ?? raw ?? {};
+    const arr = data?.dynamic_auto_platforms || [];
+    if (Array.isArray(arr) && arr.length) {
+      selectedAutoPlatforms.value = arr;
+      localStorage.setItem('autoPublishDynamicPlatforms', JSON.stringify(arr));
+    } else {
+      const local = localStorage.getItem('autoPublishDynamicPlatforms');
+      selectedAutoPlatforms.value = local ? JSON.parse(local) : [];
+    }
+    const seconds = Number((data?.dynamic_auto_interval_seconds ?? data?.dynamic_auto_interval ?? localStorage.getItem('autoPublishDynamicInterval')) || 0);
+    if (seconds > 0) {
+      const d = Math.floor(seconds / 86400);
+      const h = Math.floor((seconds % 86400) / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      autoPublishIntervalDays.value = d;
+      autoPublishIntervalHours.value = h;
+      autoPublishIntervalMinutes.value = m;
+      localStorage.setItem('autoPublishDynamicInterval', String(seconds));
+    } else {
+      const localInterval = Number(localStorage.getItem('autoPublishDynamicInterval') || 600);
+      const d = Math.floor(localInterval / 86400);
+      const h = Math.floor((localInterval % 86400) / 3600);
+      const m = Math.floor((localInterval % 3600) / 60);
+      autoPublishIntervalDays.value = d;
+      autoPublishIntervalHours.value = h;
+      autoPublishIntervalMinutes.value = m;
+    }
+    const first = data?.dynamic_auto_first_run_time;
+    if (first) {
+      autoFirstTime.value = dayjs(first);
+    }
+    const enabled = data?.dynamic_auto_enabled;
+    if (typeof enabled === 'boolean') {
+      autoDynamicEnabled.value = enabled;
+      if (enabled && selectedAutoPlatforms.value.length && !autoIntervalId.value && !autoInitialTimeoutId.value) {
+        await startAutoPublishSchedule();
+      }
+    } else {
+      const localEnabled = localStorage.getItem('autoPublishDynamicEnabled');
+      if (localEnabled === 'true' && selectedAutoPlatforms.value.length && !autoIntervalId.value && !autoInitialTimeoutId.value) {
+        autoDynamicEnabled.value = true;
+        await startAutoPublishSchedule();
+      }
+    }
+  } catch (e) {
+    const local = localStorage.getItem('autoPublishDynamicPlatforms');
+    selectedAutoPlatforms.value = local ? JSON.parse(local) : [];
+    const localInterval = Number(localStorage.getItem('autoPublishDynamicInterval') || 600);
+    const d = Math.floor(localInterval / 86400);
+    const h = Math.floor((localInterval % 86400) / 3600);
+    const m = Math.floor((localInterval % 3600) / 60);
+    autoPublishIntervalDays.value = d;
+    autoPublishIntervalHours.value = h;
+    autoPublishIntervalMinutes.value = m;
+  } finally {
+    autoConfigLoading.value = false;
+  }
+};
+
+const saveAutoPublishConfig = async () => {
+  try {
+    autoConfigLoading.value = true;
+    const seconds = calculateInterval();
+    const payload = {
+      key: 'auto_publish_dynamic',
+      value: {
+        dynamic_auto_platforms: selectedAutoPlatforms.value,
+        dynamic_auto_interval_seconds: seconds,
+        dynamic_auto_first_run_time: (autoFirstTime.value ? dayjs(autoFirstTime.value).format('YYYY-MM-DD HH:mm:ss') : ''),
+        dynamic_auto_enabled: !!autoDynamicEnabled.value
+      }
+    };
+    await updateSystemSettings(payload);
+    localStorage.setItem('autoPublishDynamicPlatforms', JSON.stringify(selectedAutoPlatforms.value));
+    localStorage.setItem('autoPublishDynamicInterval', String(seconds));
+    localStorage.setItem('autoPublishDynamicEnabled', String(!!autoDynamicEnabled.value));
+    autoPopoverVisible.value = false;
+    message.success('自动发布平台配置已保存');
+  } catch (e) {
+    localStorage.setItem('autoPublishDynamicPlatforms', JSON.stringify(selectedAutoPlatforms.value));
+    localStorage.setItem('autoPublishDynamicInterval', String(calculateInterval()));
+    localStorage.setItem('autoPublishDynamicEnabled', String(!!autoDynamicEnabled.value));
+    autoPopoverVisible.value = false;
+    message.success('已保存到本地配置');
+  } finally {
+    autoConfigLoading.value = false;
+  }
+};
+const normalizePlatforms = (raw) => {
+  let arr = Array.isArray(raw)
+    ? raw
+    : (Array.isArray(raw?.platforms) ? raw.platforms : Object.values(raw || {}));
+  return (arr || []).map((p) => ({
+    ...p,
+    name: p?.name || p?.platformName || p?.key || p?.id,
+  }));
+};
+
+const autoInitialTimeoutId = ref(null);
+const autoIntervalId = ref(null);
+const autoPopoverVisible = ref(false);
+const autoDynamicEnabled = ref(false);
+const autoDynamicLoading = ref(false);
+const autoDynamicNextRunTime = ref('');
+const selectedAutoPlatforms = ref([]);
+const autoConfigLoading = ref(false);
+const autoPublishIntervalDays = ref(0);
+const autoPublishIntervalHours = ref(0);
+const autoPublishIntervalMinutes = ref(10);
+const autoFirstTime = ref(null);
+const autoPublishIntervalLabel = computed(() => {
+  const d = Number(autoPublishIntervalDays.value) || 0;
+  const h = Number(autoPublishIntervalHours.value) || 0;
+  const m = Number(autoPublishIntervalMinutes.value) || 0;
+  const parts = [];
+  if (d) parts.push(`${d}天`);
+  if (h) parts.push(`${h}小时`);
+  if (m || parts.length === 0) parts.push(`${m}分钟`);
+  return parts.join('');
+});
+const calculateInterval = () => {
+  const days = Number(autoPublishIntervalDays.value) || 0;
+  const hours = Number(autoPublishIntervalHours.value) || 0;
+  const minutes = Number(autoPublishIntervalMinutes.value) || 0;
+  return days * 86400 + hours * 3600 + minutes * 60;
+};
+const selectedAutoPlatformNames = computed(() => {
+  const set = new Set(selectedAutoPlatforms.value);
+  const names = (dynamicPlatforms.value || []).filter(p => set.has(p.name)).map(p => p.platformName || p.name);
+  return names.length ? names.join('、') : '未配置';
+});
+const openAutoPublishPopover = async () => {
+  autoPopoverVisible.value = true;
+  await loadAutoPublishConfig();
+  await loadPlatformsForAutoPublish();
+};
+
+const loadPlatformsForAutoPublish = async () => {
+  try {
+    let list = await getPlatformInfos('DYNAMIC');
+    let platforms = normalizePlatforms(list);
+    if (!platforms.length) {
+      const all = await getPlatformInfos();
+      platforms = normalizePlatforms(all).filter((p) => (p.type === 'DYNAMIC' || !p.type));
+    }
+    dynamicPlatforms.value = platforms;
+  } catch (_) {
+    dynamicPlatforms.value = [];
+  }
 };
 
 // 详情
@@ -513,13 +851,6 @@ const openPublish = async (item) => {
     initPublishFormFromItem(item);
   }
   try {
-    const normalizePlatforms = (raw) => {
-      let arr = Array.isArray(raw) ? raw : Object.values(raw || {});
-      return (arr || []).map((p) => ({
-        ...p,
-        name: p?.name || p?.platformName || p?.key || p?.id,
-      }));
-    };
     let list = await getPlatformInfos('DYNAMIC');
     let platforms = normalizePlatforms(list);
     if (!platforms.length) {
@@ -581,7 +912,12 @@ const confirmPublish = async () => {
     };
     // 点击开始发布后立即关闭弹窗（通过校验后）
     publishModalVisible.value = false;
-    await extFuncPublish(syncData);
+    await extFuncPublish({
+      ...syncData,
+      autoClose: false,
+      autoCloseDelaySec: 0,
+      syncCloseTabs: false
+    });
     selectedPublishItem.value = null;
     selectedPlatforms.value = [];
     publishImages.value = [];
@@ -696,6 +1032,7 @@ const cancelPublish = () => { publishModalVisible.value = false; selectedPublish
   color: #333;
   display: -webkit-box;
   -webkit-line-clamp: 5;
+  line-clamp: 5;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -740,11 +1077,19 @@ const cancelPublish = () => { publishModalVisible.value = false; selectedPublish
   justify-content: center;
 }
 .publish-platforms { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-top: 12px; }
-.publish-platforms .platform { display:flex; align-items:center; gap:10px; padding:12px 8px; border:1px solid #e5e7eb; border-radius:8px; cursor:pointer; background:#fff; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: all .2s; }
+.publish-platforms .platform { display:flex; flex-direction: column; align-items:center; gap:8px; padding:12px 8px; border:1px solid #e5e7eb; border-radius:8px; cursor:pointer; background:#fff; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: all .2s; }
 .publish-platforms .platform:hover { border-color:#1890ff; box-shadow: 0 2px 8px rgba(24,144,255,.15); }
 .publish-platforms .platform.active { border-color:#1890ff; background:#f0f7ff; }
+
+/* 与“我的图文”一致的同步平台网格样式（自动发布弹层） */
+.platform-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.platform-grid .platform-item { display:flex; flex-direction: column; align-items:center; gap:6px; padding:8px 6px; border:1px solid #e5e7eb; border-radius:6px; cursor:pointer; background:#fff; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: all .2s; }
+.platform-grid .platform-item:hover { border-color:#1890ff; box-shadow: 0 2px 8px rgba(24,144,255,.15); }
+.platform-grid .platform-item.active { border-color:#1890ff; background:#f0f7ff; }
+.platform-grid .platform-icon img { width:16px; height:16px; border-radius:4px; object-fit: contain; }
+.platform-grid .platform-name { font-size:12px; color:#333; text-align:center; margin-top:4px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
 .publish-platforms .platform img { width:20px; height:20px; border-radius:4px; object-fit: contain; }
-.publish-platforms .platform span { flex:1; font-size:12px; color:#333; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
+.publish-platforms .platform span { font-size:12px; color:#333; text-align:center; margin-top:4px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
 .publish-actions { margin-top: 16px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 </style>
 

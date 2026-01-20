@@ -579,7 +579,12 @@ const confirmPublish = async () => {
         images,
       }
     };
-    await funcPublish(syncData);
+    await funcPublish({
+      ...syncData,
+      autoClose: false,
+      autoCloseDelaySec: 0,
+      syncCloseTabs: false
+    });
     message.success(`发布请求已发送到扩展（${syncPlatforms.length}个平台）`);
   } catch (e) {
     console.error('发布失败:', e);

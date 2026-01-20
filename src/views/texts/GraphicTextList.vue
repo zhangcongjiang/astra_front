@@ -61,6 +61,55 @@
       >
         批量删除 ({{ selectedIds.length }})
       </a-button>
+      <div style="display:inline-flex; align-items:center; gap:8px; margin-left: 12px;">
+        <a-popover v-model:open="autoPopoverVisible" placement="leftTop" :overlayStyle="{ maxWidth: 'calc(100vw - 32px)' }" trigger="click">
+          <template #content>
+            <div style="width: 560px; max-width: calc(100vw - 32px); max-height: 70vh; overflow: auto;">
+              <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+                <a-switch v-model:checked="autoToutiaoEnabled" :loading="autoToutiaoLoading" @change="toggleAutoToutiao" />
+                <span>自动发布（{{ autoPublishIntervalLabel }}）</span>
+                <span v-if="autoToutiaoNextRunTime" style="color:#999;">下次执行: {{ autoToutiaoNextRunTime }}</span>
+              </div>
+              <div style="margin-bottom:8px;">执行周期</div>
+              <a-space>
+                <a-input-number v-model:value="autoPublishIntervalDays" :min="0" placeholder="天" />
+                <a-input-number v-model:value="autoPublishIntervalHours" :min="0" :max="23" placeholder="小时" />
+                <a-input-number v-model:value="autoPublishIntervalMinutes" :min="0" :max="59" placeholder="分钟" />
+              </a-space>
+              <div style="margin-top:12px;">
+                <span style="margin-right:8px;">初次执行时间</span>
+                <a-date-picker v-model:value="autoFirstTime" show-time format="YYYY-MM-DD HH:mm:ss" style="width: 220px" />
+              </div>
+              <div style="margin-top:16px;">同步平台（已配置：{{ selectedAutoPlatformNames }}）</div>
+              <div class="platform-grid" style="margin-top:8px;">
+                <div
+                  v-for="p in dynamicPlatforms"
+                  :key="p.name"
+                  class="platform-item"
+                  :class="{ active: selectedAutoPlatforms.includes(p.name) }"
+                  @click="() => {
+                    const i = selectedAutoPlatforms.indexOf(p.name);
+                    if (i > -1) selectedAutoPlatforms.splice(i, 1); else selectedAutoPlatforms.push(p.name);
+                  }"
+                >
+                  <div class="platform-icon">
+                    <img v-if="p.faviconUrl" :src="p.faviconUrl" alt="" style="width:20px;height:20px;" />
+                  </div>
+                  <div class="platform-name">{{ p.platformName || p.name }}</div>
+                  <div class="platform-check" v-if="selectedAutoPlatforms.includes(p.name)">
+                    <CheckCircleFilled style="color: #52c41a; font-size: 16px;" />
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+                <a-button type="primary" :loading="autoConfigLoading" @click="saveAutoPublishConfig">保存设置</a-button>
+                <a-button @click="autoPopoverVisible=false">关闭</a-button>
+              </div>
+            </div>
+          </template>
+          <a-button size="small" @click="openAutoPublishPopover">自动发布</a-button>
+        </a-popover>
+      </div>
     </div>
 
     <div class="table-container">
@@ -110,7 +159,7 @@
           <template v-if="column.key === 'action'">
             <div class="action-buttons">
               <a-button type="link" @click="handleDownload(record)">下载</a-button>
-              <a-button type="link" :disabled="record.status === 'published'" @click="handlePublish(record)">
+              <a-button type="link" @click="handlePublish(record)">
                 发布
               </a-button>
               <!-- 新增：替换封面入口 -->
@@ -153,6 +202,7 @@
         <div v-else style="text-align: center; color: #999; padding: 24px;">暂无图片，请先向该文章关联图片</div>
       </a-spin>
     </a-modal>
+    
     <!-- 新增：发布弹窗 -->
     <a-modal v-model:open="publishModalVisible" title="发布图文" width="960px" :footer="null" @cancel="closePublishModal">
       <div class="publish-modal-content">
@@ -324,12 +374,12 @@ import {
   uploadMarkdown,
   importFromUrl,
   replaceTextCover,
-  batchDeleteTexts
+  batchDeleteTexts,
+  publishText
 } from '@/api/modules/textApi';
 import { getImageDetail } from '@/api/modules/imageApi.js';
 import { getAssetCollectionDetail } from '@/api/modules/assetApi.js';
 import { CheckCircleFilled } from '@ant-design/icons-vue';
-// 恢复：引入扩展消息方法
 import {
   checkServiceStatus as extCheckServiceStatus,
   openOptions as extOpenOptions,
@@ -337,6 +387,7 @@ import {
   funcGetPermission as extFuncGetPermission,
   getPlatformInfos as extGetPlatformInfos,
 } from '@/utils/extensionMessaging.js';
+import { getSystemSettings, updateSystemSettings } from '@/api/modules/accountApi';
 // 新增：Markdown 渲染与 HTML 净化
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
@@ -463,6 +514,42 @@ const selectedText = ref(null);
 const selectedPlatforms = ref([]);
 const dynamicPlatforms = ref([]);
 const isAutoPublish = ref(false);
+const autoToutiaoEnabled = ref(false);
+const autoToutiaoLoading = ref(false);
+const autoToutiaoNextRunTime = ref('');
+const autoPublishConfigVisible = ref(false);
+const autoPopoverVisible = ref(false);
+const selectedAutoPlatforms = ref([]);
+const autoConfigLoading = ref(false);
+const autoPublishIntervalDays = ref(0);
+const autoPublishIntervalHours = ref(0);
+const autoPublishIntervalMinutes = ref(10);
+const autoFirstTime = ref(null);
+const autoPublishIntervalLabel = computed(() => {
+  const d = Number(autoPublishIntervalDays.value) || 0;
+  const h = Number(autoPublishIntervalHours.value) || 0;
+  const m = Number(autoPublishIntervalMinutes.value) || 0;
+  const parts = [];
+  if (d) parts.push(`${d}天`);
+  if (h) parts.push(`${h}小时`);
+  if (m || parts.length === 0) parts.push(`${m}分钟`);
+  return parts.join('');
+});
+const calculateInterval = () => {
+  const days = Number(autoPublishIntervalDays.value) || 0;
+  const hours = Number(autoPublishIntervalHours.value) || 0;
+  const minutes = Number(autoPublishIntervalMinutes.value) || 0;
+  return days * 86400 + hours * 3600 + minutes * 60;
+};
+const selectedAutoPlatformNames = computed(() => {
+  const set = new Set(selectedAutoPlatforms.value);
+  const names = (dynamicPlatforms.value || []).filter(p => set.has(p.name)).map(p => p.platformName || p.name);
+  return names.length ? names.join('、') : '未配置';
+});
+const openAutoPublishPopover = async () => {
+  autoPopoverVisible.value = true;
+  await loadAutoPublishConfig();
+};
 
 const normalizePlatforms = (raw) => {
   let arr = Array.isArray(raw) ? raw : Object.values(raw || {});
@@ -488,6 +575,7 @@ const loadPlatformsForPublish = async () => {
 
 onMounted(() => {
   loadPlatformsForPublish();
+  loadAutoPublishConfig();
 });
 // 恢复：平台选择函数
 const togglePlatform = (platformKey) => {
@@ -534,6 +622,238 @@ const handlePreviewSelectedCover = async () => {
   }
 };
 
+const autoInitialTimeoutId = ref(null);
+const autoIntervalId = ref(null);
+
+const pickEarliestUnpublishedText = async () => {
+  const resp = await getTextList({ page: 1, pageSize: 1, publish: false, ordering: 'create_time', order: 'asc' });
+  const results = (resp?.data?.results) || (resp?.results) || [];
+  return results.length ? results[0] : null;
+};
+
+const autoPublishOnce = async () => {
+  try {
+    const item = await pickEarliestUnpublishedText();
+    if (!item) {
+      autoToutiaoNextRunTime.value = dayjs().add(calculateInterval(), 'second').format('YYYY-MM-DD HH:mm:ss');
+      return;
+    }
+    const tid = item.id || item.text_id;
+    let markdown = item.content || '';
+    if (!markdown || !markdown.trim()) {
+      try {
+        const resp = await getTextDetail(tid);
+        const d = resp?.data || resp;
+        markdown = d?.content || '';
+      } catch {}
+    }
+    const rawHtml = md.render(markdown || '');
+    const html = DOMPurify.sanitize(rawHtml.replace(/src=\"(\/media\/[^\"]+)\"/g, (m, p1) => `src=\"${convertToHttpUrl(p1)}\"`));
+    const digest = makeDigest(markdown || '');
+    const cover = null; // 可按需启用封面
+    const extractedImages = extractLocalImages(markdown || '');
+    const set = new Set(selectedAutoPlatforms.value);
+    const targetPlatforms = (dynamicPlatforms.value || []).filter(p => set.has(p.name));
+    if (targetPlatforms.length) {
+      const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, platformName: p.platformName, injectUrl: p.injectUrl, faviconUrl: p.faviconUrl, accountKey: p.accountKey, extraConfig: {} }));
+      const syncData = {
+        platforms: syncPlatforms,
+        isAutoPublish: true,
+        data: {
+          title: item.title || '未命名图文',
+          digest,
+          htmlContent: html,
+          markdownContent: markdown,
+          images: extractedImages
+        }
+      };
+      await publishText(tid);
+      const serviceResp = await extCheckServiceStatus();
+      if (!serviceResp) {
+        message.error('扩展服务未运行，已仅标记发布');
+      } else {
+        const trustResp = await requestDomainTrust(5000);
+        if (!trustResp || trustResp.status !== 'ok' || !trustResp.trusted) {
+          await openOptions();
+          message.info('请在扩展设置页授权当前域名后，自动发布继续');
+        }
+        await extFuncPublish({
+          ...syncData,
+          autoClose: true,
+          autoCloseDelaySec: 60,
+          syncCloseTabs: true
+        });
+      }
+    }
+    autoToutiaoNextRunTime.value = dayjs().add(calculateInterval(), 'second').format('YYYY-MM-DD HH:mm:ss');
+  } catch (err) {
+    console.error('自动发布执行失败:', err);
+    autoToutiaoNextRunTime.value = dayjs().add(calculateInterval(), 'second').format('YYYY-MM-DD HH:mm:ss');
+  }
+};
+
+const startAutoPublishSchedule = async () => {
+  const intervalSec = Math.max(60, calculateInterval());
+  const first = autoFirstTime.value ? dayjs(autoFirstTime.value) : null;
+  const now = dayjs();
+  const delayMs = first && first.isAfter(now) ? first.diff(now) : 0;
+  if (delayMs > 0) {
+    autoToutiaoNextRunTime.value = first.format('YYYY-MM-DD HH:mm:ss');
+    autoInitialTimeoutId.value = setTimeout(async () => {
+      await autoPublishOnce();
+      autoIntervalId.value = setInterval(autoPublishOnce, intervalSec * 1000);
+    }, delayMs);
+  } else {
+    await autoPublishOnce();
+    autoIntervalId.value = setInterval(autoPublishOnce, intervalSec * 1000);
+  }
+  autoToutiaoEnabled.value = true;
+};
+
+const stopAutoPublishSchedule = () => {
+  if (autoInitialTimeoutId.value) {
+    clearTimeout(autoInitialTimeoutId.value);
+    autoInitialTimeoutId.value = null;
+  }
+  if (autoIntervalId.value) {
+    clearInterval(autoIntervalId.value);
+    autoIntervalId.value = null;
+  }
+  autoToutiaoNextRunTime.value = '';
+  autoToutiaoEnabled.value = false;
+};
+
+const toggleAutoToutiao = async (val) => {
+  try {
+    autoToutiaoLoading.value = true;
+    if (val) {
+      if (!selectedAutoPlatforms.value.length) {
+        message.warning('请先在“配置自动平台”中选择至少一个平台');
+        autoToutiaoEnabled.value = false;
+        autoToutiaoLoading.value = false;
+        return;
+      }
+    }
+    if (val) {
+      await startAutoPublishSchedule();
+    } else {
+      stopAutoPublishSchedule();
+    }
+    try {
+      await updateSystemSettings({
+        key: 'auto_publish_article',
+        value: { article_auto_enabled: !!val }
+      });
+      localStorage.setItem('autoPublishArticleEnabled', String(!!val));
+    } catch {}
+    message.success(val ? '已开启自动发布' : '已关闭自动发布');
+  } catch (e) {
+    message.error(e?.message || '自动发布切换失败');
+  } finally {
+    autoToutiaoLoading.value = false;
+  }
+};
+
+const openAutoConfig = async () => {
+  autoPublishConfigVisible.value = true;
+  await loadAutoPublishConfig();
+};
+
+const loadAutoPublishConfig = async () => {
+  try {
+    autoConfigLoading.value = true;
+    const resp = await getSystemSettings({ key: 'auto_publish_article' });
+    const raw = (resp?.data?.data) ?? (resp?.data) ?? resp;
+    const data = raw?.value ?? raw ?? {};
+    const arr = data?.article_auto_platforms || [];
+    if (Array.isArray(arr) && arr.length) {
+      selectedAutoPlatforms.value = arr;
+      localStorage.setItem('autoPublishArticlePlatforms', JSON.stringify(arr));
+    } else {
+      const local = localStorage.getItem('autoPublishArticlePlatforms');
+      selectedAutoPlatforms.value = local ? JSON.parse(local) : [];
+    }
+    const seconds = Number((data?.article_auto_interval_seconds ?? data?.article_auto_interval ?? localStorage.getItem('autoPublishArticleInterval')) || 0);
+    if (seconds > 0) {
+      const d = Math.floor(seconds / 86400);
+      const h = Math.floor((seconds % 86400) / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      autoPublishIntervalDays.value = d;
+      autoPublishIntervalHours.value = h;
+      autoPublishIntervalMinutes.value = m;
+      localStorage.setItem('autoPublishArticleInterval', String(seconds));
+    } else {
+      const localInterval = Number(localStorage.getItem('autoPublishArticleInterval') || 600);
+      const d = Math.floor(localInterval / 86400);
+      const h = Math.floor((localInterval % 86400) / 3600);
+      const m = Math.floor((localInterval % 3600) / 60);
+      autoPublishIntervalDays.value = d;
+      autoPublishIntervalHours.value = h;
+      autoPublishIntervalMinutes.value = m;
+    }
+    const first = data?.article_auto_first_run_time;
+    if (first) {
+      autoFirstTime.value = dayjs(first);
+    }
+    const enabled = data?.article_auto_enabled;
+    if (typeof enabled === 'boolean') {
+      autoToutiaoEnabled.value = enabled;
+      if (enabled && selectedAutoPlatforms.value.length && !autoIntervalId.value && !autoInitialTimeoutId.value) {
+        await startAutoPublishSchedule();
+      }
+    } else {
+      const localEnabled = localStorage.getItem('autoPublishArticleEnabled');
+      if (localEnabled === 'true' && selectedAutoPlatforms.value.length && !autoIntervalId.value && !autoInitialTimeoutId.value) {
+        autoToutiaoEnabled.value = true;
+        await startAutoPublishSchedule();
+      }
+    }
+  } catch (e) {
+    const local = localStorage.getItem('autoPublishArticlePlatforms');
+    selectedAutoPlatforms.value = local ? JSON.parse(local) : [];
+    const localInterval = Number(localStorage.getItem('autoPublishArticleInterval') || 600);
+    const d = Math.floor(localInterval / 86400);
+    const h = Math.floor((localInterval % 86400) / 3600);
+    const m = Math.floor((localInterval % 3600) / 60);
+    autoPublishIntervalDays.value = d;
+    autoPublishIntervalHours.value = h;
+    autoPublishIntervalMinutes.value = m;
+  } finally {
+    autoConfigLoading.value = false;
+  }
+};
+
+const saveAutoPublishConfig = async () => {
+  try {
+    autoConfigLoading.value = true;
+    const seconds = calculateInterval();
+    const payload = {
+      key: 'auto_publish_article',
+      value: {
+        article_auto_platforms: selectedAutoPlatforms.value,
+        article_auto_interval_seconds: seconds,
+        article_auto_first_run_time: (autoFirstTime.value ? dayjs(autoFirstTime.value).format('YYYY-MM-DD HH:mm:ss') : ''),
+        article_auto_enabled: !!autoToutiaoEnabled.value
+      }
+    };
+    await updateSystemSettings(payload);
+    localStorage.setItem('autoPublishArticlePlatforms', JSON.stringify(selectedAutoPlatforms.value));
+    localStorage.setItem('autoPublishArticleInterval', String(seconds));
+    localStorage.setItem('autoPublishArticleEnabled', String(!!autoToutiaoEnabled.value));
+    autoPublishConfigVisible.value = false;
+    autoPopoverVisible.value = false;
+    message.success('自动发布平台配置已保存');
+  } catch (e) {
+    localStorage.setItem('autoPublishArticlePlatforms', JSON.stringify(selectedAutoPlatforms.value));
+    localStorage.setItem('autoPublishArticleInterval', String(calculateInterval()));
+    localStorage.setItem('autoPublishArticleEnabled', String(!!autoToutiaoEnabled.value));
+    autoPublishConfigVisible.value = false;
+    autoPopoverVisible.value = false;
+    message.success('已保存到本地配置');
+  } finally {
+    autoConfigLoading.value = false;
+  }
+};
 // 获取图文列表数据
 const fetchData = async () => {
   try {
@@ -889,6 +1209,7 @@ const confirmPublish = async () => {
   // 已移除：标签必填校验
   try {
     message.info('作品发布中');
+    await publishText(selectedText.value.id);
 
     const serviceResp = await extCheckServiceStatus();
     if (!serviceResp) {
@@ -946,7 +1267,7 @@ const confirmPublish = async () => {
       data: {
         title: selectedText.value.title || '未命名图文',
         digest,
-        cover,
+        // cover,
         htmlContent: html,
         markdownContent: markdown,
         images
@@ -954,8 +1275,12 @@ const confirmPublish = async () => {
       }
     };
 
-    console.log('发送扩展发布请求 syncData:', JSON.stringify(syncData, null, 2));
-    await extFuncPublish(syncData);
+    await extFuncPublish({
+      ...syncData,
+      autoClose: false,
+      autoCloseDelaySec: 0,
+      syncCloseTabs: false
+    });
     message.success(`发布请求已发送到扩展（${syncPlatforms.length}个平台），请在新标签页查看扩展自动填充`);
     fetchData();
   } catch (e) {
@@ -1389,11 +1714,12 @@ const handleBatchDelete = () => {
 }
 
 /* 保障平台卡片为横向网格排列 */
-.platform-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 12px;
-}
+.platform-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.platform-grid .platform-item { display:flex; flex-direction: column; align-items:center; gap:6px; padding:8px 6px; border:1px solid #e5e7eb; border-radius:6px; cursor:pointer; background:#fff; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: all .2s; }
+.platform-grid .platform-item:hover { border-color:#1890ff; box-shadow: 0 2px 8px rgba(24,144,255,.15); }
+.platform-grid .platform-item.active { border-color:#1890ff; background:#f0f7ff; }
+.platform-grid .platform-icon img { width:16px; height:16px; border-radius:4px; object-fit: contain; }
+.platform-grid .platform-name { font-size:12px; color:#333; text-align:center; margin-top:4px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 新增：封面选择弹窗的网格样式 */
 .cover-select-grid {

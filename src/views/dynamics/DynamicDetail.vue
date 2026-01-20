@@ -222,7 +222,12 @@ const confirmPublish = async () => {
     };
     // 点击开始发布后立即关闭弹窗（通过校验后）
     publishModalVisible.value = false;
-    await funcPublish(syncData);
+    await funcPublish({
+      ...syncData,
+      autoClose: false,
+      autoCloseDelaySec: 0,
+      syncCloseTabs: false
+    });
     // reset
     selectedPlatforms.value = [];
     publishImages.value = [];

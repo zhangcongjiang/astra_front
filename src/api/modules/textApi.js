@@ -129,6 +129,21 @@ export const saveText = async (textData) => {
 };
 
 /**
+ * 发布图文（将指定图文标记为已发布）
+ * @param {string|number} id - 图文ID
+ * @returns {Promise} API响应
+ */
+export const publishText = async (id) => {
+    try {
+        const response = await request.post(`/text/publish/`, { id });
+        return response;
+    } catch (error) {
+        console.error('发布图文失败:', error);
+        throw error;
+    }
+};
+
+/**
  * 从URL导入图文
  * @param {string} url - 要导入的网络地址
  * @param {string} origin - 平台来源（toutiao/baidu/hupu/xiaohongshu）
