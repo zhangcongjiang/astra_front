@@ -76,3 +76,20 @@ export const batchDeleteDynamics = async (dynamic_ids = []) => {
   }
 };
 
+export const publishDynamic = async (idOrObj) => {
+  try {
+    let dynamic_id = idOrObj;
+    if (typeof idOrObj === 'object' && idOrObj) {
+      dynamic_id = idOrObj.dynamic_id ?? idOrObj.id ?? idOrObj.dynamicId ?? idOrObj.text_id;
+    }
+    const payload = {
+      dynamic_id,
+      id: dynamic_id
+    };
+    const response = await request.post("/text/dynamic/publish/", payload);
+    return response;
+  } catch (error) {
+    console.error("发布动态失败:", error);
+    throw error;
+  }
+};

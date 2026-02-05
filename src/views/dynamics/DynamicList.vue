@@ -94,6 +94,9 @@
                     选择
                   </a-checkbox>
                   <span class="title-text" :title="item.title">{{ item.title || '未命名动态' }}</span>
+                  <a-tag :color="item.publish ? 'green' : 'orange'" class="publish-status" style="margin-left: 8px;">
+                    {{ item.publish ? '已发布' : '未发布' }}
+                  </a-tag>
                 </div>
               </template>
               <div class="card-content" @click="goDetail(item)">
@@ -223,11 +226,13 @@ import { PlusOutlined } from '@ant-design/icons-vue';
 import { CheckCircleFilled } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
 import UserSelect from '@/components/UserSelect.vue';
-import { getDynamicList, getDynamicDetail, deleteDynamic, batchDeleteDynamics, createDynamic } from '@/api/modules/dynamicApi.js';
+import { getDynamicList, getDynamicDetail, deleteDynamic, batchDeleteDynamics, createDynamic, publishDynamic } from '@/api/modules/dynamicApi.js';
 import { funcPublish as extFuncPublish, getPlatformInfos, checkServiceStatus, funcGetPermission, openOptions } from '@/utils/extensionMessaging.js';
 import { getSystemSettings, updateSystemSettings } from '@/api/modules/accountApi';
 // import { uploadImages } from '@/api/modules/imageApi.js';
 const router = useRouter();
+import { useAutoPublishDynamicStore } from '@/stores/autoPublishDynamic.js';
+const autoPublishDynamicStore = useAutoPublishDynamicStore();
 
 // 搜索表单
 const searchForm = reactive({
@@ -294,6 +299,7 @@ const fetchData = async () => {
       creator: it.username || it.creator || '',
       origin: it.origin || '未知来源',
       images: Array.isArray(it.images) ? it.images : [],
+      publish: !!it.publish
     }));
   } catch (e) {
     console.error('获取动态列表失败:', e);
@@ -385,6 +391,7 @@ const autoPublishOnce = async () => {
           videos: []
         }
       };
+      await publishDynamic(item.id ?? item.dynamic_id ?? item.dynamicId ?? item.text_id);
       const serviceResp = await checkServiceStatus();
       if (!serviceResp) {
         message.error('扩展服务未运行');
@@ -401,6 +408,7 @@ const autoPublishOnce = async () => {
           syncCloseTabs: true
         });
       }
+      await fetchData();
     }
     autoDynamicNextRunTime.value = dayjs().add(calculateInterval(), 'second').format('YYYY-MM-DD HH:mm:ss');
   } catch (err) {
@@ -450,10 +458,20 @@ const toggleAutoDynamic = async (val) => {
         return;
       }
     }
-    if (val) {
-      await startAutoPublishSchedule();
+    if (window.__autoPublishDynamicRunnerActive) {
+      if (val) {
+        await autoPublishDynamicStore.start();
+        autoDynamicNextRunTime.value = autoPublishDynamicStore.nextRunTimeLabel;
+      } else {
+        autoPublishDynamicStore.stop();
+        autoDynamicNextRunTime.value = '';
+      }
     } else {
-      stopAutoPublishSchedule();
+      if (val) {
+        await startAutoPublishSchedule();
+      } else {
+        stopAutoPublishSchedule();
+      }
     }
     try {
       await updateSystemSettings({
@@ -510,13 +528,21 @@ const loadAutoPublishConfig = async () => {
     if (typeof enabled === 'boolean') {
       autoDynamicEnabled.value = enabled;
       if (enabled && selectedAutoPlatforms.value.length && !autoIntervalId.value && !autoInitialTimeoutId.value) {
-        await startAutoPublishSchedule();
+        if (!window.__autoPublishDynamicRunnerActive) {
+          await startAutoPublishSchedule();
+        } else {
+          autoDynamicNextRunTime.value = autoPublishDynamicStore.nextRunTimeLabel;
+        }
       }
     } else {
       const localEnabled = localStorage.getItem('autoPublishDynamicEnabled');
       if (localEnabled === 'true' && selectedAutoPlatforms.value.length && !autoIntervalId.value && !autoInitialTimeoutId.value) {
         autoDynamicEnabled.value = true;
-        await startAutoPublishSchedule();
+        if (!window.__autoPublishDynamicRunnerActive) {
+          await startAutoPublishSchedule();
+        } else {
+          autoDynamicNextRunTime.value = autoPublishDynamicStore.nextRunTimeLabel;
+        }
       }
     }
   } catch (e) {
@@ -877,6 +903,7 @@ const confirmPublish = async () => {
       await openOptions();
       message.info('请在扩展设置页授权当前域名后，系统将自动继续');
     }
+    await publishDynamic(selectedPublishItem.value.id ?? selectedPublishItem.value.dynamic_id ?? selectedPublishItem.value.dynamicId ?? selectedPublishItem.value.text_id);
     const selectedSet = new Set(selectedPlatforms.value);
     const targetPlatforms = (dynamicPlatforms.value || []).filter(p => selectedSet.has(p.name));
     if (!targetPlatforms.length) { message.error('未匹配到选中的平台'); return; }
@@ -929,6 +956,7 @@ const confirmPublish = async () => {
     publishImages.value = [];
     publishTitle.value = '';
     publishContent.value = '';
+    await fetchData();
   } catch (e) {
     console.error('发布失败:', e);
     message.error(e?.message || '发布失败');
@@ -984,7 +1012,13 @@ const cancelPublish = () => { publishModalVisible.value = false; selectedPublish
 .title-text {
   font-weight: 600;
   color: #333;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.publish-status { flex-shrink: 0; }
 
 .card-content {
   display: flex;

@@ -391,6 +391,7 @@ import { getSystemSettings, updateSystemSettings } from '@/api/modules/accountAp
 // 新增：Markdown 渲染与 HTML 净化
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
+import { useAutoPublishArticleStore } from '@/stores/autoPublishArticle'
 
 // 初始化 MarkdownIt 实例与摘要生成方法
 const md = new MarkdownIt({ linkify: true, breaks: true });
@@ -444,6 +445,7 @@ const extractLocalImages = (markdown) => {
 };
 
 const router = useRouter();
+const autoPublishArticleStore = useAutoPublishArticleStore()
 
 // 本地导入弹窗与表单状态
 const importModalVisible = ref(false);
@@ -681,7 +683,9 @@ const autoPublishOnce = async () => {
           ...syncData,
           autoClose: true,
           autoCloseDelaySec: 60,
-          syncCloseTabs: true
+          syncCloseTabs: true,
+          preferBackground: true,
+          preferNoUI: true
         });
       }
     }
@@ -734,10 +738,18 @@ const toggleAutoToutiao = async (val) => {
         return;
       }
     }
-    if (val) {
-      await startAutoPublishSchedule();
+    if (window.__autoPublishArticleRunnerActive) {
+      if (val) {
+        await autoPublishArticleStore.start()
+      } else {
+        autoPublishArticleStore.stop()
+      }
     } else {
-      stopAutoPublishSchedule();
+      if (val) {
+        await startAutoPublishSchedule();
+      } else {
+        stopAutoPublishSchedule();
+      }
     }
     try {
       await updateSystemSettings({
@@ -798,15 +810,18 @@ const loadAutoPublishConfig = async () => {
     const enabled = data?.article_auto_enabled;
     if (typeof enabled === 'boolean') {
       autoToutiaoEnabled.value = enabled;
-      if (enabled && selectedAutoPlatforms.value.length && !autoIntervalId.value && !autoInitialTimeoutId.value) {
+      if (enabled && selectedAutoPlatforms.value.length && !autoIntervalId.value && !autoInitialTimeoutId.value && !window.__autoPublishArticleRunnerActive) {
         await startAutoPublishSchedule();
       }
     } else {
       const localEnabled = localStorage.getItem('autoPublishArticleEnabled');
-      if (localEnabled === 'true' && selectedAutoPlatforms.value.length && !autoIntervalId.value && !autoInitialTimeoutId.value) {
+      if (localEnabled === 'true' && selectedAutoPlatforms.value.length && !autoIntervalId.value && !autoInitialTimeoutId.value && !window.__autoPublishArticleRunnerActive) {
         autoToutiaoEnabled.value = true;
         await startAutoPublishSchedule();
       }
+    }
+    if (window.__autoPublishArticleRunnerActive) {
+      autoToutiaoNextRunTime.value = autoPublishArticleStore.nextRunTimeLabel || ''
     }
   } catch (e) {
     const local = localStorage.getItem('autoPublishArticlePlatforms');
