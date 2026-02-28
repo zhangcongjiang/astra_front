@@ -142,7 +142,15 @@ export const useAutoPublishDynamicStore = defineStore('autoPublishDynamic', {
         const targetPlatforms = (this.platforms || []).filter(p => set.has(p.name))
         if (targetPlatforms.length) {
           const syncPlatforms = targetPlatforms.map(p => ({ name: p.name, platformName: p.platformName, injectUrl: p.injectUrl, faviconUrl: p.faviconUrl, accountKey: p.accountKey, extraConfig: {} }))
-          const images = (item.images || []).map((img) => {
+          const id = item.id ?? item.dynamic_id ?? item.dynamicId ?? item.text_id
+          let detail = null
+          if (id) {
+            try {
+              const d = await getDynamicDetail(id)
+              detail = (d?.data?.data) ?? (d?.data) ?? d
+            } catch {}
+          }
+          const images = ((detail?.images || item.images || [])).map((img) => {
             if (typeof img === 'string') {
               return { name: '', url: convertToHttpUrl(img), type: 'image/jpeg', size: 0 }
             } else {
@@ -158,12 +166,17 @@ export const useAutoPublishDynamicStore = defineStore('autoPublishDynamic', {
             isAutoPublish: true,
             data: {
               title: item.title || '未命名动态',
-              content: (item.content || '').toString(),
+              content: (
+                detail?.content ||
+                item.content ||
+                item.resource_detail?.text ||
+                item.text ||
+                ''
+              ).toString(),
               images,
               videos: []
             }
           }
-          const id = item.id ?? item.dynamic_id ?? item.dynamicId ?? item.text_id
           if (id) await publishDynamic(id)
           const serviceResp = await extCheckServiceStatus()
           if (serviceResp) {

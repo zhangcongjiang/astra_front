@@ -1264,9 +1264,39 @@ const confirmPublish = async () => {
       }
     }
     const rawHtml = md.render(markdown);
-    const html = DOMPurify.sanitize(
+    const sanitizedHtml = DOMPurify.sanitize(
       rawHtml.replace(/src=\"(\/media\/[^\"]+)\"/g, (m, p1) => `src=\"${convertToHttpUrl(p1)}\"`)
     );
+    const inlineLocalImages = async (htmlStr) => {
+      const map = new Map();
+      const re = /<img[^>]+src=['"]([^'"]+)['"][^>]*>/gi;
+      let m;
+      const urls = new Set();
+      while ((m = re.exec(htmlStr)) !== null) {
+        const u = m[1];
+        if (u.includes('/media/')) urls.add(u);
+      }
+      const toAbs = (u) => {
+        if (u.startsWith('http')) return u;
+        if (u.startsWith('/')) return `${window.location.origin}${u}`;
+        return u;
+      };
+      for (const u of urls) {
+        try {
+          const resp = await fetch(toAbs(u), { credentials: 'include' });
+          const blob = await resp.blob();
+          const dataUrl = await new Promise((resolve) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(blob); });
+          map.set(u, dataUrl);
+        } catch {}
+      }
+      if (map.size === 0) return htmlStr;
+      let out = htmlStr;
+      for (const [k, v] of map.entries()) {
+        out = out.split(k).join(v);
+      }
+      return out;
+    };
+    const html = await inlineLocalImages(sanitizedHtml);
     const digest = makeDigest(markdown);
     const baseImages = Array.isArray(selectedText.value.images) ? selectedText.value.images : [];
     const extractedImages = extractLocalImages(markdown);
@@ -1292,9 +1322,11 @@ const confirmPublish = async () => {
 
     await extFuncPublish({
       ...syncData,
-      autoClose: false,
-      autoCloseDelaySec: 0,
-      syncCloseTabs: false
+      autoClose: true,
+      autoCloseDelaySec: 5,
+      syncCloseTabs: true,
+      preferBackground: true,
+      preferNoUI: true
     });
     message.success(`发布请求已发送到扩展（${syncPlatforms.length}个平台），请在新标签页查看扩展自动填充`);
     fetchData();

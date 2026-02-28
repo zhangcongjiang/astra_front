@@ -136,11 +136,33 @@ const loginPatterns = {
   TOUTIAO: [/passport\.toutiao\.com/i, /mp\.toutiao\.com\/(auth|login)/i, /登录/i],
   DOUYIN: [/passport\.douyin\.com/i, /creator\.douyin\.com\/portal/i, /登录/i],
   WEIXIN: [/mp\.weixin\.qq\.com.*(login|cgi-bin\/loginpage)/i, /登录/i],
-  WEIXIN_CHANNEL: [/channels\.weixin\.qq\.com.*login/i, /登录/i],
+  WEIXIN_CHANNEL: [
+    /channels\.weixin\.qq\.com.*(login|signin|auth|sso|qrlogin)/i,
+    /work\.weixin\.(qq\.com|com)/i,
+    /mp\.weixin\.qq\.com\/cgi-bin\/loginpage/i,
+    /\blogin\b/i,
+    /登录/i,
+    /账号登录/i,
+    /微信登录/i,
+    /企业微信/i,
+    /扫码登录/i,
+    /二维码/i
+  ],
   REDNOTE: [/xiaohongshu\.com.*(passport|login)/i, /登录/i],
   BILIBILI: [/passport\.bilibili\.com/i, /登录/i],
   WEIBO: [/passport\.weibo\.com/i, /weibo\.com\/login/i, /登录/i],
-  DEFAULT: [/登录/i, /sign\\s*in/i, /password/i, /扫码登录/i]
+  DEFAULT: [
+    /登录/i,
+    /\bsign\\s*in\b/i,
+    /\blogin\b/i,
+    /\bpassword\b/i,
+    /扫码登录/i,
+    /二维码/i,
+    /\bqr(?:code)?\b/i,
+    /\bsso\b/i,
+    /\bpassport\b/i,
+    /\bauth\b/i
+  ]
 };
 const makeProxyUrl = (url) => {
   try {
