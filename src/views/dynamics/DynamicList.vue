@@ -156,18 +156,23 @@
           <a-input v-model:value="createForm.title" placeholder="请输入标题" />
         </a-form-item>
         <a-form-item label="正文">
-          <a-textarea v-model:value="createForm.content" :rows="6" placeholder="请输入正文内容（支持 Markdown）" />
+          <div @paste="handlePaste">
+            <a-textarea v-model:value="createForm.content" :rows="6" placeholder="请输入正文内容（支持 Markdown，可直接粘贴图片）" />
+          </div>
         </a-form-item>
-        <a-form-item label="图片（仅支持本地选择）">
+        <a-form-item label="图片（支持本地选择或 Ctrl+V 粘贴）">
           <a-upload :beforeUpload="() => false" :showUploadList="false" multiple accept="image/png,image/jpeg,image/jpg,image/gif" @change="handleCreateFileChange">
             <a-button type="dashed">选择本地图片</a-button>
           </a-upload>
           <div class="upload-preview" v-if="createImages.length > 0" style="margin-top: 12px;">
-            <a-carousel dots autoplay>
-              <div v-for="(img, idx) in createImages" :key="idx" class="carousel-item">
-                <img :src="img.previewUrl || img.url" class="cover-image" />
+            <div class="preview-grid">
+              <div v-for="(img, idx) in createImages" :key="idx" class="preview-item">
+                <img :src="img.previewUrl || img.url" class="preview-img" />
+                <div class="remove-btn" @click="removeCreateImage(idx)">
+                  <CloseCircleFilled />
+                </div>
               </div>
-            </a-carousel>
+            </div>
           </div>
         </a-form-item>
       </a-form>
@@ -720,22 +725,22 @@ const openCreateModal = () => { createModalVisible.value = true; };
 const closeCreateModal = () => { createModalVisible.value = false; createImages.value = []; selectedImageKeys.value = new Set(); };
 
 // 处理上传组件文件选择变更（仅本地选择，不立即上传）
-const getFileKey = (file) => `${file.name}_${file.size}_${file.lastModified || 0}`;
+const getFileKey = (file) => `${file.name || 'unknown'}_${file.size}_${file.lastModified || 0}`;
 const selectedImageKeys = ref(new Set());
 const handleCreateFileChange = async (info) => {
   const incoming = (info?.fileList || [])
     .map(f => f.originFileObj)
-    .filter(Boolean)
-    .filter(f => beforeCreateUpload(f));
+    .filter(Boolean);
 
   // 仅添加新增文件，避免因多次触发 change 导致重复追加
   const newFiles = [];
   for (const f of incoming) {
     const key = getFileKey(f);
-    if (!selectedImageKeys.value.has(key)) {
-      selectedImageKeys.value.add(key);
-      newFiles.push(f);
-    }
+    if (selectedImageKeys.value.has(key)) continue;
+    if (!beforeCreateUpload(f)) continue;
+
+    selectedImageKeys.value.add(key);
+    newFiles.push(f);
   }
   if (newFiles.length === 0) return;
   uploadCreateImages(newFiles);
@@ -754,16 +759,60 @@ const uploadCreateImages = async (files) => {
   try {
     const images = files.map((file) => ({
       file,
-      name: file.name,
+      name: file.name || `paste_image_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.png`,
       previewUrl: URL.createObjectURL(file),
     }));
     createImages.value.push(...images);
-    message.success(`已选择 ${images.length} 张图片`);
+    message.success(`已添加 ${images.length} 张图片`);
   } catch (error) {
     console.error('处理本地图片失败:', error);
     message.error(`处理本地图片失败: ${error.message || '未知错误'}`);
   }
 };
+
+// 粘贴事件处理
+const handlePaste = (event) => {
+  const items = event.clipboardData && event.clipboardData.items;
+  if (!items) return;
+
+  const files = [];
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') !== -1) {
+      const file = items[i].getAsFile();
+      if (file && beforeCreateUpload(file)) {
+        files.push(file);
+      }
+    }
+  }
+
+  if (files.length > 0) {
+    event.preventDefault(); // 阻止默认粘贴行为（避免在文本框中出现文件名等）
+    // 仅添加去重后的新文件
+    const newFiles = [];
+    for (const f of files) {
+      const key = getFileKey(f);
+      if (selectedImageKeys.value.has(key)) continue;
+      
+      selectedImageKeys.value.add(key);
+      newFiles.push(f);
+    }
+    if (newFiles.length > 0) {
+      uploadCreateImages(newFiles);
+    } else {
+      message.info('粘贴的图片已存在');
+    }
+  }
+};
+
+const removeCreateImage = (index) => {
+  const img = createImages.value[index];
+  if (img && img.file) {
+    const key = getFileKey(img.file);
+    selectedImageKeys.value.delete(key);
+  }
+  createImages.value.splice(index, 1);
+};
+
 const submitCreate = async () => {
   if (!createForm.title?.trim()) { message.warning('请填写标题'); return; }
   const contentText = (createForm.content || '').trim();
@@ -1122,6 +1171,49 @@ const cancelPublish = () => { publishModalVisible.value = false; selectedPublish
 .platform-grid .platform-item.active { border-color:#1890ff; background:#f0f7ff; }
 .platform-grid .platform-icon img { width:16px; height:16px; border-radius:4px; object-fit: contain; }
 .platform-grid .platform-name { font-size:12px; color:#333; text-align:center; margin-top:4px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 弹窗图片预览 */
+.preview-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.preview-item {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #eee;
+}
+
+.preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-item .remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  color: #ff4d4f;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.preview-item:hover .remove-btn {
+  opacity: 1;
+}
+
 .publish-platforms .platform img { width:20px; height:20px; border-radius:4px; object-fit: contain; }
 .publish-platforms .platform span { font-size:12px; color:#333; text-align:center; margin-top:4px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
 .publish-actions { margin-top: 16px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
